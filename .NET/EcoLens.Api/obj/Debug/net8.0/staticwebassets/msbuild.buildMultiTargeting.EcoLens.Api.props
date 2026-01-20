@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\EcoLens.Api.props" />
+</Project>
