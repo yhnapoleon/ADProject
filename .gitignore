@@ -1,0 +1,60 @@
+# OS-specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IDE / Editors
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+out/
+artifacts/
+
+# Logs & test results
+logs/
+*.log
+TestResults/
+TestResult*/
+*.coverage
+*.coveragexml
+*.trx
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+*.nuget.props
+*.nuget.targets
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# MSBuild cache/temp
+*.cache
+*.tmp
+
+# Publish profiles
+*.publishsettings
+*.pubxml
+*.pubxml.user
+
+# Rider backend
+.idea/
+
+# Optional local appsettings overrides (keep main appsettings.json tracked)
+appsettings.*.local.json
+appsettings.Development.Local.json
+
+

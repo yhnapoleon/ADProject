@@ -1,0 +1,184 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using EcoLens.Api.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace EcoLens.Api.Data;
+
+public class ApplicationDbContext : DbContext
+{
+	public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+	{
+	}
+
+	public DbSet<ApplicationUser> ApplicationUsers => Set<ApplicationUser>();
+	public DbSet<CarbonReference> CarbonReferences => Set<CarbonReference>();
+	public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
+	public DbSet<AiInsight> AiInsights => Set<AiInsight>();
+	public DbSet<StepRecord> StepRecords => Set<StepRecord>();
+	public DbSet<Post> Posts => Set<Post>();
+	public DbSet<Comment> Comments => Set<Comment>();
+	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+	public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
+
+	public override int SaveChanges()
+	{
+		ApplyTimestamps();
+		return base.SaveChanges();
+	}
+
+	public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+	{
+		ApplyTimestamps();
+		return base.SaveChangesAsync(cancellationToken);
+	}
+
+	private void ApplyTimestamps()
+	{
+		var utcNow = DateTime.UtcNow;
+		foreach (var entry in ChangeTracker.Entries().Where(e => e.Entity is BaseEntity))
+		{
+			if (entry.State == EntityState.Added)
+			{
+				((BaseEntity)entry.Entity).CreatedAt = utcNow;
+				((BaseEntity)entry.Entity).UpdatedAt = utcNow;
+			}
+			else if (entry.State == EntityState.Modified)
+			{
+				((BaseEntity)entry.Entity).UpdatedAt = utcNow;
+			}
+		}
+	}
+
+	protected override void OnModelCreating(ModelBuilder modelBuilder)
+	{
+		base.OnModelCreating(modelBuilder);
+
+		// ApplicationUser relations
+		modelBuilder.Entity<ApplicationUser>()
+			.HasMany(u => u.ActivityLogs)
+			.WithOne(a => a.User!)
+			.HasForeignKey(a => a.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<ApplicationUser>()
+			.HasMany(u => u.AiInsights)
+			.WithOne(i => i.User!)
+			.HasForeignKey(i => i.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<ApplicationUser>()
+			.HasMany(u => u.StepRecords)
+			.WithOne(s => s.User!)
+			.HasForeignKey(s => s.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		// ActivityLog -> CarbonReference
+		modelBuilder.Entity<ActivityLog>()
+			.HasOne(a => a.CarbonReference!)
+			.WithMany()
+			.HasForeignKey(a => a.CarbonReferenceId)
+			.OnDelete(DeleteBehavior.Restrict);
+
+		// Decimal precisions (mirror annotations, explicit for safety)
+		modelBuilder.Entity<ApplicationUser>()
+			.Property(p => p.TotalCarbonSaved)
+			.HasColumnType("decimal(18,2)");
+
+		modelBuilder.Entity<ApplicationUser>()
+			.Property(p => p.IsActive)
+			.HasDefaultValue(true);
+
+		modelBuilder.Entity<CarbonReference>()
+			.Property(p => p.Co2Factor)
+			.HasColumnType("decimal(18,4)");
+
+		modelBuilder.Entity<ActivityLog>()
+			.Property(p => p.Quantity)
+			.HasColumnType("decimal(18,4)");
+
+		modelBuilder.Entity<ActivityLog>()
+			.Property(p => p.TotalEmission)
+			.HasColumnType("decimal(18,4)");
+
+		modelBuilder.Entity<StepRecord>()
+			.Property(p => p.CarbonOffset)
+			.HasColumnType("decimal(18,4)");
+
+		// CarbonReference unique constraint for (LabelName, Category, Region)
+		modelBuilder.Entity<CarbonReference>()
+			.HasIndex(c => new { c.LabelName, c.Category, c.Region })
+			.IsUnique();
+
+		// Community relations
+		modelBuilder.Entity<Post>()
+			.HasOne(p => p.User!)
+			.WithMany()
+			.HasForeignKey(p => p.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<Post>()
+			.HasMany(p => p.Comments)
+			.WithOne(c => c.Post!)
+			.HasForeignKey(c => c.PostId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<Comment>()
+			.HasOne(c => c.User!)
+			.WithMany()
+			.HasForeignKey(c => c.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		// Social follow relations
+		modelBuilder.Entity<UserFollow>()
+			.HasOne(f => f.Follower!)
+			.WithMany()
+			.HasForeignKey(f => f.FollowerId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<UserFollow>()
+			.HasOne(f => f.Followee!)
+			.WithMany()
+			.HasForeignKey(f => f.FolloweeId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<UserFollow>()
+			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
+			.IsUnique();
+
+		// BarcodeReference unique constraint for Barcode
+		modelBuilder.Entity<BarcodeReference>()
+			.HasIndex(b => b.Barcode)
+			.IsUnique();
+
+		// Seed data for CarbonReferences
+		modelBuilder.Entity<CarbonReference>().HasData(
+			new CarbonReference
+			{
+				Id = 1,
+				LabelName = "Beef",
+				Category = Models.Enums.CarbonCategory.Food,
+				Co2Factor = 27.0m,
+				Unit = "kgCO2"
+			},
+			new CarbonReference
+			{
+				Id = 2,
+				LabelName = "Subway",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.03m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 3,
+				LabelName = "Electricity",
+				Category = Models.Enums.CarbonCategory.Utility,
+				Co2Factor = 0.5m,
+				Unit = "kgCO2/kWh"
+			}
+		);
+	}
+}
