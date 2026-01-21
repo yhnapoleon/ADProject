@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\DELL\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj": {}
+    "C:\\Users\\13736\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj": {}
   },
   "projects": {
-    "C:\\Users\\DELL\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj": {
+    "C:\\Users\\13736\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\DELL\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj",
+        "projectUniqueName": "C:\\Users\\13736\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj",
         "projectName": "EcoLens.Api",
-        "projectPath": "C:\\Users\\DELL\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj",
-        "packagesPath": "C:\\Users\\DELL\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\DELL\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\obj\\",
+        "projectPath": "C:\\Users\\13736\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\EcoLens.Api.csproj",
+        "packagesPath": "C:\\Users\\13736\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\13736\\Desktop\\AD\\ADProject\\.NET\\EcoLens.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\DELL\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\13736\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -45,7 +45,7 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.100"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net8.0": {
@@ -89,7 +89,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.101/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.301/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

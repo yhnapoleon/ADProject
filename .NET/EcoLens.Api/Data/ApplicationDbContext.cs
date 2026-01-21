@@ -86,6 +86,10 @@ public class ApplicationDbContext : DbContext
 			.Property(p => p.TotalCarbonSaved)
 			.HasColumnType("decimal(18,2)");
 
+		modelBuilder.Entity<ApplicationUser>()
+			.Property(p => p.IsActive)
+			.HasDefaultValue(true);
+
 		modelBuilder.Entity<CarbonReference>()
 			.Property(p => p.Co2Factor)
 			.HasColumnType("decimal(18,4)");
@@ -101,6 +105,11 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<StepRecord>()
 			.Property(p => p.CarbonOffset)
 			.HasColumnType("decimal(18,4)");
+
+		// CarbonReference unique constraint for (LabelName, Category, Region)
+		modelBuilder.Entity<CarbonReference>()
+			.HasIndex(c => new { c.LabelName, c.Category, c.Region })
+			.IsUnique();
 
 		// Community relations
 		modelBuilder.Entity<Post>()

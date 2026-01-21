@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
+using EcoLens.Api.Models.Enums;
 
 namespace EcoLens.Api.DTOs.Activity;
 
@@ -15,5 +16,8 @@ public class CreateActivityLogDto
 
 	[Required]
 	public decimal Quantity { get; set; }
+
+	// 可选：当为 Utility 时，服务端将按用户 Region 优先匹配
+	public CarbonCategory? Category { get; set; }
 }
 

@@ -21,5 +21,9 @@ public class CarbonReference : BaseEntity
 	[Required]
 	[MaxLength(50)]
 	public string Unit { get; set; } = string.Empty;
+
+	// 可选：用于 Utility 等按地区区分的因子
+	[MaxLength(100)]
+	public string? Region { get; set; }
 }
 

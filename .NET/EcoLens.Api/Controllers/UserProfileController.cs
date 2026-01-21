@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using EcoLens.Api.Data;
 using EcoLens.Api.Models.Enums;
+using EcoLens.Api.DTOs.User;
+using EcoLens.Api.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,13 +38,6 @@ public class UserProfileController : ControllerBase
 		public int CurrentPoints { get; set; }
 		public int Rank { get; set; }
 		public UserRole Role { get; set; }
-	}
-
-	public class UpdateUserProfileDto
-	{
-		public string? AvatarUrl { get; set; }
-		public string? Username { get; set; }
-		public string? Region { get; set; }
 	}
 
 	/// <summary>
@@ -88,14 +83,14 @@ public class UserProfileController : ControllerBase
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (user is null) return NotFound();
 
-		// Username 唯一性检查（当修改时）
-		if (!string.IsNullOrWhiteSpace(dto.Username) && !dto.Username.Equals(user.Username, StringComparison.Ordinal))
+		// Nickname -> Username，唯一性检查（当修改时）
+		if (!string.IsNullOrWhiteSpace(dto.Nickname) && !dto.Nickname.Equals(user.Username, StringComparison.Ordinal))
 		{
 			var exists = await _db.ApplicationUsers
-				.AnyAsync(u => u.Username == dto.Username && u.Id != user.Id, ct);
+				.AnyAsync(u => u.Username == dto.Nickname && u.Id != user.Id, ct);
 			if (exists) return Conflict("Username already in use.");
 
-			user.Username = dto.Username;
+			user.Username = dto.Nickname;
 		}
 
 		if (dto.AvatarUrl is not null)
@@ -127,6 +122,35 @@ public class UserProfileController : ControllerBase
 		};
 
 		return Ok(result);
+	}
+
+	/// <summary>
+	/// 修改密码：验证旧密码后更新为新密码。
+	/// </summary>
+	[HttpPost("change-password")]
+	public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto dto, CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		if (string.IsNullOrWhiteSpace(dto.OldPassword) || string.IsNullOrWhiteSpace(dto.NewPassword))
+		{
+			return BadRequest("OldPassword and NewPassword are required.");
+		}
+
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+		if (user is null) return NotFound();
+
+		var oldHash = PasswordHasher.Hash(dto.OldPassword);
+		if (!string.Equals(oldHash, user.PasswordHash, StringComparison.OrdinalIgnoreCase))
+		{
+			return Unauthorized("Old password is incorrect.");
+		}
+
+		user.PasswordHash = PasswordHasher.Hash(dto.NewPassword);
+		await _db.SaveChangesAsync(ct);
+
+		return Ok();
 	}
 }
 

@@ -86,6 +86,11 @@ public class AuthController : ControllerBase
 			return Unauthorized("Invalid credentials.");
 		}
 
+		if (!user.IsActive)
+		{
+			return Unauthorized("User is banned.");
+		}
+
 		var hash = PasswordHasher.Hash(dto.Password);
 		if (!string.Equals(hash, user.PasswordHash, StringComparison.OrdinalIgnoreCase))
 		{
