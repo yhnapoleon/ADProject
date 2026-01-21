@@ -18,6 +18,9 @@ public class ApplicationDbContext : DbContext
 	public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 	public DbSet<AiInsight> AiInsights => Set<AiInsight>();
 	public DbSet<StepRecord> StepRecords => Set<StepRecord>();
+	public DbSet<Post> Posts => Set<Post>();
+	public DbSet<Comment> Comments => Set<Comment>();
+	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
 
 	public override int SaveChanges()
 	{
@@ -98,6 +101,70 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<StepRecord>()
 			.Property(p => p.CarbonOffset)
 			.HasColumnType("decimal(18,4)");
+
+		// Community relations
+		modelBuilder.Entity<Post>()
+			.HasOne(p => p.User!)
+			.WithMany()
+			.HasForeignKey(p => p.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<Post>()
+			.HasMany(p => p.Comments)
+			.WithOne(c => c.Post!)
+			.HasForeignKey(c => c.PostId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<Comment>()
+			.HasOne(c => c.User!)
+			.WithMany()
+			.HasForeignKey(c => c.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		// Social follow relations
+		modelBuilder.Entity<UserFollow>()
+			.HasOne(f => f.Follower!)
+			.WithMany()
+			.HasForeignKey(f => f.FollowerId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<UserFollow>()
+			.HasOne(f => f.Followee!)
+			.WithMany()
+			.HasForeignKey(f => f.FolloweeId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		modelBuilder.Entity<UserFollow>()
+			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
+			.IsUnique();
+
+		// Seed data for CarbonReferences
+		modelBuilder.Entity<CarbonReference>().HasData(
+			new CarbonReference
+			{
+				Id = 1,
+				LabelName = "Beef",
+				Category = Models.Enums.CarbonCategory.Food,
+				Co2Factor = 27.0m,
+				Unit = "kgCO2"
+			},
+			new CarbonReference
+			{
+				Id = 2,
+				LabelName = "Subway",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.03m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 3,
+				LabelName = "Electricity",
+				Category = Models.Enums.CarbonCategory.Utility,
+				Co2Factor = 0.5m,
+				Unit = "kgCO2/kWh"
+			}
+		);
 	}
 }
 

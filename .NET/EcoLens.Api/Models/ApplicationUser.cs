@@ -31,6 +31,9 @@ public class ApplicationUser : BaseEntity
 
 	public int CurrentPoints { get; set; }
 
+	[MaxLength(100)]
+	public string? Region { get; set; }
+
 	public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
 	public ICollection<AiInsight> AiInsights { get; set; } = new List<AiInsight>();
 	public ICollection<StepRecord> StepRecords { get; set; } = new List<StepRecord>();
