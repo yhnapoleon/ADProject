@@ -1,5 +1,7 @@
 using System.Text;
 using EcoLens.Api.Data;
+using EcoLens.Api.DTOs;
+using EcoLens.Api.Services;
 using EcoLens.Api.Services;
 using EcoLens.Api.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,6 +36,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // JWT Options binding
 builder.Services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+// AI Options binding
+builder.Services.Configure<AiSettings>(configuration.GetSection("AiSettings"));
 
 // JWT Authentication
 builder.Services
@@ -96,6 +100,7 @@ builder.Services.AddSwaggerGen(c =>
 
 // DI registrations
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddHttpClient<IAiService, GeminiService>();
 
 var app = builder.Build();
 
