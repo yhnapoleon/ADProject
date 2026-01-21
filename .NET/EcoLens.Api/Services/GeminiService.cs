@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using EcoLens.Api.DTOs;
+using EcoLens.Api.Services;
 using Microsoft.Extensions.Options;
 
 namespace EcoLens.Api.Services;

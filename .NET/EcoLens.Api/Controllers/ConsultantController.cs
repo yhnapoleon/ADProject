@@ -1,8 +1,8 @@
 using System.Threading;
 using System.Threading.Tasks;
-using EcoLens.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using EcoLens.Api.Services;
 
 namespace EcoLens.Api.Controllers;
 

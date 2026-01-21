@@ -2,7 +2,6 @@ using System.Text;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs;
 using EcoLens.Api.Services;
-using EcoLens.Api.Services;
 using EcoLens.Api.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;

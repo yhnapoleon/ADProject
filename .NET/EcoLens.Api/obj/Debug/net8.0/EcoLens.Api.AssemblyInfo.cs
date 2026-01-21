@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EcoLens.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ca54670964629a9ae50189ae5b2845822bcc2a57")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c84744f7566f8fcc9ec85c81110ecf3edae6dc70")]
 [assembly: System.Reflection.AssemblyProductAttribute("EcoLens.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EcoLens.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
