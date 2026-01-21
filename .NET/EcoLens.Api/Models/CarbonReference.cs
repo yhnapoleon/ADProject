@@ -25,5 +25,9 @@ public class CarbonReference : BaseEntity
 	// 可选：用于 Utility 等按地区区分的因子
 	[MaxLength(100)]
 	public string? Region { get; set; }
+
+	// PB-005: 条形码（可选，用于扫码查询）
+	[MaxLength(64)]
+	public string? Barcode { get; set; }
 }
 

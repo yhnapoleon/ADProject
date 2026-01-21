@@ -143,6 +143,20 @@ public class AdminController : ControllerBase
 
 		return Ok();
 	}
+
+	/// <summary>
+	/// 删除帖子（软删除 IsDeleted=true）。
+	/// </summary>
+	[HttpDelete("posts/{id:int}")]
+	public async Task<IActionResult> DeletePost([FromRoute] int id, CancellationToken ct)
+	{
+		var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id, ct);
+		if (post is null) return NotFound();
+
+		post.IsDeleted = true;
+		await _db.SaveChangesAsync(ct);
+		return NoContent();
+	}
 }
 
 

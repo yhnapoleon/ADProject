@@ -111,6 +111,9 @@ app.UseCors(AllowAllCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
+// 静态文件（用于访问 wwwroot/uploads）
+app.UseStaticFiles();
+
 app.MapControllers();
 
 app.Run();

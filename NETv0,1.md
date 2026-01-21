@@ -32,11 +32,20 @@
 | AiChat | `/api/ai/chat` | POST | 登录 | Mock/示例 | 关键词触发示例回复（预留对接大模型 TODO）。 |
 | Insight | `/api/Insight/weekly-report` | GET | 登录 | Mock/示例 | 基于近 7 天日志返回示例洞见（预留外部服务 TODO）。 |
 | Vision | `/api/Vision/analyze` | POST | 登录 | Mock/示例 | 读取上传图片文件名简单识别（预留 Python 微服务对接 TODO）。 |
+| Product | `/api/product/{barcode}` | GET | 登录 | 已实现 | 通过条形码在 `CarbonReferences` 中查询商品/因子，返回名称、因子与单位（PB-005）。 |
+| Trip | `/api/trip/calculate` | POST | 登录 | Mock/示例 | 随机 1-50km 距离，根据 `TransportMode` 估算排放（注释注明应调用 Google Maps Routes API）（PB-005）。 |
+| Media | `/api/media/upload` | POST | 登录 | 已实现 | 上传图片至 `wwwroot/uploads/{yyyyMMdd}/{guid}.ext`，返回相对 URL（PB-008/PB-013）。 |
+| Admin | `/api/admin/posts/{id}` | DELETE | Admin | 已实现 | 软删除帖子（设置 `IsDeleted=true`）（PB-008）。 |
+| Utility | `/api/Utility/ocr` | POST | 登录 | Mock/示例 | 模拟返回 `{ electricityUsage, waterUsage, gasUsage }`（注释注明应接入 Azure Form Recognizer/Google ML Kit）（PB-013）。 |
 
 ### 基础设施与实体（非 API）
 - 用户实体：新增 `IsActive`（默认 true）、`Region` 字段；被封禁用户无法登录。
 - 碳因子实体：新增可选 `Region` 字段；在 DbContext 上为 `(LabelName, Category, Region)` 建立唯一索引。
 - 步数实体：`StepRecord` 支持每日一条的更新/新增与减排换算。
+- PB-005：在 `CarbonReference` 新增可选 `Barcode` 字段并建立索引；新增 `ProductController` 与 `TripController`（Mock）。
+- PB-008：在 `Post` 实体新增 `IsDeleted` 并在 `DbContext` 添加全局过滤；在 `AdminController` 增加软删除帖子接口。
+- PB-008/PB-013：新增 `MediaController` 支持图片上传；`Program.cs` 启用 `UseStaticFiles()` 用于访问 `/uploads/...`。
+- PB-013：新增 `UtilityController` 的 OCR Mock 接口，预留对接 Azure Form Recognizer/Google ML Kit。
 
 ### 备注
 - Admin 严格权限控制在 `AdminController` 中通过 `[Authorize(Roles = "Admin")]` 实现；`CarbonFactorController` 的 `/api/admin/factor` 目前仅 `[Authorize]`，如需收敛为 AdminOnly 可按需调整。 +

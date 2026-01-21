@@ -111,6 +111,10 @@ public class ApplicationDbContext : DbContext
 			.HasIndex(c => new { c.LabelName, c.Category, c.Region })
 			.IsUnique();
 
+		// PB-005: 为条形码建立索引（可为空，非唯一）
+		modelBuilder.Entity<CarbonReference>()
+			.HasIndex(c => c.Barcode);
+
 		// Community relations
 		modelBuilder.Entity<Post>()
 			.HasOne(p => p.User!)
@@ -123,6 +127,10 @@ public class ApplicationDbContext : DbContext
 			.WithOne(c => c.Post!)
 			.HasForeignKey(c => c.PostId)
 			.OnDelete(DeleteBehavior.Cascade);
+
+		// PB-008: 全局过滤软删除帖子
+		modelBuilder.Entity<Post>()
+			.HasQueryFilter(p => !p.IsDeleted);
 
 		modelBuilder.Entity<Comment>()
 			.HasOne(c => c.User!)
