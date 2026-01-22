@@ -62,3 +62,4 @@ appsettings.Development.Local.json
 .NET/EcoLens.Api/bin/
 .NET/EcoLens.Api/obj/
 
+node_modules
