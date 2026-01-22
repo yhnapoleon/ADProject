@@ -31,7 +31,7 @@
 | Leaderboard | `/api/Leaderboard/friends` | GET | 登录 | 已实现 | 我关注的人排行榜（按 `TotalCarbonSaved` 排序）。 |
 | AiChat | `/api/ai/chat` | POST | 登录 | 已实现 | 调用 OpenAI 兼容接口（BaseUrl）转发至 Gemini 模型返回回复。 |
 | Insight | `/api/Insight/weekly-report` | GET | 登录 | Mock/示例 | 基于近 7 天日志返回示例洞见（预留外部服务 TODO）。 |
-| Vision | `/api/Vision/analyze` | POST | 登录 | Mock/示例 | 读取上传图片文件名简单识别（预留 Python 微服务对接 TODO）。 |
+| Vision | `/api/Vision/analyze` | POST | 登录 | 已实现 | 转发图片到 Python FastAPI `VisionService` 的 `/predict/image`，返回 `label/confidence/source_model`（需先启动 `VisionService`）。 |
 | Product | `/api/product/{barcode}` | GET | 登录 | 已实现 | 通过条形码在 `CarbonReferences` 中查询商品/因子，返回名称、因子与单位（PB-005）。 |
 | Trip | `/api/trip/calculate` | POST | 登录 | Mock/示例 | 随机 1-50km 距离，根据 `TransportMode` 估算排放（注释注明应调用 Google Maps Routes API）（PB-005）。 |
 | Media | `/api/media/upload` | POST | 登录 | 已实现 | 上传图片至 `wwwroot/uploads/{yyyyMMdd}/{guid}.ext`，返回相对 URL（PB-008/PB-013）。 |
