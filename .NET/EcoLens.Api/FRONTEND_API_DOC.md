@@ -15,6 +15,75 @@ Authorization: Bearer {your_jwt_token}
 
 ---
 
+## 📦 文档获取方式
+
+### 从 GitHub 分支下载
+
+本文档和相关文件可以从 GitHub 分支直接下载：
+
+**GitHub 仓库地址：** `https://github.com/yhnapoleon/ADProject`  
+**分支名称：** `dev/hu-xt`
+
+**下载方式：**
+
+1. **直接访问文件（推荐）**
+   - 主要文档：https://github.com/yhnapoleon/ADProject/blob/dev/hu-xt/.NET/EcoLens.Api/FRONTEND_API_DOC.md
+   - 请求示例文件：https://github.com/yhnapoleon/ADProject/blob/dev/hu-xt/.NET/EcoLens.Api/EcoLens.Api.http
+   - 在 GitHub 网页上点击 "Raw" 按钮即可查看原始内容，或直接复制
+
+2. **克隆整个分支**
+   ```bash
+   git clone -b dev/hu-xt https://github.com/yhnapoleon/ADProject.git
+   ```
+
+3. **只下载特定文件**
+   - 在 GitHub 网页上找到文件
+   - 点击文件 → 点击 "Raw" → 另存为
+
+---
+
+## 🔑 API Key 说明
+
+### 后端 API Key（不需要）
+
+**前端不需要后端的 Google Maps API Key。**
+
+**原因：**
+- ✅ 所有 Google Maps API 调用（地理编码、路线计算等）都在后端完成
+- ✅ 前端只需要调用后端 API（`http://localhost:5133/api/travel`）
+- ✅ 后端已经处理了所有 Google Maps 相关功能
+- ✅ API Key 保存在后端服务器，前端无法访问
+
+**前端只需要：**
+- 调用后端 API 接口
+- 使用后端返回的数据（坐标、路线、距离等）
+
+### 前端地图显示 Key（可能需要）
+
+**如果前端需要在页面上显示地图，可能需要自己的 Google Maps JavaScript API Key。**
+
+**情况说明：**
+
+| 情况 | 是否需要 Key | 说明 |
+|------|-------------|------|
+| 使用 Google Maps JavaScript API 显示地图 | ✅ 需要 | 需要申请 Google Maps JavaScript API Key（仅用于前端地图显示） |
+| 使用 Leaflet.js 等开源地图库 | ❌ 不需要 | 开源库不需要 API Key |
+| 只显示文字信息，不显示地图 | ❌ 不需要 | 不需要任何 API Key |
+
+**如何申请前端地图 Key（如果需要）：**
+1. 访问 [Google Cloud Console](https://console.cloud.google.com/)
+2. 创建项目或选择现有项目
+3. 启用 "Maps JavaScript API"
+4. 创建 API Key
+5. 配置 API Key 限制（建议限制为特定域名，更安全）
+
+**注意：**
+- 前端地图 Key 和后端 API Key 是**分开的**，互不影响
+- 前端地图 Key 只用于加载 Google Maps JavaScript 库
+- 后端 API Key 用于后端调用 Google Maps API（地理编码、路线计算等）
+
+---
+
 ## 🚀 API 接口列表
 
 ### 1. 预览路线和碳排放（可选功能）
@@ -260,7 +329,11 @@ Authorization: Bearer {your_jwt_token}
 
 后端返回的 `routePolyline` 是 Google Maps 编码的路线字符串，前端可以使用以下方式绘制：
 
+**⚠️ 注意：** 如果使用 Google Maps JavaScript API，需要前端自己的 Google Maps JavaScript API Key（见上方"API Key 说明"）。
+
 #### 方案 1：使用 Google Maps JavaScript API
+
+**需要：** 前端自己的 Google Maps JavaScript API Key
 
 ```javascript
 // 解码 polyline
@@ -279,6 +352,8 @@ routePath.setMap(map);
 ```
 
 #### 方案 2：使用 Leaflet.js（开源，免费）
+
+**优点：** 不需要 API Key，完全免费
 
 ```javascript
 // 需要安装 @mapbox/polyline 库
@@ -457,4 +532,5 @@ fetch('http://localhost:5133/api/travel', {
 
 ## 📅 更新日志
 
+- 2026-01-22: 添加文档获取方式和 API Key 说明
 - 2024-XX-XX: 初始版本
