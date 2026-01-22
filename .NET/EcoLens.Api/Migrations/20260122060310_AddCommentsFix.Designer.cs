@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EcoLens.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260121125858_AddClimatiqFieldsToCarbonReference")]
-    partial class AddClimatiqFieldsToCarbonReference
+    [Migration("20260122060310_AddCommentsFix")]
+    partial class AddCommentsFix
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -159,6 +159,51 @@ namespace EcoLens.Api.Migrations
                     b.ToTable("ApplicationUsers");
                 });
 
+            modelBuilder.Entity("EcoLens.Api.Models.BarcodeReference", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("CarbonReferenceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Barcode")
+                        .IsUnique();
+
+                    b.HasIndex("CarbonReferenceId");
+
+                    b.ToTable("BarcodeReferences");
+                });
+
             modelBuilder.Entity("EcoLens.Api.Models.CarbonReference", b =>
                 {
                     b.Property<int>("Id")
@@ -216,33 +261,33 @@ namespace EcoLens.Api.Migrations
                             Id = 1,
                             Category = 0,
                             Co2Factor = 27.0m,
-                            CreatedAt = new DateTime(2026, 1, 21, 12, 58, 57, 539, DateTimeKind.Utc).AddTicks(660),
+                            CreatedAt = new DateTime(2026, 1, 22, 6, 3, 10, 301, DateTimeKind.Utc).AddTicks(3135),
                             LabelName = "Beef",
                             Source = "Local",
                             Unit = "kgCO2",
-                            UpdatedAt = new DateTime(2026, 1, 21, 12, 58, 57, 539, DateTimeKind.Utc).AddTicks(666)
+                            UpdatedAt = new DateTime(2026, 1, 22, 6, 3, 10, 301, DateTimeKind.Utc).AddTicks(3138)
                         },
                         new
                         {
                             Id = 2,
                             Category = 1,
                             Co2Factor = 0.03m,
-                            CreatedAt = new DateTime(2026, 1, 21, 12, 58, 57, 539, DateTimeKind.Utc).AddTicks(674),
+                            CreatedAt = new DateTime(2026, 1, 22, 6, 3, 10, 301, DateTimeKind.Utc).AddTicks(3145),
                             LabelName = "Subway",
                             Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 21, 12, 58, 57, 539, DateTimeKind.Utc).AddTicks(674)
+                            UpdatedAt = new DateTime(2026, 1, 22, 6, 3, 10, 301, DateTimeKind.Utc).AddTicks(3146)
                         },
                         new
                         {
                             Id = 3,
                             Category = 2,
                             Co2Factor = 0.5m,
-                            CreatedAt = new DateTime(2026, 1, 21, 12, 58, 57, 539, DateTimeKind.Utc).AddTicks(676),
+                            CreatedAt = new DateTime(2026, 1, 22, 6, 3, 10, 301, DateTimeKind.Utc).AddTicks(3148),
                             LabelName = "Electricity",
                             Source = "Local",
                             Unit = "kgCO2/kWh",
-                            UpdatedAt = new DateTime(2026, 1, 21, 12, 58, 57, 539, DateTimeKind.Utc).AddTicks(676)
+                            UpdatedAt = new DateTime(2026, 1, 22, 6, 3, 10, 301, DateTimeKind.Utc).AddTicks(3148)
                         });
                 });
 
@@ -415,18 +460,27 @@ namespace EcoLens.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("EcoLens.Api.Models.BarcodeReference", b =>
+                {
+                    b.HasOne("EcoLens.Api.Models.CarbonReference", "CarbonReference")
+                        .WithMany()
+                        .HasForeignKey("CarbonReferenceId");
+
+                    b.Navigation("CarbonReference");
+                });
+
             modelBuilder.Entity("EcoLens.Api.Models.Comment", b =>
                 {
                     b.HasOne("EcoLens.Api.Models.Post", "Post")
                         .WithMany("Comments")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Post");
@@ -461,13 +515,13 @@ namespace EcoLens.Api.Migrations
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "Followee")
                         .WithMany()
                         .HasForeignKey("FolloweeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "Follower")
                         .WithMany()
                         .HasForeignKey("FollowerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Followee");

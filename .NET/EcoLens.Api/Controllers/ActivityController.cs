@@ -78,7 +78,7 @@ public class ActivityController : ControllerBase
 				.FirstOrDefaultAsync(ct) ?? "US"; // 默认使用美国地区
 
 			var climatiqEstimate = await _climatiqService.GetCarbonEmissionEstimateAsync(
-				climatiqActivityId, dto.Quantity, "kg", climatiqRegion);
+				climatiqActivityId, dto.Quantity, dto.Unit, climatiqRegion);
 
 			if (climatiqEstimate is not null)
 			{
@@ -86,9 +86,9 @@ public class ActivityController : ControllerBase
 				carbonRef = new CarbonReference
 				{
 					LabelName = dto.Label,
-					Category = dto.Category,
+					Category = dto.Category, // 直接使用 dto.Category
 					Co2Factor = climatiqEstimate.Co2e / dto.Quantity, // Climatiq 返回总排放，这里计算因子
-					Unit = dto.Unit ?? "kg", // 假设 dto 中包含 Unit，或者根据需要调整
+					Unit = dto.Unit,
 					Region = climatiqRegion,
 					Source = "Climatiq",
 					ClimatiqActivityId = climatiqActivityId

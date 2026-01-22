@@ -20,11 +20,17 @@ namespace EcoLens.Api.Services
         public async Task<OpenFoodFactsProductResponseDto?> GetProductByBarcodeAsync(string barcode, CancellationToken ct = default)
         {
             var response = await _httpClient.GetAsync($"{barcode}?fields=product_name,categories_tags,brands,image_url,ecoscore_data", ct);
-            response.EnsureSuccessStatusCode();
+            
+            // 如果是 404 Not Found，则返回 null 而不是抛出异常
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode(); // 对于其他非成功状态码，仍然抛出异常
 
             var content = await response.Content.ReadAsStringAsync(ct);
             return JsonSerializer.Deserialize<OpenFoodFactsProductResponseDto>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
         }
     }
 }
-

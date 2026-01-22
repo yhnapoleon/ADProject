@@ -123,26 +123,26 @@ public class ApplicationDbContext : DbContext
 			.HasMany(p => p.Comments)
 			.WithOne(c => c.Post!)
 			.HasForeignKey(c => c.PostId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.Restrict); // Changed to Restrict
 
 		modelBuilder.Entity<Comment>()
 			.HasOne(c => c.User!)
 			.WithMany()
 			.HasForeignKey(c => c.UserId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.Restrict); // Changed to Restrict
 
 		// Social follow relations
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Follower!)
 			.WithMany()
 			.HasForeignKey(f => f.FollowerId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.Restrict); // Changed to Restrict
 
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Followee!)
 			.WithMany()
 			.HasForeignKey(f => f.FolloweeId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.Restrict); // Changed to Restrict
 
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
