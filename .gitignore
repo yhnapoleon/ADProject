@@ -58,3 +58,7 @@ appsettings.*.local.json
 appsettings.Development.Local.json
 
 
+# Project-specific .NET outputs
+.NET/EcoLens.Api/bin/
+.NET/EcoLens.Api/obj/
+
