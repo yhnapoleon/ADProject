@@ -1,0 +1,60 @@
+Hainanese Chicken Rice
+Char Kway Teow
+Laksa
+Nasi Lemak
+Satay
+Bak Kut Teh
+Roti Prata
+Chili Crab
+Black Pepper Crab
+Curry Fish Head
+Oyster Omelette
+Wanton Mee
+Hokkien Mee
+Roast Duck Rice
+Beef Rendang
+Nasi Goreng
+Tom Yum Soup
+Pad Thai
+Green Curry
+Mango Sticky Rice
+Dim Sum
+Har Gow
+Siew Mai
+Xiao Long Bao
+Char Siu Bao
+Peking Duck
+Mapo Tofu
+Kung Pao Chicken
+Hot Pot
+Sweet and Sour Pork
+Wonton Soup
+Spring Rolls
+Dumplings
+Fried Rice
+Chow Mein
+Ma Po Tofu
+General Tso's Chicken
+Bubble Tea
+Sushi
+Sashimi
+Ramen
+Tempura
+Udon
+Miso Soup
+Takoyaki
+Okonomiyaki
+Yakitori
+Bibimbap
+Kimchi
+Bulgogi
+Tteokbokki
+Korean Fried Chicken
+Biryani
+Butter Chicken
+Naan
+Tandoori Chicken
+Samosa
+Vietnamese Pho
+Banh Mi
+Summer Rolls

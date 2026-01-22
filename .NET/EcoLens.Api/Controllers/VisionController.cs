@@ -1,3 +1,5 @@
+using EcoLens.Api.DTOs;
+using EcoLens.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,22 +11,46 @@ namespace EcoLens.Api.Controllers;
 [Authorize]
 public class VisionController : ControllerBase
 {
+	private readonly IVisionService _visionService;
+
+	public VisionController(IVisionService visionService)
+	{
+		_visionService = visionService;
+	}
+
 	/// <summary>
-	/// 模拟分析图片并返回识别标签。
-	/// TODO: Call Python Microservice via HttpClient here
+	/// 调用 Python FastAPI 的图像识别服务，返回融合后的预测结果。
 	/// </summary>
 	[HttpPost("analyze")]
-	public async Task<ActionResult<object>> Analyze([FromForm] IFormFile image, CancellationToken ct)
+	[Consumes("multipart/form-data")]
+	public async Task<ActionResult<VisionPredictionResponseDto>> Analyze([FromForm] IFormFile image, CancellationToken ct)
 	{
 		if (image == null || image.Length == 0)
 		{
 			return BadRequest("No image uploaded.");
 		}
 
-		// Mock: filename contains "steak" -> "Steak" else "Apple"
-		var label = image.FileName.Contains("steak", StringComparison.OrdinalIgnoreCase) ? "Steak" : "Apple";
-		await Task.CompletedTask;
-		return Ok(new { label });
+		try
+		{
+			var result = await _visionService.PredictAsync(image, ct);
+			return Ok(result);
+		}
+		catch (ArgumentException ex)
+		{
+			return BadRequest(ex.Message);
+		}
+		catch (InvalidOperationException ex)
+		{
+			return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+		}
+		catch (HttpRequestException ex)
+		{
+			return StatusCode(StatusCodes.Status502BadGateway, $"Vision service error: {ex.Message}");
+		}
+		catch (Exception ex)
+		{
+			return StatusCode(StatusCodes.Status500InternalServerError, $"Unexpected error: {ex.Message}");
+		}
 	}
 }
 
