@@ -21,6 +21,7 @@ public class ApplicationDbContext : DbContext
 	public DbSet<Post> Posts => Set<Post>();
 	public DbSet<Comment> Comments => Set<Comment>();
 	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+	public DbSet<TravelLog> TravelLogs => Set<TravelLog>();
 
 	public override int SaveChanges()
 	{
@@ -74,6 +75,12 @@ public class ApplicationDbContext : DbContext
 			.HasForeignKey(s => s.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
 
+		modelBuilder.Entity<ApplicationUser>()
+			.HasMany<TravelLog>()
+			.WithOne(t => t.User!)
+			.HasForeignKey(t => t.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
 		// ActivityLog -> CarbonReference
 		modelBuilder.Entity<ActivityLog>()
 			.HasOne(a => a.CarbonReference!)
@@ -102,6 +109,31 @@ public class ApplicationDbContext : DbContext
 			.Property(p => p.CarbonOffset)
 			.HasColumnType("decimal(18,4)");
 
+		// TravelLog decimal precisions
+		modelBuilder.Entity<TravelLog>()
+			.Property(p => p.CarbonEmission)
+			.HasColumnType("decimal(18,4)");
+
+		modelBuilder.Entity<TravelLog>()
+			.Property(p => p.DistanceKilometers)
+			.HasColumnType("decimal(10,2)");
+
+		modelBuilder.Entity<TravelLog>()
+			.Property(p => p.OriginLatitude)
+			.HasColumnType("decimal(10,7)");
+
+		modelBuilder.Entity<TravelLog>()
+			.Property(p => p.OriginLongitude)
+			.HasColumnType("decimal(10,7)");
+
+		modelBuilder.Entity<TravelLog>()
+			.Property(p => p.DestinationLatitude)
+			.HasColumnType("decimal(10,7)");
+
+		modelBuilder.Entity<TravelLog>()
+			.Property(p => p.DestinationLongitude)
+			.HasColumnType("decimal(10,7)");
+
 		// Community relations
 		modelBuilder.Entity<Post>()
 			.HasOne(p => p.User!)
@@ -119,20 +151,20 @@ public class ApplicationDbContext : DbContext
 			.HasOne(c => c.User!)
 			.WithMany()
 			.HasForeignKey(c => c.UserId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		// Social follow relations
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Follower!)
 			.WithMany()
 			.HasForeignKey(f => f.FollowerId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Followee!)
 			.WithMany()
 			.HasForeignKey(f => f.FolloweeId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
@@ -163,6 +195,78 @@ public class ApplicationDbContext : DbContext
 				Category = Models.Enums.CarbonCategory.Utility,
 				Co2Factor = 0.5m,
 				Unit = "kgCO2/kWh"
+			},
+			new CarbonReference
+			{
+				Id = 4,
+				LabelName = "Walking",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 5,
+				LabelName = "Bicycle",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 6,
+				LabelName = "ElectricBike",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.02m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 7,
+				LabelName = "Bus",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.05m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 8,
+				LabelName = "Taxi",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.2m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 9,
+				LabelName = "CarGasoline",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.2m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 10,
+				LabelName = "CarElectric",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.05m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 11,
+				LabelName = "Train",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.04m,
+				Unit = "kgCO2/km"
+			},
+			new CarbonReference
+			{
+				Id = 12,
+				LabelName = "Plane",
+				Category = Models.Enums.CarbonCategory.Transport,
+				Co2Factor = 0.25m,
+				Unit = "kgCO2/km"
 			}
 		);
 	}

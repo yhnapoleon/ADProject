@@ -1,0 +1,36 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio
+.vs/
+.vscode/
+*.sln.docstates
+
+# 配置文件（包含敏感信息，不提交到 Git）
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+
+# 用户密钥
+secrets.json
+
+# 数据库
+*.db
+*.mdf
+*.ldf
+
+# 日志
+logs/
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+~$*

@@ -67,10 +67,18 @@ builder.Services.AddSwaggerGen(c =>
 		Description = "Sustainable lifestyle application API"
 	});
 
+	// 读取 XML 注释文件
+	var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+	var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+	if (File.Exists(xmlPath))
+	{
+		c.IncludeXmlComments(xmlPath);
+	}
+
 	// JWT Bearer Security Definition
 	c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
 	{
-		Description = "在下方输入 JWT。示例：Bearer {token}",
+		Description = "Enter JWT below. Example: Bearer {token}",
 		Name = "Authorization",
 		In = ParameterLocation.Header,
 		Type = SecuritySchemeType.Http,
@@ -94,8 +102,21 @@ builder.Services.AddSwaggerGen(c =>
 	});
 });
 
+// Memory Cache
+builder.Services.AddMemoryCache();
+
 // DI registrations
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ITravelService, TravelService>();
+
+// HttpClient for Google Maps API
+builder.Services.AddHttpClient();
+
+// Google Maps Service
+builder.Services.AddScoped<IGoogleMapsService, GoogleMapsService>();
+
+// Caching Services
+builder.Services.AddScoped<EcoLens.Api.Services.Caching.IGeocodingCacheService, EcoLens.Api.Services.Caching.GeocodingCacheService>();
 
 var app = builder.Build();
 
