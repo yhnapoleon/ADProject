@@ -1,0 +1,72 @@
+/* Records Styles */
+.records {
+  width: 100%;
+}
+
+.records :global(.ant-card) {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.records :global(.ant-card-body) {
+  padding: 24px;
+}
+
+.filterSection {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.filterSection :global(.ant-select) {
+  width: 100%;
+}
+
+.filterSection :global(.ant-select-selector) {
+  border-color: #d9d9d9;
+}
+
+.filterSection :global(.ant-select-focused .ant-select-selector) {
+  border-color: #674fa3;
+  box-shadow: 0 0 0 2px rgba(103, 79, 163, 0.1);
+}
+
+.tableSection {
+  margin: 24px 0;
+}
+
+.tableSection :global(.ant-table) {
+  border-radius: 8px;
+}
+
+.tableSection :global(.ant-table-thead > tr > th) {
+  background-color: #f8f8f8;
+  font-weight: 600;
+  color: #333;
+  border-color: #f0f0f0;
+}
+
+.tableSection :global(.ant-table-tbody > tr:hover > td) {
+  background: #fafafa;
+}
+
+.tableSection :global(.ant-tag) {
+  border-radius: 4px;
+}
+
+.summary {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8f5fb;
+  border-radius: 8px;
+  border-left: 4px solid #674fa3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
