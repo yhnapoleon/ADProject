@@ -23,8 +23,9 @@ public class ApplicationDbContext : DbContext
 	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
 	public DbSet<DietTemplate> DietTemplates => Set<DietTemplate>();
 	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
+    public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
 
-	public override int SaveChanges()
+    public override int SaveChanges()
 	{
 		ApplyTimestamps();
 		return base.SaveChanges();
