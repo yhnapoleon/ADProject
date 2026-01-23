@@ -21,6 +21,8 @@ public class ApplicationDbContext : DbContext
 	public DbSet<Post> Posts => Set<Post>();
 	public DbSet<Comment> Comments => Set<Comment>();
 	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+	public DbSet<DietTemplate> DietTemplates => Set<DietTemplate>();
+	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
 
 	public override int SaveChanges()
 	{
@@ -154,6 +156,13 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
 			.IsUnique();
+
+		// DietTemplate relations
+		modelBuilder.Entity<DietTemplate>()
+			.HasMany(t => t.Items)
+			.WithOne(i => i.DietTemplate!)
+			.HasForeignKey(i => i.DietTemplateId)
+			.OnDelete(DeleteBehavior.Cascade);
 
 		// Seed data for CarbonReferences
 		modelBuilder.Entity<CarbonReference>().HasData(

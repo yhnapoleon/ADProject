@@ -109,6 +109,8 @@ builder.Services.AddHttpClient<IVisionService, PythonVisionService>(client =>
 	client.BaseAddress = new Uri(visionBaseUrl.TrimEnd('/') + "/");
 });
 
+// Diet Template services
+builder.Services.AddScoped<IDietTemplateService, DietTemplateService>();
 var app = builder.Build();
 
 // Middleware pipeline
