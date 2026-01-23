@@ -1,0 +1,50 @@
+/* EditProfile Styles */
+.editProfile {
+  width: 100%;
+  min-height: calc(100vh - 200px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.formCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-top: 24px;
+}
+
+.formCard :global(.ant-card-body) {
+  padding: 32px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #666;
+}
+
+.formCard :global(.ant-form-item-label > label) {
+  font-weight: 600;
+  color: #333;
+}
+
+.formCard :global(.ant-input),
+.formCard :global(.ant-input-number),
+.formCard :global(.ant-picker) {
+  border-color: #d9d9d9;
+}
+
+.formCard :global(.ant-input:focus),
+.formCard :global(.ant-input-number:focus),
+.formCard :global(.ant-picker:focus),
+.formCard :global(.ant-input-focused),
+.formCard :global(.ant-picker-focused) {
+  border-color: #674fa3;
+  box-shadow: 0 0 0 2px rgba(103, 79, 163, 0.1);
+}

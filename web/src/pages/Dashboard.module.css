@@ -1,0 +1,102 @@
+/* Dashboard Styles */
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.emissionCard {
+  background: linear-gradient(135deg, #674fa3 0%, #7d5fb8 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(103, 79, 163, 0.15);
+}
+
+.emissionCard :global(.ant-card-body) {
+  padding: 32px;
+}
+
+.emissionSection {
+  margin-bottom: 12px;
+}
+
+.label {
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 8px;
+}
+
+.largeNumber {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.smallText {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 8px;
+}
+
+.emissionCircle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  margin: 0 auto;
+}
+
+.circleValue {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.circleLabel {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.categoryCard {
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.categoryCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.categoryTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.categoryList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  text-align: left;
+  display: inline-block;
+}
+
+.categoryList li {
+  margin-bottom: 6px;
+}
+
+.categoryList li::before {
+  content: '• ';
+  color: #674fa3;
+  font-weight: bold;
+  margin-right: 6px;
+}

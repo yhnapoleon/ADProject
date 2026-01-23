@@ -28,6 +28,9 @@ public class Post : BaseEntity
 
 	public int ViewCount { get; set; }
 
+	// PB-008: 软删除标记
+	public bool IsDeleted { get; set; } = false;
+
 	public ApplicationUser? User { get; set; }
 	public ICollection<Comment> Comments { get; set; } = new List<Comment>();
 }

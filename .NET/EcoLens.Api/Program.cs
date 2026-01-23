@@ -1,5 +1,6 @@
 using System.Text;
 using EcoLens.Api.Data;
+using EcoLens.Api.DTOs;
 using EcoLens.Api.Services;
 using EcoLens.Api.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -35,6 +36,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // JWT Options binding
 builder.Services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
+// AI Options binding
+builder.Services.Configure<AiSettings>(configuration.GetSection("AiSettings"));
 
 // JWT Authentication
 builder.Services
@@ -176,6 +179,16 @@ builder.Services.AddScoped<IGoogleMapsService, GoogleMapsService>();
 // Caching Services
 builder.Services.AddScoped<EcoLens.Api.Services.Caching.IGeocodingCacheService, EcoLens.Api.Services.Caching.GeocodingCacheService>();
 
+// Vision settings binding & HttpClient
+builder.Services.Configure<VisionSettings>(configuration.GetSection("VisionService"));
+var visionBaseUrl = configuration["VisionService:BaseUrl"] ?? "http://localhost:8000";
+builder.Services.AddHttpClient<IVisionService, PythonVisionService>(client =>
+{
+	client.BaseAddress = new Uri(visionBaseUrl.TrimEnd('/') + "/");
+});
+
+// Diet Template services
+builder.Services.AddScoped<IDietTemplateService, DietTemplateService>();
 var app = builder.Build();
 
 // Middleware pipeline
@@ -189,6 +202,9 @@ app.UseCors(AllowAllCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// 静态文件（用于访问 wwwroot/uploads）
+app.UseStaticFiles();
 
 app.MapControllers();
 

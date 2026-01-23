@@ -1,9 +1,12 @@
 using System.Security.Claims;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs.Activity;
+using EcoLens.Api.Models.Enums;
+using EcoLens.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using EcoLens.Api.Services;
 
 namespace EcoLens.Api.Controllers;
 
@@ -13,10 +16,12 @@ namespace EcoLens.Api.Controllers;
 public class ActivityController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
+	private readonly IClimatiqService _climatiqService;
 
-	public ActivityController(ApplicationDbContext db)
+	public ActivityController(ApplicationDbContext db, IClimatiqService climatiqService)
 	{
 		_db = db;
+		_climatiqService = climatiqService;
 	}
 
 	private int? GetUserId()
@@ -34,10 +39,68 @@ public class ActivityController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == dto.Label, ct);
+		// 针对 Utility 类别按 Region 优先匹配，否则按 LabelName 直接匹配
+		CarbonReference? carbonRef = null;
+		if (dto.Category is CarbonCategory.Utility)
+		{
+			var userRegion = await _db.ApplicationUsers
+				.Where(u => u.Id == userId.Value)
+				.Select(u => u.Region)
+				.FirstOrDefaultAsync(ct);
+
+			// 优先匹配 (Label, Utility, userRegion)，否则回退 (Label, Utility, Region == null)
+			if (!string.IsNullOrWhiteSpace(userRegion))
+			{
+				carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
+					c => c.LabelName == dto.Label && c.Category == CarbonCategory.Utility && c.Region == userRegion, ct);
+			}
+
+			if (carbonRef is null)
+			{
+				carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
+					c => c.LabelName == dto.Label && c.Category == CarbonCategory.Utility && c.Region == null, ct);
+			}
+		}
+		else
+		{
+			carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == dto.Label, ct);
+		}
+
+		// 如果本地未找到碳参考数据，尝试从 Climatiq API 获取
 		if (carbonRef is null)
 		{
-			return NotFound("Carbon reference not found for the given label.");
+			// 这里需要一个逻辑来将 dto.Label 和 dto.Category 映射到 Climatiq 的 activityId
+			// 暂时使用一个示例 activityId，实际应用中需要根据您的深度学习模型输出进行映射
+			var climatiqActivityId = "consumer_goods-type_snack_foods"; // 示例 Climatiq Activity ID
+			var climatiqRegion = await _db.ApplicationUsers
+				.Where(u => u.Id == userId.Value)
+				.Select(u => u.Region)
+				.FirstOrDefaultAsync(ct) ?? "US"; // 默认使用美国地区
+
+			var climatiqEstimate = await _climatiqService.GetCarbonEmissionEstimateAsync(
+				climatiqActivityId, dto.Quantity, dto.Unit, climatiqRegion);
+
+			if (climatiqEstimate is not null)
+			{
+				// 将 Climatiq 结果保存到本地 CarbonReference 数据库，方便下次使用
+				carbonRef = new CarbonReference
+				{
+					LabelName = dto.Label,
+					Category = dto.Category, // 直接使用 dto.Category
+					Co2Factor = climatiqEstimate.Co2e / dto.Quantity, // Climatiq 返回总排放，这里计算因子
+					Unit = dto.Unit,
+					Region = climatiqRegion,
+					Source = "Climatiq",
+					ClimatiqActivityId = climatiqActivityId
+				};
+				await _db.CarbonReferences.AddAsync(carbonRef, ct);
+				await _db.SaveChangesAsync(ct);
+			}
+		}
+
+		if (carbonRef is null)
+		{
+			return NotFound("Carbon reference not found for the given label, neither locally nor via Climatiq.");
 		}
 
 		var total = dto.Quantity * carbonRef.Co2Factor;
@@ -66,6 +129,54 @@ public class ActivityController : ControllerBase
 		};
 
 		return Ok(result);
+	}
+
+	/// <summary>
+	/// 仪表盘数据：近 7 天排放趋势、当日碳中和差值（目标 10kg/天）、等效植树数（按 TotalCarbonSaved/20）。
+	/// </summary>
+	[HttpGet("dashboard")]
+	public async Task<ActionResult<DashboardDto>> Dashboard(CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		var today = DateTime.UtcNow.Date;
+		var from = today.AddDays(-6);
+
+		var dayGroups = await _db.ActivityLogs
+			.Where(l => l.UserId == userId.Value && l.CreatedAt.Date >= from && l.CreatedAt.Date <= today)
+			.GroupBy(l => l.CreatedAt.Date)
+			.Select(g => new { Day = g.Key, Total = g.Sum(x => x.TotalEmission) })
+			.ToListAsync(ct);
+
+		// 过去 7 天，按日期顺序组装列表（缺失日期补 0）
+		var weeklyTrend = new List<decimal>(7);
+		for (var i = 0; i < 7; i++)
+		{
+			var d = from.AddDays(i);
+			var total = dayGroups.FirstOrDefault(x => x.Day == d)?.Total ?? 0m;
+			weeklyTrend.Add(total);
+		}
+
+		var todayEmission = dayGroups.FirstOrDefault(x => x.Day == today)?.Total ?? 0m;
+		const decimal dailyTarget = 10m;
+		var neutralityGap = dailyTarget - todayEmission;
+
+		var totalSaved = await _db.ApplicationUsers
+			.Where(u => u.Id == userId.Value)
+			.Select(u => u.TotalCarbonSaved)
+			.FirstOrDefaultAsync(ct);
+
+		var treesPlanted = totalSaved / 20m;
+
+		var dto = new DashboardDto
+		{
+			WeeklyTrend = weeklyTrend,
+			NeutralityGap = neutralityGap,
+			TreesPlanted = treesPlanted
+		};
+
+		return Ok(dto);
 	}
 
 	/// <summary>
@@ -101,6 +212,7 @@ public class ActivityController : ControllerBase
 	[HttpGet("stats")]
 	public async Task<ActionResult<ActivityStatsDto>> Stats(CancellationToken ct)
 	{
+
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
@@ -186,4 +298,3 @@ public class ActivityController : ControllerBase
 		return Ok(items);
 	}
 }
-

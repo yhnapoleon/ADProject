@@ -1,0 +1,50 @@
+/* MainLayout Styles */
+.sider {
+  border-right: 1px solid #f0f0f0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+}
+
+.logoText {
+  font-size: 14px;
+  font-weight: 600;
+  color: #674fa3;
+  white-space: nowrap;
+}
+
+.menu {
+  border-right: none;
+}
+
+.menu :global(.ant-menu-item) {
+  margin-bottom: 8px;
+  border-radius: 6px !important;
+  margin-inline: 8px;
+}
+
+.menu :global(.ant-menu-item-selected) {
+  background-color: #f0ebf8 !important;
+  color: #674fa3 !important;
+}
+
+.menu :global(.ant-menu-item-selected::after) {
+  border-right-color: #674fa3 !important;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.content {
+  margin: 24px;
+  flex: 1;
+}

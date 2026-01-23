@@ -24,7 +24,7 @@ public class ApplicationDbContext : DbContext
 	public DbSet<TravelLog> TravelLogs => Set<TravelLog>();
 	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
 
-	public override int SaveChanges()
+    public override int SaveChanges()
 	{
 		ApplyTimestamps();
 		return base.SaveChanges();
@@ -99,6 +99,10 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<ApplicationUser>()
 			.Property(p => p.TotalCarbonSaved)
 			.HasColumnType("decimal(18,2)");
+
+		modelBuilder.Entity<ApplicationUser>()
+			.Property(p => p.IsActive)
+			.HasDefaultValue(true);
 
 		modelBuilder.Entity<CarbonReference>()
 			.Property(p => p.Co2Factor)
@@ -187,6 +191,10 @@ public class ApplicationDbContext : DbContext
 			.HasForeignKey(c => c.PostId)
 			.OnDelete(DeleteBehavior.Cascade);
 
+		// PB-008: 全局过滤软删除帖子
+		modelBuilder.Entity<Post>()
+			.HasQueryFilter(p => !p.IsDeleted);
+
 		modelBuilder.Entity<Comment>()
 			.HasOne(c => c.User!)
 			.WithMany()
@@ -209,6 +217,13 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
 			.IsUnique();
+
+		// DietTemplate relations
+		modelBuilder.Entity<DietTemplate>()
+			.HasMany(t => t.Items)
+			.WithOne(i => i.DietTemplate!)
+			.HasForeignKey(i => i.DietTemplateId)
+			.OnDelete(DeleteBehavior.Cascade);
 
 		// Seed data for CarbonReferences
 		modelBuilder.Entity<CarbonReference>().HasData(
