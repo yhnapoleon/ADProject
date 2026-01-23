@@ -17,7 +17,7 @@ const AdminLogin: React.FC = () => {
       // Store auth state (in production, use proper token management)
       localStorage.setItem('adminAuthenticated', 'true');
       localStorage.setItem('adminUsername', username);
-      navigate('/');
+      navigate('/admin');
     } else {
       setError('Please enter both username and password');
     }

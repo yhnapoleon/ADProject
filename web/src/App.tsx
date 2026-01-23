@@ -1,5 +1,10 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import MainLayout from './components/MainLayout';
+import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
+import EditProfile from './pages/EditProfile';
+import Records from './pages/Records';
 import AdminLogin from './pages/AdminLogin';
 import AdminSidebar from './components/AdminSidebar';
 import AdminDashboard from './pages/AdminDashboard';
@@ -12,30 +17,49 @@ import './App.css';
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<AdminLogin />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <div className="app">
-                <AdminSidebar />
-                <div className="main-content">
-                  <Routes>
-                    <Route path="/" element={<AdminDashboard />} />
-                    <Route path="/users" element={<AdminUserList />} />
-                    <Route path="/emission-factors" element={<AdminEmissionFactors />} />
-                    <Route path="/community-analytics" element={<AdminCommunityAnalytics />} />
-                    <Route path="/settings" element={<AdminSettings />} />
-                  </Routes>
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#674fa3',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        },
+      }}
+    >
+      <BrowserRouter>
+        <Routes>
+          {/* Admin Portal Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute>
+                <div className="app">
+                  <AdminSidebar />
+                  <div className="main-content">
+                    <Routes>
+                      <Route index element={<AdminDashboard />} />
+                      <Route path="users" element={<AdminUserList />} />
+                      <Route path="emission-factors" element={<AdminEmissionFactors />} />
+                      <Route path="community-analytics" element={<AdminCommunityAnalytics />} />
+                      <Route path="settings" element={<AdminSettings />} />
+                    </Routes>
+                  </div>
                 </div>
-              </div>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* User Portal Routes */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/edit" element={<EditProfile />} />
+            <Route path="/records" element={<Records />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ConfigProvider>
   );
 };
 

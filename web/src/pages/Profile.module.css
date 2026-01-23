@@ -1,0 +1,78 @@
+/* Profile Styles */
+.profile {
+  width: 100%;
+}
+
+.userCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+
+.userCard :global(.ant-card-body) {
+  padding: 24px;
+}
+
+.avatarContainer {
+  display: flex;
+  justify-content: center;
+}
+
+.avatar {
+  border: 3px solid #674fa3;
+}
+
+.userName {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+  margin-top: 12px;
+}
+
+.email {
+  font-size: 14px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.detailCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.detailCard :global(.ant-card-body) {
+  padding: 24px;
+}
+
+.detailCard :global(.ant-descriptions-item-label) {
+  font-weight: 600;
+  color: #674fa3;
+}
+
+.statCard {
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.statCard:hover {
+  box-shadow: 0 4px 12px rgba(103, 79, 163, 0.15);
+  transform: translateY(-2px);
+}
+
+.statCard :global(.ant-card-body) {
+  padding: 16px;
+}
+
+.statNumber {
+  font-size: 24px;
+  font-weight: 700;
+  color: #674fa3;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #666;
+  margin-top: 8px;
+}

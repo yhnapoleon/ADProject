@@ -7,11 +7,11 @@ const AdminSidebar: React.FC = () => {
   const navigate = useNavigate();
 
   const menuItems = [
-    { path: '/', label: 'Dashboard' },
-    { path: '/users', label: 'User List' },
-    { path: '/emission-factors', label: 'Emission Factors' },
-    { path: '/community-analytics', label: 'Community Analytics' },
-    { path: '/settings', label: 'Settings' },
+    { path: '/admin', label: 'Dashboard' },
+    { path: '/admin/users', label: 'User List' },
+    { path: '/admin/emission-factors', label: 'Emission Factors' },
+    { path: '/admin/community-analytics', label: 'Community Analytics' },
+    { path: '/admin/settings', label: 'Settings' },
   ];
 
   const handleLogout = (e: React.MouseEvent) => {
@@ -22,7 +22,7 @@ const AdminSidebar: React.FC = () => {
     if (confirmed) {
       localStorage.removeItem('adminAuthenticated');
       localStorage.removeItem('adminUsername');
-      navigate('/login');
+      navigate('/admin/login');
     }
   };
 
