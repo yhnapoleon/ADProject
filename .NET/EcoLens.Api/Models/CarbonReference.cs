@@ -26,8 +26,10 @@ public class CarbonReference : BaseEntity
 	[MaxLength(100)]
 	public string? Region { get; set; }
 
-	// PB-005: 条形码（可选，用于扫码查询）
-	[MaxLength(64)]
-	public string? Barcode { get; set; }
-}
+	[Required]
+	[MaxLength(50)]
+	public string Source { get; set; } = "Local"; // 数据来源：Local, Climatiq, etc.
 
+	[MaxLength(200)]
+	public string? ClimatiqActivityId { get; set; } // 如果是 Climatiq 来源，存储其 Activity ID
+}

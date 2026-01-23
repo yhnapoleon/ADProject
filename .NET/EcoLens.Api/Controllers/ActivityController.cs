@@ -6,6 +6,7 @@ using EcoLens.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using EcoLens.Api.Services;
 
 namespace EcoLens.Api.Controllers;
 
@@ -15,10 +16,12 @@ namespace EcoLens.Api.Controllers;
 public class ActivityController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
+	private readonly IClimatiqService _climatiqService;
 
-	public ActivityController(ApplicationDbContext db)
+	public ActivityController(ApplicationDbContext db, IClimatiqService climatiqService)
 	{
 		_db = db;
+		_climatiqService = climatiqService;
 	}
 
 	private int? GetUserId()
@@ -62,9 +65,42 @@ public class ActivityController : ControllerBase
 		{
 			carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == dto.Label, ct);
 		}
+
+		// 如果本地未找到碳参考数据，尝试从 Climatiq API 获取
 		if (carbonRef is null)
 		{
-			return NotFound("Carbon reference not found for the given label.");
+			// 这里需要一个逻辑来将 dto.Label 和 dto.Category 映射到 Climatiq 的 activityId
+			// 暂时使用一个示例 activityId，实际应用中需要根据您的深度学习模型输出进行映射
+			var climatiqActivityId = "consumer_goods-type_snack_foods"; // 示例 Climatiq Activity ID
+			var climatiqRegion = await _db.ApplicationUsers
+				.Where(u => u.Id == userId.Value)
+				.Select(u => u.Region)
+				.FirstOrDefaultAsync(ct) ?? "US"; // 默认使用美国地区
+
+			var climatiqEstimate = await _climatiqService.GetCarbonEmissionEstimateAsync(
+				climatiqActivityId, dto.Quantity, dto.Unit, climatiqRegion);
+
+			if (climatiqEstimate is not null)
+			{
+				// 将 Climatiq 结果保存到本地 CarbonReference 数据库，方便下次使用
+				carbonRef = new CarbonReference
+				{
+					LabelName = dto.Label,
+					Category = dto.Category, // 直接使用 dto.Category
+					Co2Factor = climatiqEstimate.Co2e / dto.Quantity, // Climatiq 返回总排放，这里计算因子
+					Unit = dto.Unit,
+					Region = climatiqRegion,
+					Source = "Climatiq",
+					ClimatiqActivityId = climatiqActivityId
+				};
+				await _db.CarbonReferences.AddAsync(carbonRef, ct);
+				await _db.SaveChangesAsync(ct);
+			}
+		}
+
+		if (carbonRef is null)
+		{
+			return NotFound("Carbon reference not found for the given label, neither locally nor via Climatiq.");
 		}
 
 		var total = dto.Quantity * carbonRef.Co2Factor;
@@ -176,6 +212,7 @@ public class ActivityController : ControllerBase
 	[HttpGet("stats")]
 	public async Task<ActionResult<ActivityStatsDto>> Stats(CancellationToken ct)
 	{
+
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
@@ -261,4 +298,3 @@ public class ActivityController : ControllerBase
 		return Ok(items);
 	}
 }
-
