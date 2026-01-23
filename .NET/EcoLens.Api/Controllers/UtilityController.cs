@@ -96,11 +96,9 @@ public class UtilityController : ControllerBase
 
 		static decimal Normalize(decimal value)
 		{
-			if (decimal.IsNaN(value) || decimal.IsInfinity(value))
-			{
-				return 0m;
-			}
-			return value < 0 ? 0m : value;
+			// decimal 类型不支持 NaN/Infinity，若出现异常值会在反序列化阶段抛出 JsonException。
+			// 这里仅做下界裁剪，避免负数。
+			return value < 0m ? 0m : value;
 		}
 	}
 
