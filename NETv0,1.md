@@ -36,13 +36,18 @@
 | Trip | `/api/trip/calculate` | POST | 登录 | Mock/示例 | 随机 1-50km 距离，根据 `TransportMode` 估算排放（注释注明应调用 Google Maps Routes API）（PB-005）。 |
 | Media | `/api/media/upload` | POST | 登录 | 已实现 | 上传图片至 `wwwroot/uploads/{yyyyMMdd}/{guid}.ext`，返回相对 URL（PB-008/PB-013）。 |
 | Admin | `/api/admin/posts/{id}` | DELETE | Admin | 已实现 | 软删除帖子（设置 `IsDeleted=true`）（PB-008）。 |
-| Utility | `/api/Utility/ocr` | POST | 登录 | Mock/示例 | 模拟返回 `{ electricityUsage, waterUsage, gasUsage }`（注释注明应接入 Azure Form Recognizer/Google ML Kit）（PB-013）。 |
+| Utility | `/api/Utility/ocr` | POST | 登录 | 已实现 | 通过 `GeminiService` 多模态识别账单图片（OpenAI 兼容 `image_url` 或 Gemini 原生 `inline_data`），按提示词严格返回 JSON：`{ electricityUsage, waterUsage, gasUsage }`，字段为数值；未识别则为 0（PB-013）。 |
 | Consultant | `/api/consultant/chat` | POST | 登录 | 已实现 | AI 智能顾问：接收 `{question}`，经 OpenAI Chat Completions 调用 Gemini 返回 `{answer}`。 |
+| Diet | `/api/diet/templates` | POST | 登录 | 已实现 | 创建饮食模版：保存 `TemplateName` 与 `Items(FoodId, Quantity, Unit)`。 |
+| Diet | `/api/diet/templates` | GET | 登录 | 已实现 | 获取当前登录用户的饮食模版列表。 |
 
 ### 基础设施与实体（非 API）
 - 用户实体：新增 `IsActive`（默认 true）、`Region` 字段；被封禁用户无法登录。
 - 碳因子实体：新增可选 `Region` 字段；在 DbContext 上为 `(LabelName, Category, Region)` 建立唯一索引。
 - 步数实体：`StepRecord` 支持每日一条的更新/新增与减排换算。
+- 饮食模版实体：新增 `DietTemplate`、`DietTemplateItem`；在 DbContext 配置一对多级联删除（Template 删除时级联删除 Items）。
+- DTO：新增 `CreateDietTemplateRequest`/`CreateDietTemplateItemRequest`、`DietTemplateDto`/`DietTemplateItemDto`，用于创建与展示饮食模版。
+- 服务与控制器：新增 `IDietTemplateService`/`DietTemplateService` 与 `DietTemplateController`，路由前缀 `api/diet/templates`。
 - PB-005：在 `CarbonReference` 新增可选 `Barcode` 字段并建立索引；新增 `ProductController` 与 `TripController`（Mock）。
 - PB-008：在 `Post` 实体新增 `IsDeleted` 并在 `DbContext` 添加全局过滤；在 `AdminController` 增加软删除帖子接口。
 - PB-008/PB-013：新增 `MediaController` 支持图片上传；`Program.cs` 启用 `UseStaticFiles()` 用于访问 `/uploads/...`。
@@ -51,4 +56,5 @@
 ### 备注
 - Admin 严格权限控制在 `AdminController` 中通过 `[Authorize(Roles = "Admin")]` 实现；`CarbonFactorController` 的 `/api/admin/factor` 目前仅 `[Authorize]`，如需收敛为 AdminOnly 可按需调整。 +
  - 已集成 AI 智能顾问：`AiSettings` 配置（`ApiKey`, `BaseUrl`, `Model`）存于 `appsettings.Development.json`；服务通过 OpenAI Chat Completions 协议调用 Gemini（中转地址 `BaseUrl`）。`/api/ai/chat` 与 `/api/consultant/chat` 均使用该服务。
+ - 饮食模版控制器从 `User` 的 Claims（`NameIdentifier/sub/uid`）解析 `Guid` 类型 UserId，用于隔离每个用户的模板数据。
 

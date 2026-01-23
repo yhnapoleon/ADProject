@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using EcoLens.Api.Services;
 
 namespace EcoLens.Api.Controllers;
 
@@ -9,10 +11,22 @@ namespace EcoLens.Api.Controllers;
 [Authorize]
 public class UtilityController : ControllerBase
 {
+	private readonly IAiService _aiService;
+
+	public UtilityController(IAiService aiService)
+	{
+		_aiService = aiService;
+	}
+
 	/// <summary>
 	/// 账单 OCR（Mock）：接收图片并返回模拟的水电气用量。
 	/// </summary>
 	[HttpPost("ocr")]
+	[Consumes("multipart/form-data")]
+	[Produces("application/json")]
+	[ProducesResponseType(StatusCodes.Status200OK)]
+	[ProducesResponseType(StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(StatusCodes.Status502BadGateway)]
 	public async Task<ActionResult<object>> Ocr([FromForm] IFormFile billImage, CancellationToken ct)
 	{
 		if (billImage == null || billImage.Length == 0)
@@ -20,22 +34,79 @@ public class UtilityController : ControllerBase
 			return BadRequest("No bill image uploaded.");
 		}
 
-		// PB-013: 此处应接入 Azure Form Recognizer 或 Google ML Kit 进行真实的票据识别。
-		// 现阶段返回模拟数据。
-		await Task.CompletedTask;
+		string prompt =
+			"You are a utility bill analyzer. Extract the monthly usage values for Electricity (kWh), Water (Cu M or m3), and Gas. " +
+			"The bill is likely from Singapore providers (e.g., SP Group). Look for labels such as 'Electricity Usage', 'Water Consumption', 'Gas Usage', " +
+			"and units 'kWh', 'm3', or 'Cu M'. If multiple periods exist, choose the latest monthly total. " +
+			"Return ONLY a valid JSON object with keys: 'electricityUsage', 'waterUsage', 'gasUsage'. " +
+			"Values should be numbers. If a field is not found, use 0. Do not wrap the JSON in code fences.";
 
-		// 简单生成一组固定/随机的模拟值
-		var rnd = new Random();
-		var electricity = Math.Round(100 + rnd.NextDouble() * 200, 1); // 100 - 300 kWh
-		var water = Math.Round(10 + rnd.NextDouble() * 30, 1);        // 10 - 40 m3
-		var gas = Math.Round(rnd.NextDouble() * 5, 1);                // 0 - 5 m3
-
-		return Ok(new
+		string aiText;
+		try
 		{
-			electricityUsage = electricity,
-			waterUsage = water,
-			gasUsage = gas
-		});
+			aiText = await _aiService.AnalyzeImageAsync(prompt, billImage);
+		}
+		catch (Exception ex)
+		{
+			return StatusCode(StatusCodes.Status502BadGateway, $"AI 调用失败: {ex.Message}");
+		}
+
+		if (string.IsNullOrWhiteSpace(aiText))
+		{
+			return StatusCode(StatusCodes.Status502BadGateway, "AI 返回空结果。");
+		}
+
+		// 容错：剔除可能的 ```json/``` 包裹，并提取花括号中的 JSON 片段
+		var sanitized = aiText.Replace("```json", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Replace("```", string.Empty, StringComparison.OrdinalIgnoreCase)
+			.Trim();
+
+		int start = sanitized.IndexOf('{');
+		int end = sanitized.LastIndexOf('}');
+		if (start >= 0 && end > start)
+		{
+			sanitized = sanitized.Substring(start, end - start + 1);
+		}
+
+		var options = new JsonSerializerOptions
+		{
+			PropertyNameCaseInsensitive = true
+		};
+
+		try
+		{
+			var dto = JsonSerializer.Deserialize<UsageDto>(sanitized, options) ?? new UsageDto();
+
+			// 归一化数值（防止 NaN/Infinity）
+			decimal e = Normalize(dto.ElectricityUsage);
+			decimal w = Normalize(dto.WaterUsage);
+			decimal g = Normalize(dto.GasUsage);
+
+			return Ok(new
+			{
+				electricityUsage = e,
+				waterUsage = w,
+				gasUsage = g
+			});
+		}
+		catch (JsonException)
+		{
+			return StatusCode(StatusCodes.Status502BadGateway, "AI 返回非 JSON 格式或解析失败。");
+		}
+
+		static decimal Normalize(decimal value)
+		{
+			// decimal 类型不支持 NaN/Infinity，若出现异常值会在反序列化阶段抛出 JsonException。
+			// 这里仅做下界裁剪，避免负数。
+			return value < 0m ? 0m : value;
+		}
+	}
+
+	private sealed class UsageDto
+	{
+		public decimal ElectricityUsage { get; set; }
+		public decimal WaterUsage { get; set; }
+		public decimal GasUsage { get; set; }
 	}
 }
 
