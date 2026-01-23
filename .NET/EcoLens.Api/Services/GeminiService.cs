@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using EcoLens.Api.DTOs;
 using EcoLens.Api.Services;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Http;
 
 namespace EcoLens.Api.Services;
 
@@ -80,6 +81,138 @@ public class GeminiService : IAiService
 		}
 	}
 
+	public async Task<string> AnalyzeImageAsync(string prompt, IFormFile image)
+	{
+		if (image == null || image.Length == 0)
+		{
+			throw new ArgumentException("上传图片为空。", nameof(image));
+		}
+
+		var baseUrl = _settings.BaseUrl?.TrimEnd('/') ?? string.Empty;
+		if (string.IsNullOrWhiteSpace(baseUrl))
+		{
+			throw new InvalidOperationException("AiSettings.BaseUrl 未配置。");
+		}
+
+		if (string.IsNullOrWhiteSpace(_settings.ApiKey))
+		{
+			throw new InvalidOperationException("AiSettings.ApiKey 未配置。");
+		}
+
+		var contentType = string.IsNullOrWhiteSpace(image.ContentType) ? "image/jpeg" : image.ContentType;
+		string base64;
+		using (var ms = new MemoryStream())
+		{
+			await image.CopyToAsync(ms);
+			base64 = Convert.ToBase64String(ms.ToArray());
+		}
+
+		// 简单判断当前是否为 OpenAI 兼容接口
+		var isOpenAiCompatible = baseUrl.Contains("/v1", StringComparison.OrdinalIgnoreCase) ||
+			baseUrl.Contains("openai", StringComparison.OrdinalIgnoreCase) ||
+			baseUrl.Contains("openrouter", StringComparison.OrdinalIgnoreCase);
+
+		if (isOpenAiCompatible)
+		{
+			var targetUrl = $"{baseUrl}/chat/completions";
+
+			using var request = new HttpRequestMessage(HttpMethod.Post, targetUrl);
+			request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
+
+			var dataUrl = $"data:{contentType};base64,{base64}";
+			var body = new
+			{
+				model = string.IsNullOrWhiteSpace(_settings.Model) ? "gemini-3-pro-preview" : _settings.Model,
+				messages = new object[]
+				{
+					new
+					{
+						role = "user",
+						content = new object[]
+						{
+							new { type = "text", text = prompt },
+							new
+							{
+								type = "image_url",
+								image_url = new { url = dataUrl }
+							}
+						}
+					}
+				}
+			};
+
+			var json = JsonSerializer.Serialize(body, SerializerOptions);
+			request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+			using var response = await _httpClient.SendAsync(request);
+			var responseText = await response.Content.ReadAsStringAsync();
+
+			if (!response.IsSuccessStatusCode)
+			{
+				throw new HttpRequestException($"AI 调用失败: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
+			}
+
+			try
+			{
+				var parsed = JsonSerializer.Deserialize<ChatCompletionsResponse>(responseText, SerializerOptions);
+				var content = parsed?.Choices?[0]?.Message?.Content ?? string.Empty;
+				return content;
+			}
+			catch (JsonException)
+			{
+				return string.Empty;
+			}
+		}
+		else
+		{
+			// 尝试 Google Gemini 原生接口：POST {baseUrl}/models/{model}:generateContent
+			// 兼容常见 Gemini 部署（可能需要 ?key=xxx 或头部），这里优先使用 Bearer，如失败由上层感知
+			var model = string.IsNullOrWhiteSpace(_settings.Model) ? "gemini-1.5-pro" : _settings.Model;
+			var targetUrl = $"{baseUrl}/models/{model}:generateContent";
+
+			using var request = new HttpRequestMessage(HttpMethod.Post, targetUrl);
+			// 部分网关仍使用 Bearer；如果后续接入原生 Gemini，需要改用 ?key= 查询参数或 x-goog-api-key
+			request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
+
+			var body = new
+			{
+				contents = new object[]
+				{
+					new
+					{
+						parts = new object[]
+						{
+							new { text = prompt },
+							new { inline_data = new { mime_type = contentType, data = base64 } }
+						}
+					}
+				}
+			};
+
+			var json = JsonSerializer.Serialize(body, SerializerOptions);
+			request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+			using var response = await _httpClient.SendAsync(request);
+			var responseText = await response.Content.ReadAsStringAsync();
+
+			if (!response.IsSuccessStatusCode)
+			{
+				throw new HttpRequestException($"AI 调用失败: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
+			}
+
+			try
+			{
+				var parsed = JsonSerializer.Deserialize<GeminiResponse>(responseText, SerializerOptions);
+				var text = parsed?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text ?? string.Empty;
+				return text;
+			}
+			catch (JsonException)
+			{
+				return string.Empty;
+			}
+		}
+	}
+
 	private sealed class ChatCompletionsResponse
 	{
 		public Choice[]? Choices { get; set; }
@@ -93,6 +226,26 @@ public class GeminiService : IAiService
 	private sealed class Message
 	{
 		public string? Content { get; set; }
+	}
+
+	private sealed class GeminiResponse
+	{
+		public GeminiCandidate[]? Candidates { get; set; }
+	}
+
+	private sealed class GeminiCandidate
+	{
+		public GeminiContent? Content { get; set; }
+	}
+
+	private sealed class GeminiContent
+	{
+		public GeminiPart[]? Parts { get; set; }
+	}
+
+	private sealed class GeminiPart
+	{
+		public string? Text { get; set; }
 	}
 }
 
