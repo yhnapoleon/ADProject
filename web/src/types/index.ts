@@ -5,6 +5,7 @@ export type EmissionType = 'Food' | 'Transport' | 'Utilities';
 export interface LeaderboardEntry {
   rank: number;
   username: string;
+  nickname: string;
   emissions: number;
   avatarUrl: string;
 }
@@ -12,6 +13,7 @@ export interface LeaderboardEntry {
 export interface User {
   id: string;
   name: string;
+  nickname: string;
   email: string;
   location: LocationEnum;
   birthDate: string;

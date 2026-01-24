@@ -189,7 +189,7 @@ const Dashboard = () => {
                     >
                       #{user.rank}
                     </span>
-                    <span>{user.username}</span>
+                    <span>{user.nickname}</span>
                   </div>
                   <span style={{ fontWeight: '600' }}>{user.emissions.toFixed(2)} kg</span>
                 </div>

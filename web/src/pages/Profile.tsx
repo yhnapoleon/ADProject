@@ -4,7 +4,7 @@ import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
 import { EditOutlined, MailOutlined, EnvironmentOutlined, CalendarOutlined, SaveOutlined, CloseOutlined, LockOutlined, UserOutlined, CameraOutlined } from '@ant-design/icons';
 import { User } from '../types/index';
-import { updateLeaderboardAvatar } from '../mock/data';
+import { updateLeaderboardAvatar, updateLeaderboardNickname } from '../mock/data';
 import styles from './Profile.module.css';
 
 const Profile = () => {
@@ -15,6 +15,7 @@ const Profile = () => {
   const [user, setUser] = useState<User>({
     id: '1',
     name: 'Melody',
+    nickname: 'EcoRanger',
     email: 'melody@example.com',
     location: 'West Region',
     birthDate: '1995-03-15',
@@ -35,18 +36,23 @@ const Profile = () => {
     const hasLower = /[a-z]/.test(pwd);
     const hasUpper = /[A-Z]/.test(pwd);
     const hasDigit = /\d/.test(pwd);
-    const hasLetter = /[A-Za-z]/.test(pwd);
-    const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
+    const hasLetter = hasLower || hasUpper;
 
-    const isStrong = pwd.length >= 8 && hasLower && hasUpper && hasDigit && hasSpecial;
-    const isMedium = pwd.length >= 8 && hasLetter && hasDigit;
-    const isOnlyLetters = pwd.length >= 8 && /^[A-Za-z]+$/.test(pwd);
-    const isOnlyDigits = pwd.length >= 8 && /^\d+$/.test(pwd);
+    // New requirement:
+    // Strong:
+    // - length > 8 (>= 9)
+    // - contains uppercase + lowercase + digit
+    const isStrong = pwd.length >= 9 && hasLower && hasUpper && hasDigit;
 
-    if (isStrong) return { label: 'Strong', percent: 100, color: '#52c41a', isMediumOrAbove: true };
-    if (isMedium && !isOnlyLetters && !isOnlyDigits) return { label: 'Medium', percent: 66, color: '#faad14', isMediumOrAbove: true };
-    if (pwd.length === 0) return { label: 'Weak', percent: 0, color: '#ff4d4f', isMediumOrAbove: false };
-    return { label: 'Weak', percent: 33, color: '#ff4d4f', isMediumOrAbove: false };
+    // Medium:
+    // - length > 8 (>= 9)
+    // - contains letters + digits (case-insensitive)
+    const isMedium = pwd.length >= 9 && hasLetter && hasDigit;
+
+    if (isStrong) return { label: 'Strong', percent: 100, color: '#52c41a', canSave: true };
+    if (isMedium) return { label: 'Medium', percent: 66, color: '#faad14', canSave: true };
+    if (pwd.length === 0) return { label: 'Weak', percent: 0, color: '#ff4d4f', canSave: false };
+    return { label: 'Weak', percent: 33, color: '#ff4d4f', canSave: false };
   }, [watchedPassword]);
 
   const locationOptions = useMemo(
@@ -63,6 +69,8 @@ const Profile = () => {
   const startEditing = () => {
     setIsEditing(true);
     form.setFieldsValue({
+      username: user.name,
+      nickname: user.nickname,
       email: user.email,
       password,
       location: user.location,
@@ -79,20 +87,24 @@ const Profile = () => {
     const values = await form.validateFields();
 
     const pwd = values.password as string;
-    const hasLetter = /[A-Za-z]/.test(pwd);
+    const hasLower = /[a-z]/.test(pwd);
+    const hasUpper = /[A-Z]/.test(pwd);
     const hasDigit = /\d/.test(pwd);
-    const mediumOrAbove = pwd.length >= 8 && hasLetter && hasDigit;
+    const hasLetter = hasLower || hasUpper;
+    const mediumOrAbove = pwd.length >= 9 && hasLetter && hasDigit;
     if (!mediumOrAbove) {
-      message.error('Password must be at least 8 characters and include letters and numbers');
+      message.error('密码强度不足');
       return;
     }
 
     setUser((prev) => ({
       ...prev,
+      nickname: values.nickname,
       email: values.email,
       location: values.location,
       birthDate: values.birthDate.format('YYYY-MM-DD'),
     }));
+    updateLeaderboardNickname(user.name, values.nickname);
     setPassword(values.password);
     setIsEditing(false);
     message.success('Profile updated successfully');
@@ -185,6 +197,7 @@ const Profile = () => {
                 >
                   {user.name}
                 </Descriptions.Item>
+                <Descriptions.Item label="Nickname">{user.nickname}</Descriptions.Item>
                 <Descriptions.Item
                   label={
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -230,6 +243,18 @@ const Profile = () => {
                 autoComplete="off"
                 style={{ marginTop: '24px' }}
               >
+                <Form.Item label="Username" name="username">
+                  <Input disabled />
+                </Form.Item>
+
+                <Form.Item
+                  label="Nickname"
+                  name="nickname"
+                  rules={[{ required: true, message: 'Please enter your nickname' }]}
+                >
+                  <Input placeholder="Enter your nickname" />
+                </Form.Item>
+
                 <Form.Item
                   label="Email"
                   name="email"

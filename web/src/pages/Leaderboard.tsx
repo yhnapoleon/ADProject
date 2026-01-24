@@ -13,7 +13,7 @@ const columns: ColumnsType<LeaderboardEntry> = [
     render: (_: string, row) => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Avatar src={row.avatarUrl} />
-        <span>{row.username}</span>
+        <span>{row.nickname}</span>
       </div>
     ),
   },
