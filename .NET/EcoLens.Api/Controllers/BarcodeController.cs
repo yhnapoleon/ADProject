@@ -12,7 +12,7 @@ namespace EcoLens.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] // 移除角色限制，但仍要求登录用户
+[Authorize] // ???????????????
 public class BarcodeController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
@@ -25,8 +25,7 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// 获取所有条形码映射或根据查询条件搜索。
-    /// </summary>
+    /// ??????????????????   /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<BarcodeReferenceResponseDto>>> Get([FromQuery] SearchBarcodeReferenceDto? searchDto, CancellationToken ct)
     {
@@ -72,120 +71,117 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// 根据条形码获取单个条形码映射（优先从本地获取，如果不存在则尝试从 Open Food Facts API 获取并缓存）。
+    /// ???????????????????? Open Food Facts ???????
     /// </summary>
+    /// <param name="barcode">????</param>
+    /// <param name="refresh">? true ???? Open Food Facts ??????? Co2Factor????????/?????</param>
     [HttpGet("{barcode}")]
-    public async Task<ActionResult<BarcodeReferenceResponseDto>> GetByBarcode(string barcode, CancellationToken ct)
+    public async Task<ActionResult<BarcodeReferenceResponseDto>> GetByBarcode(string barcode, [FromQuery(Name = "refresh")] bool? refresh = null, CancellationToken ct = default)
     {
         var barcodeRef = await _db.BarcodeReferences
             .Include(b => b.CarbonReference)
             .FirstOrDefaultAsync(b => b.Barcode == barcode, ct);
 
+        if (barcodeRef != null && refresh == true)
+        {
+            var offProduct = await _openFoodFactsService.GetProductByBarcodeAsync(barcode, ct);
+            if (offProduct?.Product != null && offProduct.Status == 1)
+            {
+                var co2 = offProduct.Product.EcoScoreData?.Agribalyse?.Co2Total
+                    ?? offProduct.Product.EcoScoreData?.AgribalyseCo2Total;
+                if (co2 != null && barcodeRef.CarbonReference != null)
+                {
+                    barcodeRef.CarbonReference.Co2Factor = co2.Value;
+                    barcodeRef.CarbonReference.Unit = "kgCO2e/kg";
+                    barcodeRef.CarbonReference.Source = "OpenFoodFacts";
+                    await _db.SaveChangesAsync(ct);
+                }
+            }
+        }
+
         if (barcodeRef is null)
         {
-            // 尝试从 Open Food Facts API 获取数据
+            // ??? Open Food Facts API ????
             var offProduct = await _openFoodFactsService.GetProductByBarcodeAsync(barcode, ct);
 
             if (offProduct?.Product != null && offProduct.Status == 1)
             {
-                CarbonReference? carbonRef = null;
+                // ?? CO2 Factor??????
                 decimal? extractedCo2Factor = null;
-                string? extractedUnit = null;
+                string extractedUnit = "kgCO2e/kg";
 
-                // 尝试从 Open Food Facts 的 EcoScoreData 中提取 CO2 Factor
-                if (offProduct.Product.EcoScoreData?.Co2eTotal != null)
+                // ????????category????LabelName????????????CarbonReference
+                string categoryLabelName = "Unknown Food"; // ????                
+                if (offProduct.Product.CategoriesTags != null && offProduct.Product.CategoriesTags.Any())
                 {
-                    extractedCo2Factor = offProduct.Product.EcoScoreData.Co2eTotal.Value / 100m; // 转换为 kgCO2e/kg
-                    extractedUnit = offProduct.Product.EcoScoreData.Co2eUnit; // 假设单位是 kgCO2e
-
-                    // 尝试在本地查找匹配的 CarbonReference，如果找到则更新其 Co2Factor
-                    // 这里可以根据 LabelName, Category, Region 等进行更精细的查找
-                    carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
-                        c => c.LabelName == offProduct.Product.ProductName || (offProduct.Product.CategoriesTags != null && offProduct.Product.CategoriesTags.Any(tag => c.LabelName == tag.Replace("en:", "", StringComparison.OrdinalIgnoreCase))), ct);
-                    
-                    if (carbonRef != null)
+                    // ??CategoriesTags ?????????????????????                    // ??: "en:beverages" -> "beverages", "en:carbonated-drinks" -> "carbonated drinks"
+                    var firstTag = offProduct.Product.CategoriesTags.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(firstTag))
                     {
-                        carbonRef.Co2Factor = extractedCo2Factor.Value; // 更新为实际值
-                        carbonRef.Unit = extractedUnit ?? "kg"; // 更新单位
+                        categoryLabelName = firstTag;
+                        
+                        // ???????? "en:", "fr:", "de:", "es:", "it:", "pt:" ??
+                        var languagePrefixes = new[] { "en:", "fr:", "de:", "es:", "it:", "pt:", "nl:", "pl:", "ru:", "ja:", "zh:" };
+                        foreach (var prefix in languagePrefixes)
+                        {
+                            if (categoryLabelName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                            {
+                                categoryLabelName = categoryLabelName.Substring(prefix.Length);
+                                break;
+                            }
+                        }
+                        
+                        // ???????????????????? "carbonated-drinks" -> "carbonated drinks"??                        categoryLabelName = categoryLabelName.Replace("-", " ");
+                    }
+                }
+
+                // ? Open Food Facts ? EcoScoreData.Agribalyse ??? CO2 Factor
+                // API ? co2_total ?? kg CO2e/kg?????????? 7622210449283 ? 3.59?
+                var co2Raw = offProduct.Product.EcoScoreData?.Agribalyse?.Co2Total
+                    ?? offProduct.Product.EcoScoreData?.AgribalyseCo2Total;
+                if (co2Raw != null)
+                    extractedCo2Factor = co2Raw.Value;
+
+                // ??????? category ? CarbonReference
+                // ???Open Food Facts ??????Food ??
+                var carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
+                    c => c.LabelName == categoryLabelName && c.Category == Models.Enums.CarbonCategory.Food, ct);
+
+                if (carbonRef != null)
+                {
+                    // ???????? CarbonReference???????? Co2Factor??????                    if (extractedCo2Factor.HasValue)
+                    {
+                        carbonRef.Co2Factor = extractedCo2Factor.Value;
+                        carbonRef.Unit = extractedUnit;
                         carbonRef.Source = "OpenFoodFacts";
                         await _db.SaveChangesAsync(ct);
                     }
-                    else
-                    {
-                        // 如果没有找到现有匹配，创建一个新的 CarbonReference
-                        carbonRef = new CarbonReference
-                        {
-                            LabelName = offProduct.Product.ProductName,
-                            Category = offProduct.Product.CategoriesTags?.Any() == true ? Enum.Parse<Models.Enums.CarbonCategory>(offProduct.Product.CategoriesTags.FirstOrDefault()!.Replace("en:", "", StringComparison.OrdinalIgnoreCase), true) : Models.Enums.CarbonCategory.Food,
-                            Co2Factor = extractedCo2Factor.Value,
-                            Unit = extractedUnit ?? "kg",
-                            Source = "OpenFoodFacts"
-                        };
-                        await _db.CarbonReferences.AddAsync(carbonRef, ct);
-                        await _db.SaveChangesAsync(ct);
-                    }
                 }
-
-                // 如果 EcoScoreData 中没有提取到，则执行现有匹配逻辑
-                if (carbonRef is null)
+                else
                 {
-                    // 1. 尝试根据 Open Food Facts 的 CategoryTags 匹配 CarbonReference
-                    if (offProduct.Product.CategoriesTags != null && offProduct.Product.CategoriesTags.Any())
+                    // ??????????????????CarbonReference????category ?? LabelName
+                    carbonRef = new CarbonReference
                     {
-                        foreach (var tag in offProduct.Product.CategoriesTags)
-                        {
-                            var cleanTag = tag.Replace("en:", "", StringComparison.OrdinalIgnoreCase);
-                            if (Enum.TryParse<Models.Enums.CarbonCategory>(cleanTag, true, out var categoryEnum))
-                            {
-                                carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
-                                    c => c.LabelName == cleanTag || c.Category == categoryEnum, ct);
-                            }
-                            else
-                            {
-                                carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
-                                    c => c.LabelName == cleanTag, ct);
-                            }
-                            if (carbonRef != null) break;
-                        }
-                    }
-
-                    // 2. 如果 CategoryTags 没有匹配到，尝试根据 ProductName 匹配
-                    if (carbonRef is null && !string.IsNullOrWhiteSpace(offProduct.Product.ProductName))
-                    {
-                        carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
-                            c => c.LabelName == offProduct.Product.ProductName, ct);
-                    }
-
-                    // 3. 如果仍未找到匹配，则回退到查找或创建一个“Unknown Food”的 CarbonReference
-                    if (carbonRef is null)
-                    {
-                        carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
-                            c => c.LabelName == "Unknown Food" && c.Category == Models.Enums.CarbonCategory.Food, ct);
-                        if (carbonRef is null)
-                        {
-                            carbonRef = new CarbonReference
-                            {
-                                LabelName = "Unknown Food",
-                                Category = Models.Enums.CarbonCategory.Food,
-                                Co2Factor = 0.5m, // 默认值0.5，表示每公斤的碳排放量
-                                Unit = "kg",
-                                Source = "Local"
-                            };
-                            await _db.CarbonReferences.AddAsync(carbonRef, ct);
-                            await _db.SaveChangesAsync(ct);
-                        }
-                    }
+                        LabelName = categoryLabelName,
+                        Category = Models.Enums.CarbonCategory.Food, // Open Food Facts ??????
+                        Co2Factor = extractedCo2Factor ?? 0.5m, // ?????????????????????.5
+                        Unit = extractedUnit,
+                        Source = extractedCo2Factor.HasValue ? "OpenFoodFacts" : "Local"
+                    };
+                    await _db.CarbonReferences.AddAsync(carbonRef, ct);
+                    await _db.SaveChangesAsync(ct);
                 }
 
-                // 创建新的 BarcodeReference
+                // ???? BarcodeReference ???????carbonRef ????????????? null?
                 barcodeRef = new BarcodeReference
                 {
                     Barcode = barcode,
-                    ProductName = offProduct.Product.ProductName,
-                    Category = offProduct.Product.CategoriesTags?.FirstOrDefault(),
-                    Brand = offProduct.Product.Brands,
-                    CarbonReferenceId = carbonRef?.Id // 关联到找到或创建的 CarbonReference
+                    ProductName = offProduct.Product.ProductName ?? "Unknown",
+                    CarbonReferenceId = carbonRef.Id,
+                    Category = categoryLabelName,
+                    Brand = offProduct.Product.Brands
                 };
+                barcodeRef.CarbonReference = carbonRef;
                 await _db.BarcodeReferences.AddAsync(barcodeRef, ct);
                 await _db.SaveChangesAsync(ct);
             }
@@ -210,8 +206,7 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// 创建新的条形码映射。
-    /// </summary>
+    /// ???????????    /// </summary>
     [HttpPost]
     public async Task<ActionResult<BarcodeReferenceResponseDto>> Create([FromBody] CreateBarcodeReferenceDto dto, CancellationToken ct)
     {
@@ -220,7 +215,7 @@ public class BarcodeController : ControllerBase
             return Conflict("Barcode already exists.");
         }
 
-        // 检查 CarbonReferenceId 是否有效
+        // ??CarbonReferenceId ????
         if (dto.CarbonReferenceId.HasValue && !await _db.CarbonReferences.AnyAsync(c => c.Id == dto.CarbonReferenceId.Value, ct))
         {
             return BadRequest("Invalid CarbonReferenceId.");
@@ -244,12 +239,12 @@ public class BarcodeController : ControllerBase
             Barcode = newBarcodeRef.Barcode,
             ProductName = newBarcodeRef.ProductName,
             CarbonReferenceId = newBarcodeRef.CarbonReferenceId,
-            // CarbonReferenceLabel, Co2Factor, Unit 需要通过 Include 加载才能获取
+            // CarbonReferenceLabel, Co2Factor, Unit ???? Include ??????
             Category = newBarcodeRef.Category,
             Brand = newBarcodeRef.Brand
         };
 
-        // 如果 CarbonReferenceId 有值，需要重新加载以获取关联数据
+        // ?? CarbonReferenceId ????????????????
         if (newBarcodeRef.CarbonReferenceId.HasValue)
         {
             var loadedRef = await _db.BarcodeReferences
@@ -267,15 +262,14 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// 更新现有条形码映射。
-    /// </summary>
+    /// ?????????    /// </summary>
     [HttpPut]
     public async Task<IActionResult> Update([FromBody] UpdateBarcodeReferenceDto dto, CancellationToken ct)
     {
         var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Id == dto.Id, ct);
         if (barcodeRef is null) return NotFound("Barcode reference not found.");
 
-        // 检查 CarbonReferenceId 是否有效
+        // ??CarbonReferenceId ????
         if (dto.CarbonReferenceId.HasValue && !await _db.CarbonReferences.AnyAsync(c => c.Id == dto.CarbonReferenceId.Value, ct))
         {
             return BadRequest("Invalid CarbonReferenceId.");
@@ -293,8 +287,7 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// 删除条形码映射。
-    /// </summary>
+    /// ???????    /// </summary>
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {

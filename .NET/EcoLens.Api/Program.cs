@@ -101,6 +101,10 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddHttpClient<IAiService, GeminiService>();
 
+// External API services
+builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
+builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>();
+
 // Vision settings binding & HttpClient
 builder.Services.Configure<VisionSettings>(configuration.GetSection("VisionService"));
 var visionBaseUrl = configuration["VisionService:BaseUrl"] ?? "http://localhost:8000";

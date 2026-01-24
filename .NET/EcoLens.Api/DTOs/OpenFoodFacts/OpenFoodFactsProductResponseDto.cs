@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace EcoLens.Api.DTOs.OpenFoodFacts
 {
     public class OpenFoodFactsProductResponseDto
@@ -13,6 +15,7 @@ namespace EcoLens.Api.DTOs.OpenFoodFacts
         public string[] CategoriesTags { get; set; } = Array.Empty<string>();
         public string? Brands { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
+        [JsonConverter(typeof(EcoScoreDataJsonConverter))]
         public EcoScoreDataDto? EcoScoreData { get; set; }
     }
 
@@ -20,7 +23,8 @@ namespace EcoLens.Api.DTOs.OpenFoodFacts
     {
         public string? AdjustmentsNutritionDataGrade { get; set; }
         public AgribalyseDataDto? Agribalyse { get; set; }
-        // 可以添加更多 Eco-Score 相关数据，如果需要
+        /// <summary>OFF 部分产品在 ecoscore_data 根节点提供 agribalyse_co2_total（kg CO2e/kg），作为 Agribalyse.Co2Total 的备用。</summary>
+        public decimal? AgribalyseCo2Total { get; set; }
     }
 
     public class AgribalyseDataDto

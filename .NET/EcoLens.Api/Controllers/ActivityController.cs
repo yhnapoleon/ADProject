@@ -80,13 +80,13 @@ public class ActivityController : ControllerBase
 			var climatiqEstimate = await _climatiqService.GetCarbonEmissionEstimateAsync(
 				climatiqActivityId, dto.Quantity, dto.Unit, climatiqRegion);
 
-			if (climatiqEstimate is not null)
+			if (climatiqEstimate is not null && dto.Category.HasValue)
 			{
 				// 将 Climatiq 结果保存到本地 CarbonReference 数据库，方便下次使用
 				carbonRef = new CarbonReference
 				{
 					LabelName = dto.Label,
-					Category = dto.Category, // 直接使用 dto.Category
+					Category = dto.Category.Value, // 使用 .Value 因为已经检查了 HasValue
 					Co2Factor = climatiqEstimate.Co2e / dto.Quantity, // Climatiq 返回总排放，这里计算因子
 					Unit = dto.Unit,
 					Region = climatiqRegion,
