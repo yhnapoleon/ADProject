@@ -1,5 +1,6 @@
-import { Row, Col, Card, Button, Progress, Avatar } from 'antd';
+import { Row, Col, Card, Button, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { getTopLeaderboard } from '../mock/data';
 import './Dashboard.module.css';
 
 const Dashboard = () => {
@@ -13,17 +14,7 @@ const Dashboard = () => {
   const transportEmissions = 0.0;
   const utilitiesEmissions = 0.0;
 
-  const leaderboard = [
-    { id: 1, name: 'Xiaowang', emissions: 1.81, avatar: 'X' },
-    { id: 2, name: 'Nina', emissions: 1.46, avatar: 'N' },
-    { id: 3, name: 'Xiaozhang', emissions: 1.22, avatar: 'Z' },
-    { id: 4, name: 'Xiaowang', emissions: 1.21, avatar: 'X' },
-    { id: 5, name: 'Xiaowang', emissions: 1.20, avatar: 'X' },
-    { id: 6, name: 'Xiaowang', emissions: 1.66, avatar: 'X' },
-    { id: 7, name: 'Xiaowang', emissions: 1.81, avatar: 'X' },
-    { id: 8, name: 'Nina', emissions: 1.46, avatar: 'N' },
-    { id: 9, name: 'Xiaozhang', emissions: 1.22, avatar: 'Z' },
-  ];
+  const leaderboard = getTopLeaderboard(5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -171,14 +162,14 @@ const Dashboard = () => {
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Leaderboard</div>
-              <Button type="link" onClick={() => navigate('/records')}>
+              <Button type="link" onClick={() => navigate('/leaderboard')}>
                 View all
               </Button>
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
               {leaderboard.map((user, index) => (
                 <div
-                  key={user.id}
+                  key={`${user.rank}-${user.username}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -196,12 +187,11 @@ const Dashboard = () => {
                         minWidth: '24px',
                       }}
                     >
-                      #{index + 1}
+                      #{user.rank}
                     </span>
-                    <Avatar style={{ background: '#674fa3' }}>{user.avatar}</Avatar>
-                    <span>{user.name}</span>
+                    <span>{user.username}</span>
                   </div>
-                  <span style={{ fontWeight: '600' }}>{user.emissions} kg</span>
+                  <span style={{ fontWeight: '600' }}>{user.emissions.toFixed(2)} kg</span>
                 </div>
               ))}
             </div>

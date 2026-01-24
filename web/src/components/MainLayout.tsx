@@ -6,6 +6,8 @@ import {
   FileTextOutlined,
   UserOutlined,
   BulbOutlined,
+  TrophyOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import './MainLayout.module.css';
 
@@ -18,6 +20,8 @@ const MainLayout: React.FC = () => {
   const getSelectedKey = () => {
     if (location.pathname.startsWith('/profile')) return 'profile';
     if (location.pathname.startsWith('/records')) return 'records';
+    if (location.pathname.startsWith('/leaderboard')) return 'leaderboard';
+    if (location.pathname.startsWith('/ai-assistant')) return 'ai-assistant';
     return 'dashboard';
   };
 
@@ -26,7 +30,13 @@ const MainLayout: React.FC = () => {
       key: 'dashboard',
       icon: <DashboardOutlined />,
       label: 'Dashboard',
-      onClick: () => navigate('/'),
+      onClick: () => navigate('/dashboard'),
+    },
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Profile',
+      onClick: () => navigate('/profile'),
     },
     {
       key: 'records',
@@ -35,17 +45,32 @@ const MainLayout: React.FC = () => {
       onClick: () => navigate('/records'),
     },
     {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Profile',
-      onClick: () => navigate('/profile'),
+      key: 'leaderboard',
+      icon: <TrophyOutlined />,
+      label: 'Leaderboard',
+      onClick: () => navigate('/leaderboard'),
+    },
+    {
+      key: 'ai-assistant',
+      icon: <RobotOutlined />,
+      label: 'AI Assistant',
+      onClick: () => navigate('/ai-assistant'),
     },
   ];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {/* Sidebar */}
-      <Sider width={240} style={{ background: '#fff' }}>
+      <Sider
+        width={240}
+        style={{
+          background: '#fff',
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          overflow: 'auto',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '20px', borderBottom: '1px solid #f0f0f0', marginBottom: '16px' }}>
           <img
             src="/src/assets/icons/splash.svg"
@@ -63,7 +88,7 @@ const MainLayout: React.FC = () => {
       </Sider>
 
       {/* Main Content */}
-      <Layout>
+      <Layout style={{ height: '100vh', overflow: 'auto' }}>
         {/* Header */}
         <Header
           style={{
@@ -82,10 +107,17 @@ const MainLayout: React.FC = () => {
             {dayjs().format('MMMM DD, YYYY')}
           </div>
           <Space size="middle">
-            <Button type="default" icon={<BulbOutlined />}>
+            <Button type="default" icon={<BulbOutlined />} onClick={() => navigate('/ai-assistant')}>
               Tips
             </Button>
-            <Avatar icon={<UserOutlined />} style={{ background: '#674fa3' }} />
+            <Button
+              type="text"
+              onClick={() => navigate('/profile')}
+              aria-label="Go to profile"
+              style={{ padding: 0, height: 'auto' }}
+            >
+              <Avatar icon={<UserOutlined />} style={{ background: '#674fa3' }} />
+            </Button>
           </Space>
         </Header>
 

@@ -3,8 +3,9 @@ import { ConfigProvider } from 'antd';
 import MainLayout from './components/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
-import EditProfile from './pages/EditProfile';
 import Records from './pages/Records';
+import Leaderboard from './pages/Leaderboard';
+import AIAssistant from './pages/AIAssistant';
 import AdminLogin from './pages/AdminLogin';
 import AdminSidebar from './components/AdminSidebar';
 import AdminDashboard from './pages/AdminDashboard';
@@ -53,8 +54,9 @@ const App: React.FC = () => {
           <Route element={<MainLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/ai-assistant" element={<AIAssistant />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/edit" element={<EditProfile />} />
             <Route path="/records" element={<Records />} />
           </Route>
         </Routes>

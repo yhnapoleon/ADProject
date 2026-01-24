@@ -2,6 +2,13 @@ export type LocationEnum = 'West Region' | 'North Region' | 'North-East Region' 
 
 export type EmissionType = 'Food' | 'Transport' | 'Utilities';
 
+export interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  emissions: number;
+  avatarUrl: string;
+}
+
 export interface User {
   id: string;
   name: string;

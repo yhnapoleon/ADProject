@@ -1,14 +1,18 @@
-import { Card, Descriptions, Avatar, Button, Tag, Row, Col } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { EditOutlined, MailOutlined, EnvironmentOutlined, CalendarOutlined } from '@ant-design/icons';
+import { useMemo, useState } from 'react';
+import { Card, Descriptions, Avatar, Button, Row, Col, Form, Input, Select, DatePicker, message, Space, Progress, Upload } from 'antd';
+import type { UploadProps } from 'antd';
+import dayjs from 'dayjs';
+import { EditOutlined, MailOutlined, EnvironmentOutlined, CalendarOutlined, SaveOutlined, CloseOutlined, LockOutlined, UserOutlined, CameraOutlined } from '@ant-design/icons';
 import { User } from '../types/index';
-import './Profile.module.css';
+import { updateLeaderboardAvatar } from '../mock/data';
+import styles from './Profile.module.css';
 
 const Profile = () => {
-  const navigate = useNavigate();
+  const [form] = Form.useForm();
+  const [isEditing, setIsEditing] = useState(false);
 
   // Mock data
-  const user: User = {
+  const [user, setUser] = useState<User>({
     id: '1',
     name: 'Melody',
     email: 'melody@example.com',
@@ -16,6 +20,99 @@ const Profile = () => {
     birthDate: '1995-03-15',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Melody',
     joinDays: 127,
+  });
+
+  const [password, setPassword] = useState<string>('password123');
+  const [avatarUrl, setAvatarUrl] = useState<string>(user.avatar);
+  const watchedPassword: string = Form.useWatch('password', form) ?? '';
+
+  const joinDateText = useMemo(() => {
+    return dayjs().subtract(user.joinDays, 'day').format('MMMM DD, YYYY');
+  }, [user.joinDays]);
+
+  const passwordStrength = useMemo(() => {
+    const pwd = watchedPassword ?? '';
+    const hasLower = /[a-z]/.test(pwd);
+    const hasUpper = /[A-Z]/.test(pwd);
+    const hasDigit = /\d/.test(pwd);
+    const hasLetter = /[A-Za-z]/.test(pwd);
+    const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
+
+    const isStrong = pwd.length >= 8 && hasLower && hasUpper && hasDigit && hasSpecial;
+    const isMedium = pwd.length >= 8 && hasLetter && hasDigit;
+    const isOnlyLetters = pwd.length >= 8 && /^[A-Za-z]+$/.test(pwd);
+    const isOnlyDigits = pwd.length >= 8 && /^\d+$/.test(pwd);
+
+    if (isStrong) return { label: 'Strong', percent: 100, color: '#52c41a', isMediumOrAbove: true };
+    if (isMedium && !isOnlyLetters && !isOnlyDigits) return { label: 'Medium', percent: 66, color: '#faad14', isMediumOrAbove: true };
+    if (pwd.length === 0) return { label: 'Weak', percent: 0, color: '#ff4d4f', isMediumOrAbove: false };
+    return { label: 'Weak', percent: 33, color: '#ff4d4f', isMediumOrAbove: false };
+  }, [watchedPassword]);
+
+  const locationOptions = useMemo(
+    () => [
+      { label: 'West Region', value: 'West Region' },
+      { label: 'North Region', value: 'North Region' },
+      { label: 'North-East Region', value: 'North-East Region' },
+      { label: 'East Region', value: 'East Region' },
+      { label: 'Central Region', value: 'Central Region' },
+    ],
+    []
+  );
+
+  const startEditing = () => {
+    setIsEditing(true);
+    form.setFieldsValue({
+      email: user.email,
+      password,
+      location: user.location,
+      birthDate: dayjs(user.birthDate),
+    });
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    form.resetFields();
+  };
+
+  const saveProfile = async () => {
+    const values = await form.validateFields();
+
+    const pwd = values.password as string;
+    const hasLetter = /[A-Za-z]/.test(pwd);
+    const hasDigit = /\d/.test(pwd);
+    const mediumOrAbove = pwd.length >= 8 && hasLetter && hasDigit;
+    if (!mediumOrAbove) {
+      message.error('Password must be at least 8 characters and include letters and numbers');
+      return;
+    }
+
+    setUser((prev) => ({
+      ...prev,
+      email: values.email,
+      location: values.location,
+      birthDate: values.birthDate.format('YYYY-MM-DD'),
+    }));
+    setPassword(values.password);
+    setIsEditing(false);
+    message.success('Profile updated successfully');
+  };
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const beforeUpload: UploadProps['beforeUpload'] = async (file) => {
+    const base64 = await fileToBase64(file as unknown as File);
+    setAvatarUrl(base64);
+    setUser((prev) => ({ ...prev, avatar: base64 }));
+    updateLeaderboardAvatar(user.name, base64);
+    message.success('Avatar updated');
+    return false;
   };
 
   return (
@@ -25,18 +122,23 @@ const Profile = () => {
         <Col xs={24} md={8}>
           <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
             <div style={{ textAlign: 'center' }}>
-              <Avatar
-                src={user.avatar}
-                size={120}
-                style={{ border: '3px solid #674fa3' }}
-              />
+              <Upload accept="image/*" showUploadList={false} beforeUpload={beforeUpload}>
+                <div className={styles.avatarUploadWrapper} aria-label="Upload avatar">
+                  <Avatar
+                    src={avatarUrl}
+                    size={120}
+                    style={{ border: '3px solid #674fa3' }}
+                  />
+                  <div className={styles.avatarOverlay}>
+                    <CameraOutlined />
+                    <span style={{ marginLeft: 8, fontWeight: 600 }}>Edit</span>
+                  </div>
+                </div>
+              </Upload>
             </div>
             <div style={{ textAlign: 'center', marginTop: '16px' }}>
               <div style={{ fontSize: '20px', fontWeight: '700', color: '#333', marginTop: '12px' }}>{user.name}</div>
               <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>{user.email}</div>
-              <Tag color="purple" style={{ marginTop: '12px' }}>
-                Member for {user.joinDays} days
-              </Tag>
             </div>
           </Card>
         </Col>
@@ -46,82 +148,137 @@ const Profile = () => {
           <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
             <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '18px', fontWeight: '600' }}>Personal Information</div>
-              <Button
-                type="primary"
-                icon={<EditOutlined />}
-                onClick={() => navigate('/profile/edit')}
-                style={{
-                  background: '#674fa3',
-                  borderColor: '#674fa3',
-                }}
-              >
-                Edit Profile
-              </Button>
+              {!isEditing ? (
+                <Button
+                  type="primary"
+                  icon={<EditOutlined />}
+                  onClick={startEditing}
+                  style={{ background: '#674fa3', borderColor: '#674fa3' }}
+                >
+                  Edit Profile
+                </Button>
+              ) : (
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<SaveOutlined />}
+                    onClick={saveProfile}
+                    style={{ background: '#674fa3', borderColor: '#674fa3' }}
+                  >
+                    Save
+                  </Button>
+                  <Button icon={<CloseOutlined />} onClick={cancelEditing}>
+                    Cancel
+                  </Button>
+                </Space>
+              )}
             </div>
 
-            <Descriptions
-              column={1}
-              size="middle"
-              style={{ marginTop: '24px' }}
-            >
-              <Descriptions.Item
-                label={
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MailOutlined /> Email
-                  </span>
-                }
+            {!isEditing ? (
+              <Descriptions column={1} size="middle" style={{ marginTop: '24px' }}>
+                <Descriptions.Item
+                  label={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <UserOutlined /> Username
+                    </span>
+                  }
+                >
+                  {user.name}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MailOutlined /> Email
+                    </span>
+                  }
+                >
+                  {user.email}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <LockOutlined /> Password
+                    </span>
+                  }
+                >
+                  ********
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CalendarOutlined /> Birth Date
+                    </span>
+                  }
+                >
+                  {dayjs(user.birthDate).format('MMMM DD, YYYY')}
+                </Descriptions.Item>
+                <Descriptions.Item
+                  label={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <EnvironmentOutlined /> Location
+                    </span>
+                  }
+                >
+                  {user.location}
+                </Descriptions.Item>
+                <Descriptions.Item label="Join Date">{joinDateText}</Descriptions.Item>
+              </Descriptions>
+            ) : (
+              <Form
+                form={form}
+                layout="vertical"
+                autoComplete="off"
+                style={{ marginTop: '24px' }}
               >
-                {user.email}
-              </Descriptions.Item>
-              <Descriptions.Item
-                label={
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <EnvironmentOutlined /> Location
-                  </span>
-                }
-              >
-                <Tag color="purple">{user.location}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item
-                label={
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <CalendarOutlined /> Birth Date
-                  </span>
-                }
-              >
-                {new Date(user.birthDate).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Descriptions.Item>
-              <Descriptions.Item label="Member Since">
-                {user.joinDays} days ago
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
+                <Form.Item
+                  label="Email"
+                  name="email"
+                  rules={[
+                    { required: true, message: 'Please enter your email' },
+                    { type: 'email', message: 'Please enter a valid email' },
+                  ]}
+                >
+                  <Input placeholder="Enter your email" />
+                </Form.Item>
 
-          {/* Stats Cards */}
-          <Row gutter={16} style={{ marginTop: '24px' }}>
-            <Col xs={12} sm={8}>
-              <Card style={{ borderRadius: '8px', border: '1px solid #f0f0f0', textAlign: 'center', transition: 'all 0.3s ease' }}>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#674fa3' }}>127</div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>Days</div>
-              </Card>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Card style={{ borderRadius: '8px', border: '1px solid #f0f0f0', textAlign: 'center', transition: 'all 0.3s ease' }}>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#674fa3' }}>5.2</div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>kg CO₂e</div>
-              </Card>
-            </Col>
-            <Col xs={12} sm={8}>
-              <Card style={{ borderRadius: '8px', border: '1px solid #f0f0f0', textAlign: 'center', transition: 'all 0.3s ease' }}>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: '#674fa3' }}>18</div>
-                <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>Logs</div>
-              </Card>
-            </Col>
-          </Row>
+                <Form.Item
+                  label="Password"
+                  name="password"
+                  rules={[{ required: true, message: 'Please enter your password' }]}
+                >
+                  <Input.Password placeholder="Enter your password" />
+                </Form.Item>
+
+                <div style={{ marginTop: -8, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 6 }}>
+                    <span>Password strength</span>
+                    <span style={{ color: passwordStrength.color, fontWeight: 600 }}>{passwordStrength.label}</span>
+                  </div>
+                  <Progress
+                    percent={passwordStrength.percent}
+                    showInfo={false}
+                    strokeColor={passwordStrength.color}
+                  />
+                </div>
+
+                <Form.Item
+                  label="Location"
+                  name="location"
+                  rules={[{ required: true, message: 'Please select your location' }]}
+                >
+                  <Select options={locationOptions} />
+                </Form.Item>
+
+                <Form.Item
+                  label="Birth Date"
+                  name="birthDate"
+                  rules={[{ required: true, message: 'Please select your birth date' }]}
+                >
+                  <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                </Form.Item>
+              </Form>
+            )}
+          </Card>
         </Col>
       </Row>
     </div>
