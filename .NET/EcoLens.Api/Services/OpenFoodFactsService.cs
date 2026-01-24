@@ -8,11 +8,15 @@ namespace EcoLens.Api.Services
     {
         private readonly HttpClient _httpClient;
         private readonly string _baseUrl;
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            PropertyNameCaseInsensitive = true
+        };
 
         public OpenFoodFactsService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            // Open Food Facts API 没有 API Key，但最好还是从配置中读取 BaseUrl
             _baseUrl = configuration["OpenFoodFacts:BaseUrl"] ?? "https://world.openfoodfacts.org/api/v2/product/";
             _httpClient.BaseAddress = new Uri(_baseUrl);
         }
@@ -20,17 +24,69 @@ namespace EcoLens.Api.Services
         public async Task<OpenFoodFactsProductResponseDto?> GetProductByBarcodeAsync(string barcode, CancellationToken ct = default)
         {
             var response = await _httpClient.GetAsync($"{barcode}?fields=product_name,categories_tags,brands,image_url,ecoscore_data", ct);
-            
-            // 如果是 404 Not Found，则返回 null 而不是抛出异常
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
                 return null;
-            }
-
-            response.EnsureSuccessStatusCode(); // 对于其他非成功状态码，仍然抛出异常
+            response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync(ct);
-            return JsonSerializer.Deserialize<OpenFoodFactsProductResponseDto>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+            var result = JsonSerializer.Deserialize<OpenFoodFactsProductResponseDto>(content, JsonOptions);
+
+            // 若反序列化后仍取不到 co2_total，从原始 JSON 中尝试提取并补全
+            if (result?.Product != null && !TryGetCo2FromEcoScore(result.Product.EcoScoreData, out _))
+                TryPatchEcoScoreFromRaw(content, result.Product);
+
+            return result;
+        }
+
+        private static bool TryGetCo2FromEcoScore(EcoScoreDataDto? eco, out decimal co2)
+        {
+            co2 = 0;
+            if (eco == null) return false;
+            var v = eco.Agribalyse?.Co2Total ?? eco.AgribalyseCo2Total;
+            if (v == null) return false;
+            co2 = v.Value;
+            return true;
+        }
+
+        private static void TryPatchEcoScoreFromRaw(string json, ProductDto product)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("product", out var prod)) return;
+                if (!prod.TryGetProperty("ecoscore_data", out var eco)) return;
+
+                decimal? co2 = null;
+                if (eco.ValueKind == JsonValueKind.String)
+                {
+                    var s = eco.GetString();
+                    if (string.IsNullOrWhiteSpace(s)) return;
+                    using var inner = JsonDocument.Parse(s);
+                    TryGetCo2FromElement(inner.RootElement, out co2);
+                }
+                else if (eco.ValueKind == JsonValueKind.Object)
+                {
+                    TryGetCo2FromElement(eco, out co2);
+                }
+                if (co2 == null) return;
+
+                product.EcoScoreData ??= new EcoScoreDataDto();
+                if (product.EcoScoreData.Agribalyse != null)
+                    product.EcoScoreData.Agribalyse.Co2Total = co2;
+                else
+                    product.EcoScoreData.Agribalyse = new AgribalyseDataDto { Co2Total = co2 };
+            }
+            catch { /* 忽略解析异常 */ }
+        }
+
+        private static void TryGetCo2FromElement(JsonElement el, out decimal? co2)
+        {
+            co2 = null;
+            if (el.TryGetProperty("agribalyse", out var ag) && ag.TryGetProperty("co2_total", out var c1))
+                co2 = c1.GetDecimal();
+            if (co2 == null && el.TryGetProperty("agribalyse_co2_total", out var c2))
+                co2 = c2.GetDecimal();
         }
     }
 }
