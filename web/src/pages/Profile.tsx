@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Card, Descriptions, Avatar, Button, Row, Col, Form, Input, Select, DatePicker, message, Space, Progress, Upload } from 'antd';
+import { Card, Descriptions, Avatar, Button, Row, Col, Form, Input, Select, DatePicker, message, Space, Progress, Upload, Modal } from 'antd';
 import type { UploadProps } from 'antd';
 import dayjs from 'dayjs';
-import { EditOutlined, MailOutlined, EnvironmentOutlined, CalendarOutlined, SaveOutlined, CloseOutlined, LockOutlined, UserOutlined, CameraOutlined } from '@ant-design/icons';
+import { EditOutlined, MailOutlined, EnvironmentOutlined, CalendarOutlined, SaveOutlined, CloseOutlined, LockOutlined, UserOutlined, CameraOutlined, TrophyOutlined, LogoutOutlined } from '@ant-design/icons';
 import { User } from '../types/index';
-import { updateLeaderboardAvatar, updateLeaderboardNickname } from '../mock/data';
+import { getLeaderboardUser, updateLeaderboardAvatar, updateLeaderboardNickname } from '../mock/data';
 import styles from './Profile.module.css';
+import { useNavigate } from 'react-router-dom';
 
 const Profile = () => {
+  const navigate = useNavigate();
   const [form] = Form.useForm();
   const [isEditing, setIsEditing] = useState(false);
+
+  const currentUserLeaderboard = getLeaderboardUser('Melody');
 
   // Mock data
   const [user, setUser] = useState<User>({
@@ -21,6 +25,9 @@ const Profile = () => {
     birthDate: '1995-03-15',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Melody',
     joinDays: 127,
+    pointsWeek: currentUserLeaderboard?.pointsWeek ?? 0,
+    pointsMonth: currentUserLeaderboard?.pointsMonth ?? 0,
+    pointsTotal: currentUserLeaderboard?.pointsTotal ?? 0,
   });
 
   const [password, setPassword] = useState<string>('password123');
@@ -127,30 +134,63 @@ const Profile = () => {
     return false;
   };
 
+  const handleLogout = () => {
+    Modal.confirm({
+      title: 'Are you sure you want to log out?',
+      okText: 'Log Out',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: () => {
+        localStorage.removeItem('isLoggedIn');
+        navigate('/login', { replace: true });
+      },
+    });
+  };
+
   return (
     <div style={{ width: '100%' }}>
       <Row gutter={[24, 24]}>
         {/* User Info Card */}
         <Col xs={24} md={8}>
           <Card style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)' }}>
-            <div style={{ textAlign: 'center' }}>
-              <Upload accept="image/*" showUploadList={false} beforeUpload={beforeUpload}>
-                <div className={styles.avatarUploadWrapper} aria-label="Upload avatar">
-                  <Avatar
-                    src={avatarUrl}
-                    size={120}
-                    style={{ border: '3px solid #674fa3' }}
-                  />
-                  <div className={styles.avatarOverlay}>
-                    <CameraOutlined />
-                    <span style={{ marginLeft: 8, fontWeight: 600 }}>Edit</span>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ textAlign: 'center' }}>
+                <Upload accept="image/*" showUploadList={false} beforeUpload={beforeUpload}>
+                  <div className={styles.avatarUploadWrapper} aria-label="Upload avatar">
+                    <Avatar
+                      src={avatarUrl}
+                      size={120}
+                      style={{ border: '3px solid #674fa3' }}
+                    />
+                    <div className={styles.avatarOverlay}>
+                      <CameraOutlined />
+                      <span style={{ marginLeft: 8, fontWeight: 600 }}>Edit</span>
+                    </div>
                   </div>
+                </Upload>
+              </div>
+              <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: '#333', marginTop: '12px' }}>{user.name}</div>
+                <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>{user.email}</div>
+                <div style={{ marginTop: 14, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, color: '#333' }}>
+                  <TrophyOutlined style={{ color: '#FFD700' }} />
+                  <span style={{ fontWeight: 600 }}>Total Points:</span>
+                  <span style={{ fontWeight: 700 }}>{user.pointsTotal}</span>
                 </div>
-              </Upload>
-            </div>
-            <div style={{ textAlign: 'center', marginTop: '16px' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: '#333', marginTop: '12px' }}>{user.name}</div>
-              <div style={{ fontSize: '14px', color: '#666', marginTop: '4px' }}>{user.email}</div>
+              </div>
+
+              <div style={{ flex: 1 }} />
+
+              <Button
+                block
+                danger
+                type="text"
+                icon={<LogoutOutlined />}
+                onClick={handleLogout}
+                style={{ marginTop: 18, fontWeight: 700 }}
+              >
+                Log Out
+              </Button>
             </div>
           </Card>
         </Col>

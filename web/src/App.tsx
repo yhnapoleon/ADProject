@@ -1,11 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import MainLayout from './components/MainLayout';
+import SplashScreen from './components/SplashScreen';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Records from './pages/Records';
 import Leaderboard from './pages/Leaderboard';
 import AIAssistant from './pages/AIAssistant';
+import Onboarding from './pages/Onboarding';
+import LogMeal from './pages/LogMeal';
+import LogTravel from './pages/LogTravel';
+import LogUtility from './pages/LogUtility';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import AdminLogin from './pages/AdminLogin';
 import AdminSidebar from './components/AdminSidebar';
 import AdminDashboard from './pages/AdminDashboard';
@@ -16,7 +24,39 @@ import AdminSettings from './pages/AdminSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
+function getIsLoggedIn() {
+  try {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+const RequireUserAuth = () => {
+  if (!getIsLoggedIn()) return <Navigate to="/login" replace />;
+  return <Outlet />;
+};
+
+const RedirectIfAuthed = () => {
+  if (getIsLoggedIn()) return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
+};
+
 const App: React.FC = () => {
+  const [showSplash, setShowSplash] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) return <SplashScreen />;
+  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+  if (showOnboarding && !isAdminPath) {
+    return <Onboarding onFinish={() => setShowOnboarding(false)} />;
+  }
+
   return (
     <ConfigProvider
       theme={{
@@ -28,6 +68,12 @@ const App: React.FC = () => {
     >
       <BrowserRouter>
         <Routes>
+          {/* Public Auth Routes (no MainLayout) */}
+          <Route element={<RedirectIfAuthed />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Route>
+
           {/* Admin Portal Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route
@@ -50,14 +96,19 @@ const App: React.FC = () => {
             }
           />
 
-          {/* User Portal Routes */}
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/ai-assistant" element={<AIAssistant />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/records" element={<Records />} />
+          {/* User Portal Routes (requires login) */}
+          <Route element={<RequireUserAuth />}>
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/ai-assistant" element={<AIAssistant />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/records" element={<Records />} />
+              <Route path="/log-meal" element={<LogMeal />} />
+              <Route path="/log-travel" element={<LogTravel />} />
+              <Route path="/log-utility" element={<LogUtility />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

@@ -8,6 +8,9 @@ export interface LeaderboardEntry {
   nickname: string;
   emissions: number;
   avatarUrl: string;
+  pointsWeek: number;
+  pointsMonth: number;
+  pointsTotal: number;
 }
 
 export interface User {
@@ -19,6 +22,9 @@ export interface User {
   birthDate: string;
   avatar: string;
   joinDays: number;
+  pointsWeek: number;
+  pointsMonth: number;
+  pointsTotal: number;
 }
 
 export interface Record {

@@ -2,10 +2,12 @@ import { Layout, Menu, Button, Avatar, Space } from 'antd';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
-  DashboardOutlined,
+  AppstoreOutlined,
+  CoffeeOutlined,
+  CarOutlined,
+  BulbOutlined,
   FileTextOutlined,
   UserOutlined,
-  BulbOutlined,
   TrophyOutlined,
   RobotOutlined,
 } from '@ant-design/icons';
@@ -17,26 +19,30 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isLoggingPage = location.pathname.startsWith('/log-');
+
   const getSelectedKey = () => {
-    if (location.pathname.startsWith('/profile')) return 'profile';
+    if (isLoggingPage) {
+      if (location.pathname.startsWith('/log-meal')) return 'log-meal';
+      if (location.pathname.startsWith('/log-travel')) return 'log-travel';
+      if (location.pathname.startsWith('/log-utility')) return 'log-utility';
+    }
+
+    if (location.pathname.startsWith('/dashboard')) return 'dashboard';
     if (location.pathname.startsWith('/records')) return 'records';
     if (location.pathname.startsWith('/leaderboard')) return 'leaderboard';
+    if (location.pathname.startsWith('/profile')) return 'profile';
     if (location.pathname.startsWith('/ai-assistant')) return 'ai-assistant';
     return 'dashboard';
   };
 
-  const menuItems = [
+  // Group A (default/daily mode)
+  const groupAItems = [
     {
       key: 'dashboard',
-      icon: <DashboardOutlined />,
+      icon: <AppstoreOutlined />,
       label: 'Dashboard',
       onClick: () => navigate('/dashboard'),
-    },
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Profile',
-      onClick: () => navigate('/profile'),
     },
     {
       key: 'records',
@@ -51,12 +57,54 @@ const MainLayout: React.FC = () => {
       onClick: () => navigate('/leaderboard'),
     },
     {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Profile',
+      onClick: () => navigate('/profile'),
+    },
+    {
       key: 'ai-assistant',
       icon: <RobotOutlined />,
       label: 'AI Assistant',
       onClick: () => navigate('/ai-assistant'),
     },
   ];
+
+  // Group B (logging mode)
+  const groupBItems = [
+    {
+      key: 'dashboard',
+      icon: <AppstoreOutlined />,
+      label: 'Dashboard',
+      onClick: () => navigate('/dashboard'),
+    },
+    {
+      key: 'log-meal',
+      icon: <CoffeeOutlined />,
+      label: 'Food',
+      onClick: () => navigate('/log-meal'),
+    },
+    {
+      key: 'log-travel',
+      icon: <CarOutlined />,
+      label: 'Travel',
+      onClick: () => navigate('/log-travel'),
+    },
+    {
+      key: 'log-utility',
+      icon: <BulbOutlined />,
+      label: 'Utility',
+      onClick: () => navigate('/log-utility'),
+    },
+    {
+      key: 'ai-assistant',
+      icon: <RobotOutlined />,
+      label: 'AI Assistant',
+      onClick: () => navigate('/ai-assistant'),
+    },
+  ];
+
+  const menuItems = isLoggingPage ? groupBItems : groupAItems;
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -107,8 +155,8 @@ const MainLayout: React.FC = () => {
             {dayjs().format('MMMM DD, YYYY')}
           </div>
           <Space size="middle">
-            <Button type="default" icon={<BulbOutlined />} onClick={() => navigate('/ai-assistant')}>
-              Tips
+            <Button type="default" icon={<RobotOutlined />} onClick={() => navigate('/ai-assistant')}>
+              Ask AI
             </Button>
             <Button
               type="text"

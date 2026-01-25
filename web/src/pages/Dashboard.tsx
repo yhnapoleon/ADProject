@@ -1,10 +1,11 @@
 import { Row, Col, Card, Button, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { getTopLeaderboard } from '../mock/data';
+import { mockLeaderboardData } from '../mock/data';
 import './Dashboard.module.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const numberFormatter = new Intl.NumberFormat('en-US');
 
   // Mock data
   const todayEmissions = 0.0;
@@ -14,7 +15,9 @@ const Dashboard = () => {
   const transportEmissions = 0.0;
   const utilitiesEmissions = 0.0;
 
-  const leaderboard = getTopLeaderboard(5);
+  const weeklyLeaderboard = [...mockLeaderboardData]
+    .sort((a, b) => b.pointsWeek - a.pointsWeek)
+    .slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -95,9 +98,9 @@ const Dashboard = () => {
                   marginTop: '16px',
                   fontWeight: '600',
                 }}
-                onClick={() => navigate('/records')}
+                onClick={() => navigate('/log-meal')}
               >
-                Log Food
+                Log Meal
               </Button>
             </div>
           </Card>
@@ -121,7 +124,7 @@ const Dashboard = () => {
                   marginTop: '16px',
                   fontWeight: '600',
                 }}
-                onClick={() => navigate('/records')}
+                onClick={() => navigate('/log-travel')}
               >
                 Log Trip
               </Button>
@@ -147,7 +150,7 @@ const Dashboard = () => {
                   marginTop: '16px',
                   fontWeight: '600',
                 }}
-                onClick={() => navigate('/records')}
+                onClick={() => navigate('/log-utility')}
               >
                 Log Usage
               </Button>
@@ -161,21 +164,23 @@ const Dashboard = () => {
         <Col span={24}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Leaderboard</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Weekly Leaderboard</div>
+              </div>
               <Button type="link" onClick={() => navigate('/leaderboard')}>
                 View all
               </Button>
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {leaderboard.map((user, index) => (
+              {weeklyLeaderboard.map((user, index) => (
                 <div
-                  key={`${user.rank}-${user.username}`}
+                  key={user.username}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '12px 0',
-                    borderBottom: index < leaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    borderBottom: index < weeklyLeaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -187,11 +192,13 @@ const Dashboard = () => {
                         minWidth: '24px',
                       }}
                     >
-                      #{user.rank}
+                      {index + 1}
                     </span>
                     <span>{user.nickname}</span>
                   </div>
-                  <span style={{ fontWeight: '600' }}>{user.emissions.toFixed(2)} kg</span>
+                  <span style={{ fontWeight: 700, color: '#674fa3' }}>
+                    {numberFormatter.format(user.pointsWeek)} pts
+                  </span>
                 </div>
               ))}
             </div>
