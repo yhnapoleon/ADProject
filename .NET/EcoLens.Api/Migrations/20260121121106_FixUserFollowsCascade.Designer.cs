@@ -4,6 +4,7 @@ using EcoLens.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EcoLens.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260121121106_FixUserFollowsCascade")]
+    partial class FixUserFollowsCascade
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -123,11 +126,6 @@ namespace EcoLens.Api.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -156,47 +154,6 @@ namespace EcoLens.Api.Migrations
                     b.ToTable("ApplicationUsers");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.BarcodeReference", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Barcode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Brand")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int?>("CarbonReferenceId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Category")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ProductName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CarbonReferenceId");
-
-                    b.ToTable("BarcodeReferences");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.CarbonReference", b =>
                 {
                     b.Property<int>("Id")
@@ -208,10 +165,6 @@ namespace EcoLens.Api.Migrations
                     b.Property<int>("Category")
                         .HasColumnType("int");
 
-                    b.Property<string>("ClimatiqActivityId")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<decimal>("Co2Factor")
                         .HasColumnType("decimal(18,4)");
 
@@ -222,15 +175,6 @@ namespace EcoLens.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Region")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -250,165 +194,120 @@ namespace EcoLens.Api.Migrations
                             Id = 1,
                             Category = 0,
                             Co2Factor = 27.0m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1122),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9834),
                             LabelName = "Beef",
-                            Source = "Local",
                             Unit = "kgCO2",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1130)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9846)
                         },
                         new
                         {
                             Id = 2,
                             Category = 1,
                             Co2Factor = 0.03m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1141),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9857),
                             LabelName = "Subway",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1142)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9857)
                         },
                         new
                         {
                             Id = 3,
                             Category = 2,
                             Co2Factor = 0.5m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1144),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9860),
                             LabelName = "Electricity",
-                            Source = "Local",
                             Unit = "kgCO2/kWh",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1144)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9860)
                         },
                         new
                         {
                             Id = 4,
                             Category = 1,
                             Co2Factor = 0m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1146),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9862),
                             LabelName = "Walking",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1146)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9862)
                         },
                         new
                         {
                             Id = 5,
                             Category = 1,
                             Co2Factor = 0m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1148),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9864),
                             LabelName = "Bicycle",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1149)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9865)
                         },
                         new
                         {
                             Id = 6,
                             Category = 1,
                             Co2Factor = 0.02m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1150),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9866),
                             LabelName = "ElectricBike",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1151)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9866)
                         },
                         new
                         {
                             Id = 7,
                             Category = 1,
                             Co2Factor = 0.05m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1152),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9868),
                             LabelName = "Bus",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1152)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9868)
                         },
                         new
                         {
                             Id = 8,
                             Category = 1,
                             Co2Factor = 0.2m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1154),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9870),
                             LabelName = "Taxi",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1154)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9870)
                         },
                         new
                         {
                             Id = 9,
                             Category = 1,
                             Co2Factor = 0.2m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1156),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9872),
                             LabelName = "CarGasoline",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1156)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9872)
                         },
                         new
                         {
                             Id = 10,
                             Category = 1,
                             Co2Factor = 0.05m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1158),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9874),
                             LabelName = "CarElectric",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1158)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9874)
                         },
                         new
                         {
                             Id = 11,
                             Category = 1,
                             Co2Factor = 0.04m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1160),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9876),
                             LabelName = "Train",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1160)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9876)
                         },
                         new
                         {
                             Id = 12,
                             Category = 1,
                             Co2Factor = 0.25m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1162),
+                            CreatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9878),
                             LabelName = "Plane",
-                            Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1162)
-                        },
-                        new
-                        {
-                            Id = 13,
-                            Category = 2,
-                            Co2Factor = 0.4057m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1163),
-                            LabelName = "Electricity_SG",
-                            Source = "Local",
-                            Unit = "kgCO2/kWh",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1164)
-                        },
-                        new
-                        {
-                            Id = 14,
-                            Category = 2,
-                            Co2Factor = 0.419m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1165),
-                            LabelName = "Water_SG",
-                            Source = "Local",
-                            Unit = "kgCO2/m³",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1166)
-                        },
-                        new
-                        {
-                            Id = 15,
-                            Category = 2,
-                            Co2Factor = 0.184m,
-                            CreatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1167),
-                            LabelName = "Gas_SG",
-                            Source = "Local",
-                            Unit = "kgCO2/kWh",
-                            UpdatedAt = new DateTime(2026, 1, 26, 5, 9, 20, 314, DateTimeKind.Utc).AddTicks(1167)
+                            UpdatedAt = new DateTime(2026, 1, 21, 12, 11, 6, 379, DateTimeKind.Utc).AddTicks(9878)
                         });
                 });
 
@@ -446,68 +345,6 @@ namespace EcoLens.Api.Migrations
                     b.ToTable("Comments");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.DietTemplate", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("TemplateName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("DietTemplates");
-                });
-
-            modelBuilder.Entity("EcoLens.Api.Models.DietTemplateItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("DietTemplateId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("FoodId")
-                        .HasColumnType("int");
-
-                    b.Property<double>("Quantity")
-                        .HasColumnType("float");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DietTemplateId");
-
-                    b.ToTable("DietTemplateItems");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.Post", b =>
                 {
                     b.Property<int>("Id")
@@ -525,9 +362,6 @@ namespace EcoLens.Api.Migrations
 
                     b.Property<string>("ImageUrls")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -685,69 +519,6 @@ namespace EcoLens.Api.Migrations
                     b.ToTable("UserFollows");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.UtilityBill", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("BillPeriodEnd")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("BillPeriodStart")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("BillType")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("ElectricityCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal?>("ElectricityUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("GasCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal?>("GasUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<int>("InputMethod")
-                        .HasColumnType("int");
-
-                    b.Property<decimal?>("OcrConfidence")
-                        .HasColumnType("decimal(5,4)");
-
-                    b.Property<string>("OcrRawText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("TotalCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("WaterCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal?>("WaterUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UtilityBills");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.ActivityLog", b =>
                 {
                     b.HasOne("EcoLens.Api.Models.CarbonReference", "CarbonReference")
@@ -778,16 +549,6 @@ namespace EcoLens.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.BarcodeReference", b =>
-                {
-                    b.HasOne("EcoLens.Api.Models.CarbonReference", "CarbonReference")
-                        .WithMany()
-                        .HasForeignKey("CarbonReferenceId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("CarbonReference");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.Comment", b =>
                 {
                     b.HasOne("EcoLens.Api.Models.Post", "Post")
@@ -799,23 +560,12 @@ namespace EcoLens.Api.Migrations
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Post");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("EcoLens.Api.Models.DietTemplateItem", b =>
-                {
-                    b.HasOne("EcoLens.Api.Models.DietTemplate", "DietTemplate")
-                        .WithMany("Items")
-                        .HasForeignKey("DietTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("DietTemplate");
                 });
 
             modelBuilder.Entity("EcoLens.Api.Models.Post", b =>
@@ -870,17 +620,6 @@ namespace EcoLens.Api.Migrations
                     b.Navigation("Follower");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.UtilityBill", b =>
-                {
-                    b.HasOne("EcoLens.Api.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.ApplicationUser", b =>
                 {
                     b.Navigation("ActivityLogs");
@@ -888,11 +627,6 @@ namespace EcoLens.Api.Migrations
                     b.Navigation("AiInsights");
 
                     b.Navigation("StepRecords");
-                });
-
-            modelBuilder.Entity("EcoLens.Api.Models.DietTemplate", b =>
-                {
-                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("EcoLens.Api.Models.Post", b =>
