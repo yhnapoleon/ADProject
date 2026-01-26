@@ -1,8 +1,198 @@
-import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import React, { useState, useEffect, useRef } from 'react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+// @ts-ignore - GeoJSON 文件导入
+import singaporeGeoJsonUrl from '../assets/Singapore.geojson?url';
 import './AdminDashboard.css';
 
+// 区域数据接口 - 用于后续后端数据集成
+interface RegionData {
+  regionCode: string;
+  regionName: string;
+  carbonReduced: number; // kg CO2
+  userCount: number;
+  reductionRate: number; // percentage
+}
+
+
+// 简单的坐标投影函数
+const projectCoordinates = (lng: number, lat: number, center: [number, number], scale: number, width: number, height: number): [number, number] => {
+  const x = (lng - center[0]) * scale + width / 2;
+  const y = (center[1] - lat) * scale + height / 2;
+  return [x, y];
+};
+
+// 将 GeoJSON 坐标转换为 SVG 路径
+const geoJsonToPath = (coordinates: any[], center: [number, number], scale: number, width: number, height: number): string => {
+  if (!coordinates || coordinates.length === 0) return '';
+  
+  const processRing = (ring: number[][]): string => {
+    if (!ring || ring.length === 0) return '';
+    const points = ring.map(([lng, lat]) => {
+      const [x, y] = projectCoordinates(lng, lat, center, scale, width, height);
+      return `${x},${y}`;
+    });
+    return `M ${points[0]} L ${points.slice(1).join(' L ')} Z`;
+  };
+  
+  if (Array.isArray(coordinates[0])) {
+    if (typeof coordinates[0][0] === 'number') {
+      // 单个环
+      return processRing(coordinates as number[][]);
+    } else if (Array.isArray(coordinates[0][0])) {
+      // 多个环
+      return (coordinates as number[][][]).map(ring => processRing(ring)).join(' ');
+    }
+  }
+  
+  return '';
+};
+
 const AdminDashboard: React.FC = () => {
+  const [geoData, setGeoData] = useState<any>(null);
+  const [regionData, setRegionData] = useState<Record<string, RegionData>>({});
+  const [bounds, setBounds] = useState<{ minX: number; maxX: number; minY: number; maxY: number; center: [number, number]; scale: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [tooltip, setTooltip] = useState<{ regionCode: string; regionName: string; data: RegionData | null; x: number; y: number } | null>(null);
+  const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 计算边界框和投影配置，确保地图完整显示
+  const calculateBounds = (data: any) => {
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+
+    const processCoordinates = (coords: any): void => {
+      if (!Array.isArray(coords)) return;
+      
+      if (coords.length > 0 && typeof coords[0] === 'number') {
+        // 这是一个坐标点 [lng, lat]
+        const [lng, lat] = coords;
+        minLng = Math.min(minLng, lng);
+        maxLng = Math.max(maxLng, lng);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      } else {
+        // 这是一个数组，递归处理
+        coords.forEach(processCoordinates);
+      }
+    };
+
+    if (data.features) {
+      data.features.forEach((feature: any) => {
+        if (feature.geometry?.coordinates) {
+          processCoordinates(feature.geometry.coordinates);
+        }
+      });
+    }
+
+    const centerLng = (minLng + maxLng) / 2;
+    const centerLat = (minLat + maxLat) / 2;
+    const lngRange = maxLng - minLng;
+    const latRange = maxLat - minLat;
+
+    // 计算缩放比例，留出边距，确保地图完整显示
+    const padding = 0.15; // 15% 边距
+    const width = 800;
+    const height = 600;
+    const scaleX = (width * (1 - padding * 2)) / lngRange;
+    const scaleY = (height * (1 - padding * 2)) / latRange;
+    const scale = Math.min(scaleX, scaleY);
+
+    return {
+      minX: minLng,
+      maxX: maxLng,
+      minY: minLat,
+      maxY: maxLat,
+      center: [centerLng, centerLat] as [number, number],
+      scale,
+    };
+  };
+
+  // 加载 GeoJSON 数据
+  useEffect(() => {
+    fetch(singaporeGeoJsonUrl)
+      .then((res) => res.json())
+      .then((data) => {
+        setGeoData(data);
+        const calculatedBounds = calculateBounds(data);
+        setBounds(calculatedBounds);
+        // TODO: 后续集成后端API
+        // 替换下面的模拟数据为实际API调用
+        // 示例: const response = await fetch('/api/regions/stats');
+        // const apiData = await response.json();
+        loadRegionData(data);
+      })
+      .catch((err) => {
+        console.error('Failed to load GeoJSON:', err);
+      });
+  }, []);
+
+  // 加载区域数据 - 目前使用模拟数据，后续替换为后端API调用
+  const loadRegionData = (geoData: any) => {
+    const mockData: Record<string, RegionData> = {};
+    if (geoData.features) {
+      geoData.features.forEach((feature: any) => {
+        const regionCode = feature.properties?.REGION_C || '';
+        const regionName = feature.properties?.REGION_N || '';
+        if (regionCode) {
+          // 生成更分散的模拟数据，确保有不同颜色
+          const randomValue = Math.random();
+          let carbonReduced: number;
+          
+          // 确保数据分布在不同范围，以便显示不同颜色
+          if (randomValue < 0.25) {
+            // 25% 的区域为 Very Low (<500)
+            carbonReduced = Math.random() * 300 + 200;
+          } else if (randomValue < 0.5) {
+            // 25% 的区域为 Low (500-1000)
+            carbonReduced = Math.random() * 500 + 500;
+          } else if (randomValue < 0.75) {
+            // 25% 的区域为 Medium (1000-1750)
+            carbonReduced = Math.random() * 750 + 1000;
+          } else {
+            // 25% 的区域为 High (>1750)
+            carbonReduced = Math.random() * 750 + 1750;
+          }
+          
+          mockData[regionCode] = {
+            regionCode,
+            regionName,
+            carbonReduced,
+            userCount: Math.floor(Math.random() * 5000 + 1000),
+            reductionRate: Math.random() * 20 + 5,
+          };
+        }
+      });
+    }
+    console.log('Loaded region data:', mockData); // 调试信息
+    setRegionData(mockData);
+  };
+
+  // 根据区域数据获取颜色
+  const getRegionColor = (regionCode: string): string => {
+    if (!regionCode) return '#e0e0e0'; // 默认灰色（无区域代码）
+    
+    const data = regionData[regionCode];
+    if (!data) {
+      console.warn(`No data found for region: ${regionCode}`);
+      return '#e0e0e0'; // 默认灰色（无数据）
+    }
+
+    // 根据碳减排量设置颜色强度
+    const carbonReduced = data.carbonReduced;
+    
+    if (carbonReduced > 1750) {
+      return '#2E7D32'; // 深绿色 - 高减排 (>1750)
+    } else if (carbonReduced > 1000) {
+      return '#4CAF50'; // 中绿色 (1000-1750)
+    } else if (carbonReduced > 500) {
+      return '#81C784'; // 浅绿色 (500-1000)
+    } else {
+      return '#C8E6C9'; // 很浅的绿色 (<500)
+    }
+  };
+
   const weeklyData = [
     { week: 'Week 1', value: 800 },
     { week: 'Week 2', value: 1200 },
@@ -42,64 +232,193 @@ const AdminDashboard: React.FC = () => {
       <div className="charts-container">
         <div className="chart-card">
           <h3>Regional Reduction Trends (Singapore)</h3>
-          <div className="singapore-map-container">
-            <svg
-              viewBox="0 0 500 300"
-              className="singapore-map"
-              preserveAspectRatio="xMidYMid meet"
-            >
-              <defs>
-                {/* Clip path to restrict heatmap points within Singapore outline */}
-                <clipPath id="singaporeClip">
-                  <path
-                    d="M 80 50 L 120 45 L 180 55 L 240 50 L 300 55 L 360 60 L 420 70 L 450 90 L 460 130 L 455 170 L 445 210 L 430 240 L 410 260 L 380 270 L 350 275 L 320 270 L 290 265 L 260 260 L 230 255 L 200 250 L 170 245 L 140 240 L 110 235 L 85 225 L 70 200 L 65 170 L 60 140 L 58 110 L 70 80 L 80 50 Z"
-                  />
-                </clipPath>
-              </defs>
-              
-              {/* Singapore Main Island - based on the provided outline */}
-              <path
-                d="M 80 50 L 120 45 L 180 55 L 240 50 L 300 55 L 360 60 L 420 70 L 450 90 L 460 130 L 455 170 L 445 210 L 430 240 L 410 260 L 380 270 L 350 275 L 320 270 L 290 265 L 260 260 L 230 255 L 200 250 L 170 245 L 140 240 L 110 235 L 85 225 L 70 200 L 65 170 L 60 140 L 58 110 L 70 80 L 80 50 Z"
-                fill="#e0e0e0"
-                stroke="#999"
-                strokeWidth="1.5"
-              />
-              
-              {/* Heatmap Data Points - clipped to map outline */}
-              <g clipPath="url(#singaporeClip)">
-                {Array.from({ length: 60 }).map((_, i) => {
-                  // Generate points within the Singapore outline bounds
-                  const baseX = 100 + Math.random() * 350;
-                  const baseY = 60 + Math.random() * 220;
-                  const intensity = Math.random();
-                  const size = 4 + intensity * 8;
-                  const opacity = 0.3 + intensity * 0.7;
-                  
-                  // Color gradient: yellow-green to dark green
-                  let color;
-                  if (intensity > 0.7) {
-                    color = '#2E7D32'; // Dark green
-                  } else if (intensity > 0.4) {
-                    color = '#4CAF50'; // Medium green
-                  } else {
-                    color = '#81C784'; // Light green
-                  }
-                  
-                  return (
-                    <circle
-                      key={i}
-                      cx={baseX}
-                      cy={baseY}
-                      r={size}
-                      fill={color}
-                      opacity={opacity}
-                      className="heat-point"
-                    />
-                  );
-                })}
-              </g>
-            </svg>
+          <div 
+            className="singapore-map-container"
+            onMouseLeave={() => {
+              if (tooltipTimeoutRef.current) {
+                clearTimeout(tooltipTimeoutRef.current);
+              }
+              tooltipTimeoutRef.current = setTimeout(() => {
+                setTooltip(null);
+              }, 100);
+            }}
+          >
+            {geoData && bounds && Object.keys(regionData).length > 0 ? (
+              <>
+                <svg
+                  ref={svgRef}
+                  viewBox="0 0 800 600"
+                  className="singapore-map"
+                  preserveAspectRatio="xMidYMid meet"
+                  onMouseMove={(e) => {
+                    if (tooltipTimeoutRef.current) {
+                      clearTimeout(tooltipTimeoutRef.current);
+                      tooltipTimeoutRef.current = null;
+                    }
+                    
+                    if (tooltip) {
+                      const containerRect = e.currentTarget.closest('.singapore-map-container')?.getBoundingClientRect();
+                      if (containerRect) {
+                        setTooltip({
+                          ...tooltip,
+                          x: e.clientX - containerRect.left,
+                          y: e.clientY - containerRect.top,
+                        });
+                      }
+                    }
+                  }}
+                >
+                  {geoData.features?.map((feature: any, index: number) => {
+                    const regionCode = feature.properties?.REGION_C || '';
+                    const regionName = feature.properties?.REGION_N || '';
+                    const fillColor = getRegionColor(regionCode);
+                    const geometry = feature.geometry;
+                    const data = regionData[regionCode] || null;
+                    
+                    if (geometry.type === 'MultiPolygon') {
+                      return geometry.coordinates.map((polygon: any, polyIndex: number) => {
+                        const pathData = polygon.map((ring: number[][]) => 
+                          geoJsonToPath(ring, bounds.center, bounds.scale, 800, 600)
+                        ).join(' ');
+                        
+                        return (
+                          <path
+                            key={`${index}-${polyIndex}`}
+                            d={pathData}
+                            fill={fillColor}
+                            stroke="#fff"
+                            strokeWidth={0.5}
+                            className="region-path"
+                            data-region-code={regionCode}
+                            data-region-name={regionName}
+                            style={{ cursor: 'pointer' }}
+                            onMouseEnter={(e) => {
+                              // 清除任何待清除的 tooltip 延迟
+                              if (tooltipTimeoutRef.current) {
+                                clearTimeout(tooltipTimeoutRef.current);
+                                tooltipTimeoutRef.current = null;
+                              }
+                              
+                              // 找到所有相同区域的 path 元素并同时高亮
+                              const svgElement = e.currentTarget.closest('svg');
+                              if (svgElement && regionCode) {
+                                const sameRegionPaths = svgElement.querySelectorAll(
+                                  `path[data-region-code="${regionCode}"]`
+                                ) as NodeListOf<SVGPathElement>;
+                                
+                                sameRegionPaths.forEach((path) => {
+                                  path.style.fill = '#66BB6A';
+                                  path.style.stroke = '#2E7D32';
+                                  path.style.strokeWidth = '1.5';
+                                });
+                              }
+                              
+                              const containerRect = e.currentTarget.closest('.singapore-map-container')?.getBoundingClientRect();
+                              if (containerRect) {
+                                setTooltip({
+                                  regionCode,
+                                  regionName,
+                                  data,
+                                  x: e.clientX - containerRect.left,
+                                  y: e.clientY - containerRect.top,
+                                });
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              // 找到所有相同区域的 path 元素并恢复颜色
+                              const svgElement = e.currentTarget.closest('svg');
+                              if (svgElement && regionCode) {
+                                const sameRegionPaths = svgElement.querySelectorAll(
+                                  `path[data-region-code="${regionCode}"]`
+                                ) as NodeListOf<SVGPathElement>;
+                                
+                                sameRegionPaths.forEach((path) => {
+                                  path.style.fill = fillColor;
+                                  path.style.stroke = '#fff';
+                                  path.style.strokeWidth = '0.5';
+                                });
+                              }
+                              
+                              // 延迟清除 tooltip，给新区域的 onMouseEnter 时间触发
+                              if (tooltipTimeoutRef.current) {
+                                clearTimeout(tooltipTimeoutRef.current);
+                              }
+                              tooltipTimeoutRef.current = setTimeout(() => {
+                                // 检查鼠标是否真的离开了所有区域
+                                const relatedTarget = e.relatedTarget as Element;
+                                if (!relatedTarget || !relatedTarget.closest('.region-path')) {
+                                  setTooltip(null);
+                                }
+                                tooltipTimeoutRef.current = null;
+                              }, 50);
+                            }}
+                          />
+                        );
+                      });
+                    }
+                    
+                    return null;
+                  })}
+                </svg>
+                {tooltip && (
+                  <div
+                    className="map-tooltip"
+                    style={{
+                      left: `${tooltip.x + 10}px`,
+                      top: `${tooltip.y + 10}px`,
+                    }}
+                  >
+                    <div className="tooltip-title">{tooltip.regionName}</div>
+                    {tooltip.data ? (
+                      <div className="tooltip-content">
+                        <div className="tooltip-item">
+                          <span className="tooltip-label">碳减排量:</span>
+                          <span className="tooltip-value">{tooltip.data.carbonReduced.toFixed(2)} kg CO₂</span>
+                        </div>
+                        <div className="tooltip-item">
+                          <span className="tooltip-label">用户数量:</span>
+                          <span className="tooltip-value">{tooltip.data.userCount.toLocaleString()}</span>
+                        </div>
+                        <div className="tooltip-item">
+                          <span className="tooltip-label">减排率:</span>
+                          <span className="tooltip-value">{tooltip.data.reductionRate.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="tooltip-content">
+                        <div className="tooltip-item">暂无数据</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="map-loading">Loading map data...</div>
+            )}
           </div>
+          {Object.keys(regionData).length > 0 && (
+            <div className="map-legend">
+              <div className="legend-title">Carbon Reduction (kg CO2)</div>
+              <div className="legend-items">
+                <div className="legend-item">
+                  <span className="legend-color" style={{ backgroundColor: '#2E7D32' }}></span>
+                  <span>High (&gt;1750)</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-color" style={{ backgroundColor: '#4CAF50' }}></span>
+                  <span>Medium (1000-1750)</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-color" style={{ backgroundColor: '#81C784' }}></span>
+                  <span>Low (500-1000)</span>
+                </div>
+                <div className="legend-item">
+                  <span className="legend-color" style={{ backgroundColor: '#C8E6C9' }}></span>
+                  <span>Very Low (&lt;500)</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="chart-card">
           <h3>Weekly Platform Impact (kg CO2)</h3>
