@@ -34,6 +34,8 @@ public class ApplicationUser : BaseEntity
 	[MaxLength(100)]
 	public string? Region { get; set; }
 
+	public DateTime? BirthDate { get; set; }
+
 	public bool IsActive { get; set; } = true;
 
 	public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();

@@ -19,6 +19,55 @@ public class LeaderboardController : ControllerBase
 		_db = db;
 	}
 
+	/// <summary>
+	/// /leaderboard?period=week|month|all
+	/// </summary>
+	[HttpGet]
+	[AllowAnonymous]
+	public async Task<ActionResult<IEnumerable<object>>> Get([FromQuery] string period = "all", CancellationToken ct = default)
+	{
+		// 简化实现：按总减排（all），或最近7/30天排放求和排行
+		var users = _db.ApplicationUsers.AsQueryable();
+		var logs = _db.ActivityLogs.AsQueryable();
+		DateTime? from = null;
+		if (string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-6);
+		else if (string.Equals(period, "month", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-29);
+
+		var emissions = logs
+			.Where(l => !from.HasValue || l.CreatedAt.Date >= from.Value)
+			.GroupBy(l => l.UserId)
+			.Select(g => new { UserId = g.Key, Emission = g.Sum(x => x.TotalEmission) });
+
+		var query = from u in users
+					join e in emissions on u.Id equals e.UserId into ue
+					from e in ue.DefaultIfEmpty()
+					select new
+					{
+						userId = u.Id,
+						username = u.Username,
+						nickname = u.Username,
+						avatarUrl = u.AvatarUrl,
+						emissions = (decimal?)e.Emission ?? 0m,
+						pointsWeek = u.CurrentPoints,
+						pointsMonth = u.CurrentPoints,
+						pointsTotal = u.CurrentPoints
+					};
+
+		var list = await query.OrderByDescending(x => x.emissions).Take(100).ToListAsync(ct);
+		var ranked = list.Select((x, i) => new
+		{
+			rank = i + 1,
+			username = x.username,
+			nickname = x.nickname,
+			emissions = x.emissions,
+			avatarUrl = x.avatarUrl,
+			pointsWeek = x.pointsWeek,
+			pointsMonth = x.pointsMonth,
+			pointsTotal = x.pointsTotal
+		});
+		return Ok(ranked);
+	}
+
 	private int? GetUserId()
 	{
 		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

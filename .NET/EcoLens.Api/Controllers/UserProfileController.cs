@@ -31,6 +31,7 @@ public class UserProfileController : ControllerBase
 	{
 		public int Id { get; set; }
 		public string Username { get; set; } = string.Empty;
+		public string Nickname { get; set; } = string.Empty;
 		public string Email { get; set; } = string.Empty;
 		public string? AvatarUrl { get; set; }
 		public string? Region { get; set; }
@@ -59,6 +60,7 @@ public class UserProfileController : ControllerBase
 		{
 			Id = user.Id,
 			Username = user.Username,
+			Nickname = user.Username,
 			Email = user.Email,
 			AvatarUrl = user.AvatarUrl,
 			Region = user.Region,
@@ -112,6 +114,7 @@ public class UserProfileController : ControllerBase
 		{
 			Id = user.Id,
 			Username = user.Username,
+			Nickname = user.Username,
 			Email = user.Email,
 			AvatarUrl = user.AvatarUrl,
 			Region = user.Region,
