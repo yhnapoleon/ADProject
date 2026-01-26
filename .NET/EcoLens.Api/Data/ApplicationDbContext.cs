@@ -21,6 +21,8 @@ public class ApplicationDbContext : DbContext
 	public DbSet<Post> Posts => Set<Post>();
 	public DbSet<Comment> Comments => Set<Comment>();
 	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+	public DbSet<TravelLog> TravelLogs => Set<TravelLog>();
+	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
 	public DbSet<DietTemplate> DietTemplates => Set<DietTemplate>();
 	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
     public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
@@ -92,6 +94,13 @@ public class ApplicationDbContext : DbContext
 			.WithMany()
 			.HasForeignKey(a => a.CarbonReferenceId)
 			.OnDelete(DeleteBehavior.Restrict);
+
+		// BarcodeReference -> CarbonReference
+		modelBuilder.Entity<BarcodeReference>()
+			.HasOne(b => b.CarbonReference!)
+			.WithMany()
+			.HasForeignKey(b => b.CarbonReferenceId)
+			.OnDelete(DeleteBehavior.SetNull);
 
 		// Decimal precisions (mirror annotations, explicit for safety)
 		modelBuilder.Entity<ApplicationUser>()
@@ -168,20 +177,20 @@ public class ApplicationDbContext : DbContext
 			.HasOne(c => c.User!)
 			.WithMany()
 			.HasForeignKey(c => c.UserId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		// Social follow relations
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Follower!)
 			.WithMany()
 			.HasForeignKey(f => f.FollowerId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Followee!)
 			.WithMany()
 			.HasForeignKey(f => f.FolloweeId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })

@@ -1,6 +1,121 @@
 @EcoLens.Api_HostAddress = http://localhost:5133
+@Token = your_jwt_token_here
 
-GET {{EcoLens.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### ============================================
+### 认证相关 API
+### ============================================
+
+### 1. 注册用户
+POST {{EcoLens.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+### 2. 用户登录（获取 Token）
+POST {{EcoLens.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "Test123!"
+}
+
+### ============================================
+### 出行记录 API 测试
+### ============================================
+
+### 3. 预览路线和碳排放（不保存到数据库）
+POST {{EcoLens.Api_HostAddress}}/api/travel/preview
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "北京市朝阳区",
+  "destinationAddress": "北京市海淀区",
+  "transportMode": 3
+}
+
+### 4. 创建出行记录 - 地铁
+POST {{EcoLens.Api_HostAddress}}/api/travel
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "北京市朝阳区",
+  "destinationAddress": "北京市海淀区",
+  "transportMode": 3,
+  "notes": "上班通勤"
+}
+
+### 5. 创建出行记录 - 步行
+POST {{EcoLens.Api_HostAddress}}/api/travel
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "北京市天安门广场",
+  "destinationAddress": "北京市故宫博物院",
+  "transportMode": 0,
+  "notes": "步行游览"
+}
+
+### 6. 创建出行记录 - 公交车
+POST {{EcoLens.Api_HostAddress}}/api/travel
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "北京市西单",
+  "destinationAddress": "北京市王府井",
+  "transportMode": 4,
+  "notes": "购物出行"
+}
+
+### 7. 获取当前用户的出行记录列表
+GET {{EcoLens.Api_HostAddress}}/api/travel/my-travels
+Authorization: Bearer {{Token}}
+
+### 8. 获取单条出行记录详情（替换 {id} 为实际记录ID）
+GET {{EcoLens.Api_HostAddress}}/api/travel/1
+Authorization: Bearer {{Token}}
+
+### 9. 删除出行记录（替换 {id} 为实际记录ID）
+DELETE {{EcoLens.Api_HostAddress}}/api/travel/1
+Authorization: Bearer {{Token}}
+
+### ============================================
+### 错误场景测试
+### ============================================
+
+### 10. 测试：无效地址（应该返回错误）
+POST {{EcoLens.Api_HostAddress}}/api/travel/preview
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "不存在的地址123456",
+  "destinationAddress": "另一个不存在的地址",
+  "transportMode": 3
+}
+
+### 11. 测试：缺少必填字段（应该返回验证错误）
+POST {{EcoLens.Api_HostAddress}}/api/travel
+Authorization: Bearer {{Token}}
+Content-Type: application/json
+
+{
+  "originAddress": "北京市朝阳区"
+}
+
+### 12. 测试：未授权访问（不提供 Token）
+GET {{EcoLens.Api_HostAddress}}/api/travel/my-travels
+
+### 13. 测试：获取不存在的记录（应该返回 404）
+GET {{EcoLens.Api_HostAddress}}/api/travel/99999
+Authorization: Bearer {{Token}}
 
 ###
