@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Records from './pages/Records';
 import Leaderboard from './pages/Leaderboard';
+import AboutMe from './pages/AboutMe';
 import AIAssistant from './pages/AIAssistant';
 import Onboarding from './pages/Onboarding';
 import LogMeal from './pages/LogMeal';
@@ -104,6 +105,7 @@ const App: React.FC = () => {
               <Route path="/ai-assistant" element={<AIAssistant />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/about-me" element={<AboutMe />} />
               <Route path="/records" element={<Records />} />
               <Route path="/log-meal" element={<LogMeal />} />
               <Route path="/log-travel" element={<LogTravel />} />

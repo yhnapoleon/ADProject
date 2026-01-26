@@ -1,6 +1,8 @@
 import { Row, Col, Card, Button, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import Lottie from 'lottie-react';
 import { mockLeaderboardData } from '../mock/data';
+import walkingAnimation from '../assets/icons/walking.json';
 import './Dashboard.module.css';
 import mainEatIcon from '../assets/icons/main_eat.svg';
 import mainTravelIcon from '../assets/icons/main_travel.svg';
@@ -30,15 +32,15 @@ const Dashboard = () => {
           <Row gutter={24} align="middle">
             <Col span={12}>
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '8px' }}>This Month's Emissions</div>
+                <div style={{ fontSize: '35px', opacity: '0.9', marginBottom: '8px' }}>This Month's Emissions</div>
                 <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{thisMonthEmissions.toFixed(2)} kg</div>
               </div>
             </Col>
 
             <Col span={12}>
               <div style={{ marginBottom: '12px', textAlign: 'right' }}>
-                <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '8px' }}>Target</div>
-                <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{targetEmissions.toFixed(2)} kg</div>
+                <div style={{ fontSize: '20px', opacity: '0.9', marginBottom: '8px' }}>Target</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>{targetEmissions.toFixed(2)} kg</div>
               </div>
             </Col>
           </Row>
@@ -143,8 +145,50 @@ const Dashboard = () => {
         </Col>
       </Row>
 
+      {/* steps */}
+      <Row gutter={24} style={{ marginTop: '2px' }}>
+        <Col span={24}>
+          <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              padding: '5px 5px', 
+              overflow: 'hidden'    
+            }}>
+              <div style={{ flex: '0 0 auto' }}>
+                <Lottie 
+                  animationData={walkingAnimation} 
+                  loop 
+                  autoplay 
+                  style={{ width: 300, height: 300 }}
+                />
+              </div>
+              <div style={{
+                margin: '0 auto', 
+                display: 'flex', 
+                alignItems: 'baseline', 
+                gap: '20px',
+                fontFamily: 'sans-serif',
+                whiteSpace: 'nowrap',
+              }}>
+                <div style={{ fontSize: '20px', color: '#999' }}>Steps Today</div>
+                <div style={{ fontSize: '35px', fontWeight: 'bold', color: '#674fa3' }}>9,277</div>
+                <div style={{ fontSize: '20px', color: '#999' }}>Steps</div>
+              </div>
+
+              
+              <div style={{ 
+                flex: '0 0 150px', 
+                visibility: 'hidden'
+              }}></div>
+
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
       {/* Leaderboard */}
-      <Row gutter={24} style={{ marginTop: '24px' }}>
+      <Row gutter={24} style={{ marginTop: '2px' }}>
         <Col span={24}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
