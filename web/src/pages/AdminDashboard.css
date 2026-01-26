@@ -71,8 +71,8 @@
 
 .singapore-map-container {
   width: 100%;
-  height: 300px;
-  background: white;
+  height: 400px;
+  background: #f5f5f5;
   border-radius: 4px;
   position: relative;
   overflow: hidden;
@@ -82,21 +82,60 @@
   padding: 20px;
 }
 
-.singapore-map {
+.singapore-map-container svg {
   width: 100%;
   height: 100%;
   max-width: 100%;
   max-height: 100%;
+  background: transparent;
 }
 
-.heat-point {
-  filter: drop-shadow(0 2px 4px rgba(76, 175, 80, 0.3));
-  transition: r 0.3s, opacity 0.3s;
+.singapore-map-container svg path {
+  transition: fill 0.2s ease;
 }
 
-.heat-point:hover {
-  r: 12;
-  opacity: 1;
+.map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+  font-size: 14px;
+}
+
+.map-legend {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.legend-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #666;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  border: 1px solid #ddd;
 }
 
 .table-card {
@@ -162,4 +201,49 @@
 .status-badge.draft {
   color: #f44336;
   background-color: #ffebee;
+}
+
+.map-tooltip {
+  position: absolute;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 280px;
+}
+
+.tooltip-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tooltip-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.tooltip-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.tooltip-value {
+  color: #4CAF50;
+  font-weight: 600;
 }
