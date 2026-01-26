@@ -262,140 +262,17 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// ???????????    /// </summary>
-    [HttpPost]
-    public async Task<ActionResult<BarcodeReferenceResponseDto>> Create([FromBody] CreateBarcodeReferenceDto dto, CancellationToken ct)
+    /// 根据条形码删除记录
+    /// </summary>
+    [HttpDelete("{barcode}")]
+    public async Task<IActionResult> DeleteByBarcode(string barcode, CancellationToken ct)
     {
-        if (await _db.BarcodeReferences.AnyAsync(b => b.Barcode == dto.Barcode, ct))
-        {
-            return Conflict("Barcode already exists.");
-        }
-
-        // ??CarbonReferenceId ????
-        if (dto.CarbonReferenceId.HasValue && !await _db.CarbonReferences.AnyAsync(c => c.Id == dto.CarbonReferenceId.Value, ct))
-        {
-            return BadRequest("Invalid CarbonReferenceId.");
-        }
-
-        var newBarcodeRef = new BarcodeReference
-        {
-            Barcode = dto.Barcode,
-            ProductName = dto.ProductName,
-            CarbonReferenceId = dto.CarbonReferenceId,
-            Category = dto.Category,
-            Brand = dto.Brand
-        };
-
-        await _db.BarcodeReferences.AddAsync(newBarcodeRef, ct);
-        await _db.SaveChangesAsync(ct);
-
-        var responseDto = new BarcodeReferenceResponseDto
-        {
-            Id = newBarcodeRef.Id,
-            Barcode = newBarcodeRef.Barcode,
-            ProductName = newBarcodeRef.ProductName,
-            CarbonReferenceId = newBarcodeRef.CarbonReferenceId,
-            // CarbonReferenceLabel, Co2Factor, Unit ???? Include ??????
-            Category = newBarcodeRef.Category,
-            Brand = newBarcodeRef.Brand
-        };
-
-        // ?? CarbonReferenceId ????????????????
-        if (newBarcodeRef.CarbonReferenceId.HasValue)
-        {
-            var loadedRef = await _db.BarcodeReferences
-                .Include(b => b.CarbonReference)
-                .FirstOrDefaultAsync(b => b.Id == newBarcodeRef.Id, ct);
-            if (loadedRef?.CarbonReference != null)
-            {
-                responseDto.CarbonReferenceLabel = loadedRef.CarbonReference.LabelName;
-                responseDto.Co2Factor = loadedRef.CarbonReference.Co2Factor;
-                responseDto.Unit = loadedRef.CarbonReference.Unit;
-            }
-        }
-
-        return CreatedAtAction(nameof(GetByBarcode), new { barcode = newBarcodeRef.Barcode }, responseDto);
-    }
-
-    /// <summary>
-    /// ?????????    /// </summary>
-    [HttpPut]
-    public async Task<IActionResult> Update([FromBody] UpdateBarcodeReferenceDto dto, CancellationToken ct)
-    {
-        var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Id == dto.Id, ct);
-        if (barcodeRef is null) return NotFound("Barcode reference not found.");
-
-        // ??CarbonReferenceId ????
-        if (dto.CarbonReferenceId.HasValue && !await _db.CarbonReferences.AnyAsync(c => c.Id == dto.CarbonReferenceId.Value, ct))
-        {
-            return BadRequest("Invalid CarbonReferenceId.");
-        }
-
-        barcodeRef.ProductName = dto.ProductName ?? barcodeRef.ProductName;
-        barcodeRef.CarbonReferenceId = dto.CarbonReferenceId ?? barcodeRef.CarbonReferenceId;
-        barcodeRef.Category = dto.Category ?? barcodeRef.Category;
-        barcodeRef.Brand = dto.Brand ?? barcodeRef.Brand;
-
-        _db.BarcodeReferences.Update(barcodeRef);
-        await _db.SaveChangesAsync(ct);
-
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ???????    /// </summary>
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id, CancellationToken ct)
-    {
-        var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Id == id, ct);
+        var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Barcode == barcode, ct);
         if (barcodeRef is null) return NotFound("Barcode reference not found.");
 
         _db.BarcodeReferences.Remove(barcodeRef);
         await _db.SaveChangesAsync(ct);
 
         return NoContent();
-    }
-
-    /// <summary>
-    /// 临时测试端点：直接调用 Climatiq API（用于调试）
-    /// </summary>
-    [HttpGet("test-climatiq")]
-    public async Task<ActionResult> TestClimatiq(CancellationToken ct)
-    {
-        try
-        {
-            var activityId = ClimatiqActivityMapping.DefaultFoodActivityId;
-            var estimate = await _climatiqService.GetCarbonEmissionEstimateAsync(activityId, 1m, "kg", ClimatiqActivityMapping.DefaultFoodRegion);
-            return Ok(new { 
-                Success = true, 
-                ActivityId = activityId, 
-                Co2e = estimate?.Co2e, 
-                Co2eUnit = estimate?.Co2eUnit 
-            });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { 
-                Success = false, 
-                Error = ex.Message, 
-                InnerException = ex.InnerException?.Message 
-            });
-        }
-    }
-
-    /// <summary>
-    /// 测试 activity_id 映射逻辑：根据 categories_tags 返回映射结果
-    /// </summary>
-    [HttpGet("test-mapping")]
-    [AllowAnonymous]
-    public ActionResult TestMapping([FromQuery] string[]? categoriesTags)
-    {
-        var activityId = ClimatiqActivityMapping.GetActivityIdForFood(categoriesTags);
-        return Ok(new
-        {
-            CategoriesTags = categoriesTags ?? Array.Empty<string>(),
-            MappedActivityId = activityId,
-            Region = ClimatiqActivityMapping.DefaultFoodRegion
-        });
     }
 }
