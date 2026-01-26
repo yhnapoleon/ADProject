@@ -96,12 +96,6 @@ const MainLayout: React.FC = () => {
       label: 'Utility',
       onClick: () => navigate('/log-utility'),
     },
-    {
-      key: 'ai-assistant',
-      icon: <RobotOutlined />,
-      label: 'AI Assistant',
-      onClick: () => navigate('/ai-assistant'),
-    },
   ];
 
   const menuItems = isLoggingPage ? groupBItems : groupAItems;

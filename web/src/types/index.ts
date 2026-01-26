@@ -11,6 +11,7 @@ export interface LeaderboardEntry {
   pointsWeek: number;
   pointsMonth: number;
   pointsTotal: number;
+  pointsToday?: number;
 }
 
 export interface User {

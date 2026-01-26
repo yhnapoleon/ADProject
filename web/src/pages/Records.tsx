@@ -3,10 +3,13 @@ import { Card, Table, Select, Button, Modal, message, Row, Col, Tag } from 'antd
 import { DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Record, EmissionType } from '../types/index';
 import './Records.module.css';
+import mainEatIcon from '../assets/icons/main_eat.svg';
+import mainTravelIcon from '../assets/icons/main_travel.svg';
+import mainWaterIcon from '../assets/icons/main_water.svg';
 
 const Records = () => {
-  const [filterType, setFilterType] = useState<EmissionType | undefined>();
-  const [filterMonth, setFilterMonth] = useState<string | undefined>();
+  const [filterType, setFilterType] = useState<EmissionType | 'all' | undefined>('all');
+  const [filterMonth, setFilterMonth] = useState<string | 'all'>('all');
 
   // Mock data
   const mockRecords: Record[] = [
@@ -90,13 +93,117 @@ const Records = () => {
       unit: 'kg CO₂e',
       description: 'BBQ party',
     },
+    {
+      id: '11',
+      date: '2025-12-28',
+      type: 'Food',
+      amount: 1.5,
+      unit: 'kg CO₂e',
+      description: 'Lunch at cafe',
+    },
+    {
+      id: '12',
+      date: '2025-12-27',
+      type: 'Transport',
+      amount: 1.2,
+      unit: 'kg CO₂e',
+      description: 'Taxi ride downtown',
+    },
+    {
+      id: '13',
+      date: '2025-12-26',
+      type: 'Utilities',
+      amount: 0.8,
+      unit: 'kg CO₂e',
+      description: 'Monthly electricity bill',
+    },
+    {
+      id: '14',
+      date: '2025-12-25',
+      type: 'Food',
+      amount: 4.2,
+      unit: 'kg CO₂e',
+      description: 'Christmas dinner',
+    },
+    {
+      id: '15',
+      date: '2025-12-24',
+      type: 'Transport',
+      amount: 3.5,
+      unit: 'kg CO₂e',
+      description: 'Airport transfer',
+    },
+    {
+      id: '16',
+      date: '2025-12-20',
+      type: 'Food',
+      amount: 2.0,
+      unit: 'kg CO₂e',
+      description: 'Restaurant dinner',
+    },
+    {
+      id: '17',
+      date: '2025-12-18',
+      type: 'Utilities',
+      amount: 0.4,
+      unit: 'kg CO₂e',
+      description: 'Water bill',
+    },
+    {
+      id: '18',
+      date: '2025-12-15',
+      type: 'Transport',
+      amount: 0.7,
+      unit: 'kg CO₂e',
+      description: 'MRT commute',
+    },
+    {
+      id: '19',
+      date: '2025-11-30',
+      type: 'Food',
+      amount: 1.8,
+      unit: 'kg CO₂e',
+      description: 'Weekend brunch',
+    },
+    {
+      id: '20',
+      date: '2025-11-28',
+      type: 'Transport',
+      amount: 2.3,
+      unit: 'kg CO₂e',
+      description: 'Long distance drive',
+    },
+    {
+      id: '21',
+      date: '2025-11-25',
+      type: 'Utilities',
+      amount: 0.9,
+      unit: 'kg CO₂e',
+      description: 'Electricity usage',
+    },
+    {
+      id: '22',
+      date: '2025-11-20',
+      type: 'Food',
+      amount: 1.1,
+      unit: 'kg CO₂e',
+      description: 'Vegetarian meal',
+    },
+    {
+      id: '23',
+      date: '2025-11-15',
+      type: 'Transport',
+      amount: 1.5,
+      unit: 'kg CO₂e',
+      description: 'Bus journey',
+    },
   ];
 
   // Filter records
   const filteredRecords = mockRecords.filter((record) => {
-    const matchType = !filterType || record.type === filterType;
-    const recordMonth = record.date.substring(0, 7); // YYYY-MM
-    const matchMonth = !filterMonth || recordMonth === filterMonth;
+    const matchType = !filterType || filterType === 'all' || record.type === filterType;
+    // Only filter by month if filterMonth has a specific value and is not 'all', '', null, or undefined
+    const matchMonth = !filterMonth || filterMonth === 'all' || filterMonth === '' || record.date.substring(0, 7) === filterMonth;
     return matchType && matchMonth;
   });
 
@@ -111,9 +218,9 @@ const Records = () => {
 
   const getTypeIcon = (type: EmissionType) => {
     const iconMap: { [key in EmissionType]: string } = {
-      'Food': '🍴',
-      'Transport': '🚗',
-      'Utilities': '⚡',
+      'Food': mainEatIcon,
+      'Transport': mainTravelIcon,
+      'Utilities': mainWaterIcon,
     };
     return iconMap[type];
   };
@@ -148,9 +255,11 @@ const Records = () => {
       title: 'Type',
       dataIndex: 'type',
       key: 'type',
+      align: 'center' as const,
       render: (text: EmissionType) => (
-        <Tag color={getTypeColor(text)} style={{ marginRight: 0 }}>
-          {getTypeIcon(text)} {text}
+        <Tag color={getTypeColor(text)} style={{ marginRight: 0, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+          <img src={getTypeIcon(text)} alt={text} style={{ width: '16px', height: '16px', filter: 'brightness(0) saturate(100%) invert(40%)' }} />
+          {text}
         </Tag>
       ),
       width: '15%',
@@ -188,14 +297,14 @@ const Records = () => {
   ];
 
   const typeOptions = [
-    { label: 'All Types', value: undefined },
+    { label: 'All Types', value: 'all' },
     { label: 'Food', value: 'Food' as EmissionType },
     { label: 'Transport', value: 'Transport' as EmissionType },
     { label: 'Utilities', value: 'Utilities' as EmissionType },
   ];
 
   const monthOptions = [
-    { label: 'All Months', value: undefined },
+    { label: 'All Months', value: 'all' },
     { label: 'January 2026', value: '2026-01' },
     { label: 'December 2025', value: '2025-12' },
     { label: 'November 2025', value: '2025-11' },
@@ -219,7 +328,7 @@ const Records = () => {
               </div>
               <Select
                 value={filterType}
-                onChange={setFilterType}
+                onChange={(value) => setFilterType(value as EmissionType | 'all' | undefined)}
                 options={typeOptions}
                 style={{ width: '100%' }}
                 size="large"
@@ -243,8 +352,8 @@ const Records = () => {
                 block
                 size="large"
                 onClick={() => {
-                  setFilterType(undefined);
-                  setFilterMonth(undefined);
+                  setFilterType('all');
+                  setFilterMonth('all');
                 }}
               >
                 Reset Filters
@@ -262,8 +371,11 @@ const Records = () => {
               key: record.id,
             }))}
             pagination={{
-              pageSize: 10,
+              position: ['bottomRight'],
+              defaultPageSize: 10,
               showSizeChanger: true,
+              showQuickJumper: false,
+              pageSizeOptions: ['5', '10', '20', '50'],
               showTotal: (total) => `Total ${total} records`,
             }}
             scroll={{ x: 800 }}

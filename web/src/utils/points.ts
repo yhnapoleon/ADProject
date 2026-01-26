@@ -4,9 +4,10 @@
 
 import type { LeaderboardEntry } from '../types';
 
-export type PointsPeriod = 'week' | 'month' | 'all';
+export type PointsPeriod = 'week' | 'month' | 'all' | 'today';
 
 export function getPoints(entry: LeaderboardEntry, period: PointsPeriod) {
+  if (period === 'today') return entry.pointsToday || 0;
   if (period === 'week') return entry.pointsWeek;
   if (period === 'month') return entry.pointsMonth;
   return entry.pointsTotal;

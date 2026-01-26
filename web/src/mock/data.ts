@@ -10,12 +10,13 @@ function hashString(input: string) {
 
 function makePoints(username: string) {
   // Deterministic "random" points per user, with:
-  // pointsTotal >= pointsMonth >= pointsWeek
+  // pointsTotal >= pointsMonth >= pointsWeek >= pointsToday
   const h = hashString(username);
-  const pointsWeek = 30 + (h % 170); // 30..199
+  const pointsToday = 5 + (h % 25); // 5..29
+  const pointsWeek = pointsToday + 25 + ((h >>> 8) % 145); // +25..+169
   const pointsMonth = pointsWeek + 120 + ((h >>> 8) % 380); // +120..+499
   const pointsTotal = pointsMonth + 600 + ((h >>> 16) % 2400); // +600..+2999
-  return { pointsWeek, pointsMonth, pointsTotal };
+  return { pointsToday, pointsWeek, pointsMonth, pointsTotal };
 }
 
 // Shared mock leaderboard data source (single source of truth)
