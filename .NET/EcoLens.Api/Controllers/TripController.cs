@@ -52,6 +52,13 @@ public class TripController : ControllerBase
 			TransportMode = dto.TransportMode
 		});
 	}
+
+	/// <summary>
+	/// 路由别名：/api/travel/route/calculate（与前端文档对齐）。
+	/// </summary>
+	[HttpPost("/api/travel/route/calculate")]
+	public Task<ActionResult<TripCalculateResponseDto>> CalculateAlias([FromBody] TripCalculateRequestDto dto, CancellationToken ct)
+		=> Calculate(dto, ct);
 }
 
 

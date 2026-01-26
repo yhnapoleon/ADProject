@@ -25,7 +25,9 @@ public class ApplicationDbContext : DbContext
 	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
 	public DbSet<DietTemplate> DietTemplates => Set<DietTemplate>();
 	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
-	public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>();
+    public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
+	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
+	public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
 
     public override int SaveChanges()
 	{
@@ -79,16 +81,11 @@ public class ApplicationDbContext : DbContext
 			.HasForeignKey(s => s.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
 
-		modelBuilder.Entity<ApplicationUser>()
-			.HasMany<TravelLog>()
-			.WithOne(t => t.User!)
-			.HasForeignKey(t => t.UserId)
-			.OnDelete(DeleteBehavior.Cascade);
-
-		modelBuilder.Entity<ApplicationUser>()
-			.HasMany<UtilityBill>()
-			.WithOne(u => u.User!)
-			.HasForeignKey(u => u.UserId)
+		// UtilityBill -> ApplicationUser
+		modelBuilder.Entity<UtilityBill>()
+			.HasOne(b => b.User!)
+			.WithMany()
+			.HasForeignKey(b => b.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
 
 		// ActivityLog -> CarbonReference
@@ -130,63 +127,34 @@ public class ApplicationDbContext : DbContext
 			.Property(p => p.CarbonOffset)
 			.HasColumnType("decimal(18,4)");
 
-		// TravelLog decimal precisions
-		modelBuilder.Entity<TravelLog>()
-			.Property(p => p.CarbonEmission)
-			.HasColumnType("decimal(18,4)");
+		// SystemSettings single row
+		modelBuilder.Entity<SystemSettings>()
+			.HasData(new SystemSettings { Id = 1, ConfidenceThreshold = 80, VisionModel = "default", WeeklyDigest = true, MaintenanceMode = false });
 
-		modelBuilder.Entity<TravelLog>()
-			.Property(p => p.DistanceKilometers)
-			.HasColumnType("decimal(10,2)");
-
-		modelBuilder.Entity<TravelLog>()
-			.Property(p => p.OriginLatitude)
-			.HasColumnType("decimal(10,7)");
-
-		modelBuilder.Entity<TravelLog>()
-			.Property(p => p.OriginLongitude)
-			.HasColumnType("decimal(10,7)");
-
-		modelBuilder.Entity<TravelLog>()
-			.Property(p => p.DestinationLatitude)
-			.HasColumnType("decimal(10,7)");
-
-		modelBuilder.Entity<TravelLog>()
-			.Property(p => p.DestinationLongitude)
-			.HasColumnType("decimal(10,7)");
-
-		// UtilityBill decimal precisions
+		// UtilityBill precision
 		modelBuilder.Entity<UtilityBill>()
 			.Property(p => p.ElectricityUsage)
 			.HasColumnType("decimal(18,4)");
-
 		modelBuilder.Entity<UtilityBill>()
 			.Property(p => p.WaterUsage)
 			.HasColumnType("decimal(18,4)");
-
 		modelBuilder.Entity<UtilityBill>()
 			.Property(p => p.GasUsage)
 			.HasColumnType("decimal(18,4)");
-
 		modelBuilder.Entity<UtilityBill>()
-			.Property(p => p.ElectricityCarbonEmission)
-			.HasColumnType("decimal(18,4)");
-
+			.Property(p => p.ElectricityCost)
+			.HasColumnType("decimal(18,2)");
 		modelBuilder.Entity<UtilityBill>()
-			.Property(p => p.WaterCarbonEmission)
-			.HasColumnType("decimal(18,4)");
-
+			.Property(p => p.WaterCost)
+			.HasColumnType("decimal(18,2)");
 		modelBuilder.Entity<UtilityBill>()
-			.Property(p => p.GasCarbonEmission)
-			.HasColumnType("decimal(18,4)");
+			.Property(p => p.GasCost)
+			.HasColumnType("decimal(18,2)");
 
-		modelBuilder.Entity<UtilityBill>()
-			.Property(p => p.TotalCarbonEmission)
-			.HasColumnType("decimal(18,4)");
-
-		modelBuilder.Entity<UtilityBill>()
-			.Property(p => p.OcrConfidence)
-			.HasColumnType("decimal(5,4)");
+		// CarbonReference unique constraint for (LabelName, Category, Region)
+		modelBuilder.Entity<CarbonReference>()
+			.HasIndex(c => new { c.LabelName, c.Category, c.Region })
+			.IsUnique();
 
 		// Community relations
 		modelBuilder.Entity<Post>()
@@ -264,98 +232,18 @@ public class ApplicationDbContext : DbContext
 			new CarbonReference
 			{
 				Id = 4,
-				LabelName = "Walking",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0m,
-				Unit = "kgCO2/km"
+				LabelName = "Water",
+				Category = Models.Enums.CarbonCategory.Utility,
+				Co2Factor = 0.35m,
+				Unit = "kgCO2/m3"
 			},
 			new CarbonReference
 			{
 				Id = 5,
-				LabelName = "Bicycle",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 6,
-				LabelName = "ElectricBike",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.02m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 7,
-				LabelName = "Bus",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.05m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 8,
-				LabelName = "Taxi",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.2m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 9,
-				LabelName = "CarGasoline",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.2m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 10,
-				LabelName = "CarElectric",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.05m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 11,
-				LabelName = "Ship",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.03m, // 轮船碳排放因子（kgCO2/km）
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 12,
-				LabelName = "Plane",
-				Category = Models.Enums.CarbonCategory.Transport,
-				Co2Factor = 0.25m,
-				Unit = "kgCO2/km"
-			},
-			new CarbonReference
-			{
-				Id = 13,
-				LabelName = "Electricity_SG",
+				LabelName = "Gas",
 				Category = Models.Enums.CarbonCategory.Utility,
-				Co2Factor = 0.4057m,
-				Unit = "kgCO2/kWh"
-			},
-			new CarbonReference
-			{
-				Id = 14,
-				LabelName = "Water_SG",
-				Category = Models.Enums.CarbonCategory.Utility,
-				Co2Factor = 0.419m,
-				Unit = "kgCO2/m³"
-			},
-			new CarbonReference
-			{
-				Id = 15,
-				LabelName = "Gas_SG",
-				Category = Models.Enums.CarbonCategory.Utility,
-				Co2Factor = 0.184m,
-				Unit = "kgCO2/kWh"
+				Co2Factor = 2.3m,
+				Unit = "kgCO2/unit"
 			}
 		);
 	}

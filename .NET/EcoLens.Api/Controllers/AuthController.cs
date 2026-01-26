@@ -62,6 +62,7 @@ public class AuthController : ControllerBase
 			{
 				Id = user.Id,
 				Username = user.Username,
+				Nickname = user.Username,
 				Email = user.Email,
 				Role = user.Role,
 				AvatarUrl = user.AvatarUrl,
@@ -114,6 +115,7 @@ public class AuthController : ControllerBase
 			{
 				Id = user.Id,
 				Username = user.Username,
+				Nickname = user.Username,
 				Email = user.Email,
 				Role = user.Role,
 				AvatarUrl = user.AvatarUrl,

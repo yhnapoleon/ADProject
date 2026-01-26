@@ -125,7 +125,11 @@ public class ActivityController : ControllerBase
 			Quantity = log.Quantity,
 			TotalEmission = log.TotalEmission,
 			ImageUrl = log.ImageUrl,
-			CreatedAt = log.CreatedAt
+			CreatedAt = log.CreatedAt,
+			Category = carbonRef.Category,
+			EmissionUnit = "kg CO2e",
+			FactorUnit = carbonRef.Unit,
+			Description = log.DetectedLabel ?? carbonRef.LabelName
 		};
 
 		return Ok(result);
@@ -199,7 +203,11 @@ public class ActivityController : ControllerBase
 				Quantity = l.Quantity,
 				TotalEmission = l.TotalEmission,
 				ImageUrl = l.ImageUrl,
-				CreatedAt = l.CreatedAt
+				CreatedAt = l.CreatedAt,
+				Category = l.CarbonReference!.Category,
+				EmissionUnit = "kg CO2e",
+				FactorUnit = l.CarbonReference!.Unit,
+				Description = l.DetectedLabel ?? l.CarbonReference!.LabelName
 			})
 			.ToListAsync(ct);
 

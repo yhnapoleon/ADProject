@@ -52,5 +52,21 @@ public class VisionController : ControllerBase
 			return StatusCode(StatusCodes.Status500InternalServerError, $"Unexpected error: {ex.Message}");
 		}
 	}
+
+	/// <summary>
+	/// 路由别名：/api/vision/recognize（与前端文档对齐）。
+	/// </summary>
+	[HttpPost("/api/vision/recognize")]
+	[Consumes("multipart/form-data")]
+	public Task<ActionResult<VisionPredictionResponseDto>> Recognize([FromForm] IFormFile image, CancellationToken ct)
+		=> Analyze(image, ct);
+
+	/// <summary>
+	/// 路由别名：/api/vision/meal-detect（与前端文档对齐）。
+	/// </summary>
+	[HttpPost("/api/vision/meal-detect")]
+	[Consumes("multipart/form-data")]
+	public Task<ActionResult<VisionPredictionResponseDto>> MealDetect([FromForm] IFormFile image, CancellationToken ct)
+		=> Analyze(image, ct);
 }
 
