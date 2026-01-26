@@ -202,29 +202,59 @@ public class AdminController : ControllerBase
 		var errors = new List<object>();
 		using var reader = new StreamReader(file.OpenReadStream());
 		var text = await reader.ReadToEndAsync();
+		List<EmissionFactorListItem> items;
 		try
 		{
 			// 仅支持 JSON 数组 [{itemName, category, factor, unit, source}]
-			var items = System.Text.Json.JsonSerializer.Deserialize<List<EmissionFactorListItem>>(text, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
-			foreach (var x in items)
-			{
-				if (string.IsNullOrWhiteSpace(x.ItemName) || string.IsNullOrWhiteSpace(x.Unit) || string.IsNullOrWhiteSpace(x.Category)) continue;
-				if (!Enum.TryParse<CarbonCategory>(x.Category, true, out var cat)) continue;
-				await _db.CarbonReferences.AddAsync(new CarbonReference
-				{
-					LabelName = x.ItemName,
-					Category = cat,
-					Co2Factor = x.Factor,
-					Unit = x.Unit,
-					Source = x.Source ?? "Import"
-				}, ct);
-				imported++;
-			}
-			await _db.SaveChangesAsync(ct);
+			items = System.Text.Json.JsonSerializer.Deserialize<List<EmissionFactorListItem>>(text, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
 		}
-		catch
+		catch (System.Text.Json.JsonException)
 		{
 			errors.Add(new { row = 0, message = "Failed to parse JSON." });
+			return Ok(new { importedCount = 0, errors });
+		}
+
+		for (var i = 0; i < items.Count; i++)
+		{
+			var x = items[i];
+			// 基础校验
+			if (string.IsNullOrWhiteSpace(x.ItemName) || string.IsNullOrWhiteSpace(x.Unit) || string.IsNullOrWhiteSpace(x.Category))
+			{
+				errors.Add(new { row = i + 1, message = "ItemName/Unit/Category required." });
+				continue;
+			}
+			if (!Enum.TryParse<CarbonCategory>(x.Category, true, out var cat))
+			{
+				errors.Add(new { row = i + 1, message = "Invalid category." });
+				continue;
+			}
+
+			var entity = new CarbonReference
+			{
+				LabelName = x.ItemName,
+				Category = cat,
+				Co2Factor = x.Factor,
+				Unit = x.Unit,
+				Source = x.Source ?? "Import"
+			};
+
+			try
+			{
+				await _db.CarbonReferences.AddAsync(entity, ct);
+				await _db.SaveChangesAsync(ct);
+				imported++;
+			}
+			catch (DbUpdateException ex)
+			{
+				// 回滚当前实体的跟踪，避免影响后续条目
+				_db.Entry(entity).State = EntityState.Detached;
+				errors.Add(new { row = i + 1, message = "Failed to save (possibly duplicate or constraint violation)." });
+			}
+			catch (Exception ex)
+			{
+				_db.Entry(entity).State = EntityState.Detached;
+				errors.Add(new { row = i + 1, message = $"Unexpected error: {ex.Message}" });
+			}
 		}
 
 		return Ok(new { importedCount = imported, errors });
@@ -240,7 +270,7 @@ public class AdminController : ControllerBase
 		if (!string.IsNullOrWhiteSpace(dto.ItemName)) entity.LabelName = dto.ItemName;
 		if (!string.IsNullOrWhiteSpace(dto.Unit)) entity.Unit = dto.Unit;
 		if (!string.IsNullOrWhiteSpace(dto.Category) && Enum.TryParse<CarbonCategory>(dto.Category, true, out var cat)) entity.Category = cat;
-		if (dto.Factor > 0) entity.Co2Factor = dto.Factor;
+		if (dto.Factor >= 0) entity.Co2Factor = dto.Factor;
 		if (!string.IsNullOrWhiteSpace(dto.Source)) entity.Source = dto.Source;
 		await _db.SaveChangesAsync(ct);
 
@@ -478,24 +508,30 @@ public class AdminController : ControllerBase
 	[HttpGet("analytics/category-share")]
 	public async Task<ActionResult<IEnumerable<object>>> CategoryShare(CancellationToken ct)
 	{
-		var logs = await _db.ActivityLogs
-			.Include(l => l.CarbonReference)
+		// 在数据库端完成聚合，避免将整表加载到内存
+		var grouped = await _db.ActivityLogs
+			.Join(_db.CarbonReferences,
+				l => l.CarbonReferenceId,
+				c => c.Id,
+				(l, c) => new { c.Category, l.TotalEmission })
+			.GroupBy(x => x.Category)
+			.Select(g => new { Category = g.Key, Total = g.Sum(x => x.TotalEmission) })
 			.ToListAsync(ct);
 
-		var total = logs.Sum(l => l.TotalEmission);
-		decimal TotalOrOne(decimal x) => total > 0 ? Math.Round(x * 100m / total, 2) : 0m;
+		var total = grouped.Sum(x => x.Total);
+		decimal AsPercent(decimal part) => total > 0 ? Math.Round(part * 100m / total, 2) : 0m;
 
-		var food = logs.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Food).Sum(l => l.TotalEmission);
-		var transport = logs.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Transport).Sum(l => l.TotalEmission);
-		var utility = logs.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Utility).Sum(l => l.TotalEmission);
+		decimal GetTotal(CarbonCategory cat) => grouped.FirstOrDefault(x => x.Category == cat)?.Total ?? 0m;
+		var food = GetTotal(CarbonCategory.Food);
+		var transport = GetTotal(CarbonCategory.Transport);
+		var utility = GetTotal(CarbonCategory.Utility);
 
-		var result = new[]
+		return Ok(new[]
 		{
-			new { name = "Food", value = TotalOrOne(food) },
-			new { name = "Transport", value = TotalOrOne(transport) },
-			new { name = "Utilities", value = TotalOrOne(utility) }
-		};
-		return Ok(result);
+			new { name = "Food", value = AsPercent(food) },
+			new { name = "Transport", value = AsPercent(transport) },
+			new { name = "Utilities", value = AsPercent(utility) }
+		});
 	}
 
 	/// <summary>
