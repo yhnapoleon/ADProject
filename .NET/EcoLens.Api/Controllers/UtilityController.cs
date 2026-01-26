@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 using EcoLens.Api.Services;
+using EcoLens.Api.Data;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using EcoLens.Api.Models;
+using EcoLens.Api.Models.Enums;
 
 namespace EcoLens.Api.Controllers;
 
@@ -12,10 +17,18 @@ namespace EcoLens.Api.Controllers;
 public class UtilityController : ControllerBase
 {
 	private readonly IAiService _aiService;
+	private readonly ApplicationDbContext _db;
 
-	public UtilityController(IAiService aiService)
+	public UtilityController(IAiService aiService, ApplicationDbContext db)
 	{
 		_aiService = aiService;
+		_db = db;
+	}
+
+	private int? GetUserId()
+	{
+		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
 	/// <summary>
@@ -102,12 +115,209 @@ public class UtilityController : ControllerBase
 		}
 	}
 
+	/// <summary>
+	/// 路由别名：/api/vision/utility-ocr（与前端文档对齐）。表单字段名：file
+	/// </summary>
+	[HttpPost("/api/vision/utility-ocr")]
+	[Consumes("multipart/form-data")]
+	public Task<ActionResult<object>> UtilityOcrAlias([FromForm] IFormFile file, CancellationToken ct)
+		=> Ocr(file, ct);
+
 	private sealed class UsageDto
 	{
 		public decimal ElectricityUsage { get; set; }
 		public decimal WaterUsage { get; set; }
 		public decimal GasUsage { get; set; }
 	}
+
+	#region Utility Record CRUD
+
+	public sealed class CreateUtilitiesRecordRequest
+	{
+		public string? Month { get; set; } // YYYY-MM
+		public decimal? ElectricityUsage { get; set; }
+		public decimal? ElectricityCost { get; set; }
+		public decimal? WaterUsage { get; set; }
+		public decimal? WaterCost { get; set; }
+		public decimal? GasUsage { get; set; }
+		public decimal? GasCost { get; set; }
+	}
+
+	public sealed class UpsertUtilityRecordDto
+	{
+		public string YearMonth { get; set; } = string.Empty; // YYYY-MM
+		public decimal ElectricityUsage { get; set; }
+		public decimal ElectricityCost { get; set; }
+		public decimal WaterUsage { get; set; }
+		public decimal WaterCost { get; set; }
+		public decimal GasUsage { get; set; }
+		public decimal GasCost { get; set; }
+	}
+
+	public sealed class UtilityRecordResponseDto
+	{
+		public int Id { get; set; }
+		public string YearMonth { get; set; } = string.Empty;
+		public decimal ElectricityUsage { get; set; }
+		public decimal ElectricityCost { get; set; }
+		public decimal WaterUsage { get; set; }
+		public decimal WaterCost { get; set; }
+		public decimal GasUsage { get; set; }
+		public decimal GasCost { get; set; }
+		public decimal EstimatedEmission { get; set; } // 合计的估算碳排放（kg CO2e）
+	}
+
+	/// <summary>
+	/// 保存一条 Utility 账单记录，并基于参考因子生成对应的 ActivityLog（每个非零用量各一条）。
+	/// </summary>
+	[HttpPost("record")]
+	public async Task<ActionResult<UtilityRecordResponseDto>> SaveRecord([FromBody] UpsertUtilityRecordDto dto, CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+		if (string.IsNullOrWhiteSpace(dto.YearMonth) || dto.YearMonth.Length != 7)
+		{
+			return BadRequest("YearMonth must be formatted as YYYY-MM.");
+		}
+
+		var bill = new UtilityBill
+		{
+			UserId = userId.Value,
+			YearMonth = dto.YearMonth,
+			ElectricityUsage = dto.ElectricityUsage < 0 ? 0 : dto.ElectricityUsage,
+			ElectricityCost = dto.ElectricityCost < 0 ? 0 : dto.ElectricityCost,
+			WaterUsage = dto.WaterUsage < 0 ? 0 : dto.WaterUsage,
+			WaterCost = dto.WaterCost < 0 ? 0 : dto.WaterCost,
+			GasUsage = dto.GasUsage < 0 ? 0 : dto.GasUsage,
+			GasCost = dto.GasCost < 0 ? 0 : dto.GasCost
+		};
+
+		await _db.UtilityBills.AddAsync(bill, ct);
+		await _db.SaveChangesAsync(ct);
+
+		// 生成 ActivityLog（若对应 usage > 0）
+		var userRegion = await _db.ApplicationUsers
+			.Where(u => u.Id == userId.Value)
+			.Select(u => u.Region)
+			.FirstOrDefaultAsync(ct);
+
+		async Task<CarbonReference?> FindUtilityFactorAsync(string label)
+		{
+			CarbonReference? factor = null;
+			if (!string.IsNullOrWhiteSpace(userRegion))
+			{
+				factor = await _db.CarbonReferences.FirstOrDefaultAsync(
+					c => c.LabelName == label && c.Category == CarbonCategory.Utility && c.Region == userRegion, ct);
+			}
+			if (factor is null)
+			{
+				factor = await _db.CarbonReferences.FirstOrDefaultAsync(
+					c => c.LabelName == label && c.Category == CarbonCategory.Utility && c.Region == null, ct);
+			}
+			return factor;
+		}
+
+		decimal totalEmission = 0m;
+		async Task AddLogAsync(string label, decimal usage)
+		{
+			if (usage <= 0) return;
+			var factor = await FindUtilityFactorAsync(label);
+			if (factor is null) return;
+
+			var emission = usage * factor.Co2Factor;
+			totalEmission += emission;
+
+			var log = new ActivityLog
+			{
+				UserId = userId.Value,
+				CarbonReferenceId = factor.Id,
+				Quantity = usage,
+				TotalEmission = emission,
+				ImageUrl = null,
+				DetectedLabel = $"{label} ({bill.YearMonth})"
+			};
+			await _db.ActivityLogs.AddAsync(log, ct);
+		}
+
+		await AddLogAsync("Electricity", bill.ElectricityUsage);
+		await AddLogAsync("Water", bill.WaterUsage);
+		await AddLogAsync("Gas", bill.GasUsage);
+
+		await _db.SaveChangesAsync(ct);
+
+		var response = new UtilityRecordResponseDto
+		{
+			Id = bill.Id,
+			YearMonth = bill.YearMonth,
+			ElectricityUsage = bill.ElectricityUsage,
+			ElectricityCost = bill.ElectricityCost,
+			WaterUsage = bill.WaterUsage,
+			WaterCost = bill.WaterCost,
+			GasUsage = bill.GasUsage,
+			GasCost = bill.GasCost,
+			EstimatedEmission = totalEmission
+		};
+
+		return Ok(response);
+	}
+
+	/// <summary>
+	/// 路由别名：/api/records/utilities（与前端文档对齐）。
+	/// </summary>
+	[HttpPost("/api/records/utilities")]
+	public Task<ActionResult<UtilityRecordResponseDto>> CreateUtilitiesRecord([FromBody] CreateUtilitiesRecordRequest req, CancellationToken ct)
+	{
+		var dto = new UpsertUtilityRecordDto
+		{
+			YearMonth = string.IsNullOrWhiteSpace(req.Month) ? DateTime.UtcNow.ToString("yyyy-MM") : req.Month!,
+			ElectricityUsage = req.ElectricityUsage ?? 0,
+			ElectricityCost = req.ElectricityCost ?? 0,
+			WaterUsage = req.WaterUsage ?? 0,
+			WaterCost = req.WaterCost ?? 0,
+			GasUsage = req.GasUsage ?? 0,
+			GasCost = req.GasCost ?? 0
+		};
+		return SaveRecord(dto, ct);
+	}
+
+	/// <summary>
+	/// 获取当前用户的 Utility 账单记录（按月份倒序）。
+	/// </summary>
+	[HttpGet("my-records")]
+	public async Task<ActionResult<IEnumerable<UtilityRecordResponseDto>>> MyRecords(CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		// 估算排放：按当前参考因子临时计算（无需严格一致）
+		var electricity = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == "Electricity" && c.Category == CarbonCategory.Utility, ct);
+		var water = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == "Water" && c.Category == CarbonCategory.Utility, ct);
+		var gas = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == "Gas" && c.Category == CarbonCategory.Utility, ct);
+
+		var items = await _db.UtilityBills
+			.Where(b => b.UserId == userId.Value)
+			.OrderByDescending(b => b.YearMonth)
+			.Select(b => new UtilityRecordResponseDto
+			{
+				Id = b.Id,
+				YearMonth = b.YearMonth,
+				ElectricityUsage = b.ElectricityUsage,
+				ElectricityCost = b.ElectricityCost,
+				WaterUsage = b.WaterUsage,
+				WaterCost = b.WaterCost,
+				GasUsage = b.GasUsage,
+				GasCost = b.GasCost,
+				EstimatedEmission =
+					(b.ElectricityUsage * (electricity != null ? electricity.Co2Factor : 0m)) +
+					(b.WaterUsage * (water != null ? water.Co2Factor : 0m)) +
+					(b.GasUsage * (gas != null ? gas.Co2Factor : 0m))
+			})
+			.ToListAsync(ct);
+
+		return Ok(items);
+	}
+
+	#endregion
 }
 
 

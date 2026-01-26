@@ -2,6 +2,14 @@
 
 这份文档总结了近期在 EcoLens.Api 项目中完成的主要功能开发和集成工作。
 
+## 工作概要（上一阶段）
+
+- **文档与 API 说明**：更新 `README.md` 和 `NETv0,1.md`，补充运行环境、配置、迁移、认证及 `ActivityController`、`StepController`、`LeaderboardController` 的接口说明与业务逻辑。
+- **Climatiq API 集成**：在 `appsettings` 中配置 Climatiq，实现 `ClimatiqService` 及 DTOs；在 `ActivityController.Upload` 中，当本地 `CarbonReference` 无匹配时调用 Climatiq 获取碳排放估算并可选缓存；`CarbonReference` 增加 `Source`、`ClimatiqActivityId`。
+- **条形码数据库管理**：新增 `BarcodeReference` 模型与 `BarcodeController` 的 CRUD，集成 Open Food Facts 服务与 DTOs；`GetByBarcode` 支持按条码查询、从 OFF 拉取产品并本地缓存，与 `CarbonReference` 关联。
+
+---
+
 ## 1. README.md 和 NETv0,1.md 更新
 
 -   更新了 `README.md` 文件，详细说明了 EcoLens.Api 的运行环境要求、关键配置文件、使用用户机密、数据库迁移与初始化、启动项目、身份认证（JWT）、CORS、常见问题及目录结构。

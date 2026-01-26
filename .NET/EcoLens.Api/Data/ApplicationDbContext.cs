@@ -21,9 +21,13 @@ public class ApplicationDbContext : DbContext
 	public DbSet<Post> Posts => Set<Post>();
 	public DbSet<Comment> Comments => Set<Comment>();
 	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+	public DbSet<TravelLog> TravelLogs => Set<TravelLog>();
+	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
 	public DbSet<DietTemplate> DietTemplates => Set<DietTemplate>();
 	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
     public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
+	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
+	public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
 
     public override int SaveChanges()
 	{
@@ -77,12 +81,26 @@ public class ApplicationDbContext : DbContext
 			.HasForeignKey(s => s.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
 
+		// UtilityBill -> ApplicationUser
+		modelBuilder.Entity<UtilityBill>()
+			.HasOne(b => b.User!)
+			.WithMany()
+			.HasForeignKey(b => b.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
 		// ActivityLog -> CarbonReference
 		modelBuilder.Entity<ActivityLog>()
 			.HasOne(a => a.CarbonReference!)
 			.WithMany()
 			.HasForeignKey(a => a.CarbonReferenceId)
 			.OnDelete(DeleteBehavior.Restrict);
+
+		// BarcodeReference -> CarbonReference
+		modelBuilder.Entity<BarcodeReference>()
+			.HasOne(b => b.CarbonReference!)
+			.WithMany()
+			.HasForeignKey(b => b.CarbonReferenceId)
+			.OnDelete(DeleteBehavior.SetNull);
 
 		// Decimal precisions (mirror annotations, explicit for safety)
 		modelBuilder.Entity<ApplicationUser>()
@@ -108,6 +126,30 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<StepRecord>()
 			.Property(p => p.CarbonOffset)
 			.HasColumnType("decimal(18,4)");
+
+		// SystemSettings single row
+		modelBuilder.Entity<SystemSettings>()
+			.HasData(new SystemSettings { Id = 1, ConfidenceThreshold = 80, VisionModel = "default", WeeklyDigest = true, MaintenanceMode = false });
+
+		// UtilityBill precision
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.ElectricityUsage)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.WaterUsage)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.GasUsage)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.ElectricityCost)
+			.HasColumnType("decimal(18,2)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.WaterCost)
+			.HasColumnType("decimal(18,2)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.GasCost)
+			.HasColumnType("decimal(18,2)");
 
 		// CarbonReference unique constraint for (LabelName, Category, Region)
 		modelBuilder.Entity<CarbonReference>()
@@ -135,20 +177,20 @@ public class ApplicationDbContext : DbContext
 			.HasOne(c => c.User!)
 			.WithMany()
 			.HasForeignKey(c => c.UserId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		// Social follow relations
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Follower!)
 			.WithMany()
 			.HasForeignKey(f => f.FollowerId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Followee!)
 			.WithMany()
 			.HasForeignKey(f => f.FolloweeId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })
@@ -186,6 +228,22 @@ public class ApplicationDbContext : DbContext
 				Category = Models.Enums.CarbonCategory.Utility,
 				Co2Factor = 0.5m,
 				Unit = "kgCO2/kWh"
+			},
+			new CarbonReference
+			{
+				Id = 4,
+				LabelName = "Water",
+				Category = Models.Enums.CarbonCategory.Utility,
+				Co2Factor = 0.35m,
+				Unit = "kgCO2/m3"
+			},
+			new CarbonReference
+			{
+				Id = 5,
+				LabelName = "Gas",
+				Category = Models.Enums.CarbonCategory.Utility,
+				Co2Factor = 2.3m,
+				Unit = "kgCO2/unit"
 			}
 		);
 	}
