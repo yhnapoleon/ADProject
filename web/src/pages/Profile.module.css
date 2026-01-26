@@ -22,6 +22,29 @@
   border: 3px solid #674fa3;
 }
 
+.avatarUploadWrapper {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.avatarOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.avatarUploadWrapper:hover .avatarOverlay {
+  opacity: 1;
+}
+
 .userName {
   font-size: 20px;
   font-weight: 700;

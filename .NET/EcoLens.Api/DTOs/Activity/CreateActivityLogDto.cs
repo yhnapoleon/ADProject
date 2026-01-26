@@ -17,6 +17,10 @@ public class CreateActivityLogDto
 	[Required]
 	public decimal Quantity { get; set; }
 
+	[Required]
+	[MaxLength(50)]
+	public string Unit { get; set; } = string.Empty;
+
 	// 可选：当为 Utility 时，服务端将按用户 Region 优先匹配
 	public CarbonCategory? Category { get; set; }
 }

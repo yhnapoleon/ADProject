@@ -1,9 +1,11 @@
-import { Row, Col, Card, Button, Progress, Avatar } from 'antd';
+import { Row, Col, Card, Button, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { mockLeaderboardData } from '../mock/data';
 import './Dashboard.module.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const numberFormatter = new Intl.NumberFormat('en-US');
 
   // Mock data
   const todayEmissions = 0.0;
@@ -13,17 +15,9 @@ const Dashboard = () => {
   const transportEmissions = 0.0;
   const utilitiesEmissions = 0.0;
 
-  const leaderboard = [
-    { id: 1, name: 'Xiaowang', emissions: 1.81, avatar: 'X' },
-    { id: 2, name: 'Nina', emissions: 1.46, avatar: 'N' },
-    { id: 3, name: 'Xiaozhang', emissions: 1.22, avatar: 'Z' },
-    { id: 4, name: 'Xiaowang', emissions: 1.21, avatar: 'X' },
-    { id: 5, name: 'Xiaowang', emissions: 1.20, avatar: 'X' },
-    { id: 6, name: 'Xiaowang', emissions: 1.66, avatar: 'X' },
-    { id: 7, name: 'Xiaowang', emissions: 1.81, avatar: 'X' },
-    { id: 8, name: 'Nina', emissions: 1.46, avatar: 'N' },
-    { id: 9, name: 'Xiaozhang', emissions: 1.22, avatar: 'Z' },
-  ];
+  const weeklyLeaderboard = [...mockLeaderboardData]
+    .sort((a, b) => b.pointsWeek - a.pointsWeek)
+    .slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -104,9 +98,9 @@ const Dashboard = () => {
                   marginTop: '16px',
                   fontWeight: '600',
                 }}
-                onClick={() => navigate('/records')}
+                onClick={() => navigate('/log-meal')}
               >
-                Log Food
+                Log Meal
               </Button>
             </div>
           </Card>
@@ -130,7 +124,7 @@ const Dashboard = () => {
                   marginTop: '16px',
                   fontWeight: '600',
                 }}
-                onClick={() => navigate('/records')}
+                onClick={() => navigate('/log-travel')}
               >
                 Log Trip
               </Button>
@@ -156,7 +150,7 @@ const Dashboard = () => {
                   marginTop: '16px',
                   fontWeight: '600',
                 }}
-                onClick={() => navigate('/records')}
+                onClick={() => navigate('/log-utility')}
               >
                 Log Usage
               </Button>
@@ -170,21 +164,23 @@ const Dashboard = () => {
         <Col span={24}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Leaderboard</div>
-              <Button type="link" onClick={() => navigate('/records')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Weekly Leaderboard</div>
+              </div>
+              <Button type="link" onClick={() => navigate('/leaderboard')}>
                 View all
               </Button>
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {leaderboard.map((user, index) => (
+              {weeklyLeaderboard.map((user, index) => (
                 <div
-                  key={user.id}
+                  key={user.username}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '12px 0',
-                    borderBottom: index < leaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    borderBottom: index < weeklyLeaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -196,12 +192,13 @@ const Dashboard = () => {
                         minWidth: '24px',
                       }}
                     >
-                      #{index + 1}
+                      {index + 1}
                     </span>
-                    <Avatar style={{ background: '#674fa3' }}>{user.avatar}</Avatar>
-                    <span>{user.name}</span>
+                    <span>{user.nickname}</span>
                   </div>
-                  <span style={{ fontWeight: '600' }}>{user.emissions} kg</span>
+                  <span style={{ fontWeight: 700, color: '#674fa3' }}>
+                    {numberFormatter.format(user.pointsWeek)} pts
+                  </span>
                 </div>
               ))}
             </div>

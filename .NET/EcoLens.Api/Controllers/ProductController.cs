@@ -29,20 +29,23 @@ public class ProductController : ControllerBase
 			return BadRequest("Barcode is required.");
 		}
 
-		var entity = await _db.CarbonReferences.AsNoTracking()
-			.FirstOrDefaultAsync(c => c.Barcode == barcode, ct);
+		// 使用 BarcodeReference 表查询，而不是 CarbonReference.Barcode
+		var barcodeRef = await _db.BarcodeReferences.AsNoTracking()
+			.Include(b => b.CarbonReference)
+			.FirstOrDefaultAsync(b => b.Barcode == barcode, ct);
 
-		if (entity is null)
+		if (barcodeRef is null || barcodeRef.CarbonReference is null)
 		{
 			return NotFound();
 		}
 
+		var carbonRef = barcodeRef.CarbonReference;
 		return Ok(new ProductLookupResponseDto
 		{
-			Name = entity.LabelName,
-			Co2Factor = entity.Co2Factor,
-			Unit = entity.Unit,
-			Barcode = entity.Barcode
+			Name = carbonRef.LabelName,
+			Co2Factor = carbonRef.Co2Factor,
+			Unit = carbonRef.Unit,
+			Barcode = barcodeRef.Barcode
 		});
 	}
 }

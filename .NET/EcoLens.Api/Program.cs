@@ -179,6 +179,10 @@ builder.Services.AddScoped<IGoogleMapsService, GoogleMapsService>();
 // Caching Services
 builder.Services.AddScoped<EcoLens.Api.Services.Caching.IGeocodingCacheService, EcoLens.Api.Services.Caching.GeocodingCacheService>();
 
+// External API services
+builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
+builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>();
+
 // Vision settings binding & HttpClient
 builder.Services.Configure<VisionSettings>(configuration.GetSection("VisionService"));
 var visionBaseUrl = configuration["VisionService:BaseUrl"] ?? "http://localhost:8000";
