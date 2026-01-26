@@ -46,9 +46,9 @@ public enum TransportMode
 	CarElectric = 7,
 
 	/// <summary>
-	/// 火车
+	/// 轮船
 	/// </summary>
-	Train = 8,
+	Ship = 8,
 
 	/// <summary>
 	/// 飞机

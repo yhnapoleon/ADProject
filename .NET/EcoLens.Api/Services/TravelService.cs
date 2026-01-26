@@ -371,7 +371,7 @@ public class TravelService : ITravelService
 			TransportMode.Taxi => "出租车/网约车",
 			TransportMode.CarGasoline => "私家车（汽油）",
 			TransportMode.CarElectric => "私家车（电动车）",
-			TransportMode.Train => "火车",
+			TransportMode.Ship => "轮船",
 			TransportMode.Plane => "飞机",
 			_ => mode.ToString()
 		};
@@ -392,7 +392,7 @@ public class TravelService : ITravelService
 			TransportMode.Taxi => "driving",
 			TransportMode.CarGasoline => "driving",
 			TransportMode.CarElectric => "driving",
-			TransportMode.Train => "transit",
+			TransportMode.Ship => "driving", // 轮船使用driving模式（Google Maps不支持轮船路线）
 			TransportMode.Plane => "driving", // 飞机使用driving模式（Google Maps不支持飞机路线）
 			_ => "driving"
 		};
@@ -423,7 +423,7 @@ public class TravelService : ITravelService
 			TransportMode.Taxi => "Taxi",
 			TransportMode.CarGasoline => "CarGasoline",
 			TransportMode.CarElectric => "CarElectric",
-			TransportMode.Train => "Train",
+			TransportMode.Ship => "Ship",
 			TransportMode.Plane => "Plane",
 			_ => mode.ToString()
 		};

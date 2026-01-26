@@ -9,7 +9,7 @@ namespace EcoLens.Api.DTOs.UtilityBill;
 public class UploadUtilityBillDto
 {
 	/// <summary>
-	/// 账单文件（支持图片：JPG、PNG、GIF、BMP、WEBP，或PDF文件）
+	/// 账单文件（支持图片：JPG、PNG、BMP、WEBP，或PDF文件）
 	/// </summary>
 	[Required(ErrorMessage = "File is required")]
 	public IFormFile File { get; set; } = null!;

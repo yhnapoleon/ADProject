@@ -30,7 +30,10 @@ public class GoogleMapsService : IGoogleMapsService
 	{
 		try
 		{
-			var url = $"https://maps.googleapis.com/maps/api/geocode/json?address={Uri.EscapeDataString(address)}&key={_apiKey}";
+			// 支持新加坡邮编直接输入（6位数字，如160149）
+			var normalizedAddress = NormalizeSingaporePostalCode(address);
+			
+			var url = $"https://maps.googleapis.com/maps/api/geocode/json?address={Uri.EscapeDataString(normalizedAddress)}&key={_apiKey}";
 			var response = await _httpClient.GetFromJsonAsync<GoogleGeocodingResponse>(url, ct);
 
 			if (response?.Status != "OK" || response.Results == null || response.Results.Count == 0)
@@ -383,4 +386,24 @@ public class GoogleMapsService : IGoogleMapsService
 	}
 
 	#endregion
+
+	/// <summary>
+	/// 标准化新加坡邮编输入
+	/// 如果输入是6位数字，自动添加"Singapore"后缀以提高识别率
+	/// </summary>
+	private string NormalizeSingaporePostalCode(string address)
+	{
+		if (string.IsNullOrWhiteSpace(address))
+			return address;
+
+		// 检查是否为6位数字（新加坡邮编格式）
+		var trimmedAddress = address.Trim();
+		if (System.Text.RegularExpressions.Regex.IsMatch(trimmedAddress, @"^\d{6}$"))
+		{
+			_logger.LogDebug("Detected Singapore postal code: {PostalCode}, adding 'Singapore' suffix", trimmedAddress);
+			return $"{trimmedAddress} Singapore";
+		}
+
+		return address;
+	}
 }

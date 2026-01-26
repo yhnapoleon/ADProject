@@ -77,12 +77,12 @@ public class UtilityBillParser : IUtilityBillParser
 	{
 		var hasElectricity = ContainsKeywords(lowerText, new[]
 		{
-			"electricity", "electric", "power", "kwh", "kw·h", "sp group", "sp services"
+			"electricity", "electric", "power", "kwh", "kw·h", "sp group", "sp services", "electricity services"
 		});
 
 		var hasWater = ContainsKeywords(lowerText, new[]
 		{
-			"water", "pub", "m³", "m3", "cubic meter", "litre", "liter", "consumption"
+			"water", "pub", "m³", "m3", "cubic meter", "litre", "liter", "consumption", "cu m", "water services"
 		});
 
 		var hasGas = ContainsKeywords(lowerText, new[]
@@ -148,11 +148,15 @@ public class UtilityBillParser : IUtilityBillParser
 	private decimal? ExtractWaterUsage(string text)
 	{
 		// 匹配模式：数字 + m³/m3/cubic meter/Cu M/L/litre
+		// 增强对 "Cu M" 格式的支持（SP Services 账单格式）
 		var patterns = new[]
 		{
-			@"(\d+\.?\d*)\s*(?:m³|m3|cubic\s*meter|cu\s*m|cu\.?\s*m\.?)",
-			@"(?:consumption|usage|used)\s*:?\s*(\d+\.?\d*)\s*(?:m³|m3|cubic\s*meter|cu\s*m|cu\.?\s*m\.?)",
-			@"(\d+\.?\d*)\s*(?:m³|m3|cu\s*m|cu\.?\s*m\.?)\s*(?:consumption|usage)"
+			@"(\d+\.?\d*)\s*(?:m³|m3|cubic\s*meter|cu\s*m|cu\.?\s*m\.?|cu\s+m)",
+			@"(?:consumption|usage|used)\s*:?\s*(\d+\.?\d*)\s*(?:m³|m3|cubic\s*meter|cu\s*m|cu\.?\s*m\.?|cu\s+m)",
+			@"(\d+\.?\d*)\s*(?:m³|m3|cu\s*m|cu\.?\s*m\.?|cu\s+m)\s*(?:consumption|usage)",
+			// SP Services 特定格式：Usage: 7.6 Cu M
+			@"usage\s*:?\s*(\d+\.?\d*)\s*cu\s+m",
+			@"(\d+\.?\d*)\s*cu\s+m\s*usage"
 		};
 
 		foreach (var pattern in patterns)

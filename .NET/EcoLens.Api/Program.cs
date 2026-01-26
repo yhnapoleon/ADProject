@@ -24,9 +24,10 @@ builder.Services.AddCors(options =>
 	options.AddPolicy(AllowAllCorsPolicy, policy =>
 	{
 		policy
-			.AllowAnyOrigin()
+			.SetIsOriginAllowed(_ => true) // 允许所有来源
 			.AllowAnyHeader()
-			.AllowAnyMethod();
+			.AllowAnyMethod()
+			.AllowCredentials(); // 允许凭证
 	});
 });
 
@@ -202,6 +203,7 @@ if (app.Environment.IsDevelopment())
 	app.UseSwaggerUI();
 }
 
+// CORS 必须在 Authentication 之前
 app.UseCors(AllowAllCorsPolicy);
 
 app.UseAuthentication();

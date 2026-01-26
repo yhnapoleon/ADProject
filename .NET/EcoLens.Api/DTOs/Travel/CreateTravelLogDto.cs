@@ -9,14 +9,14 @@ namespace EcoLens.Api.DTOs.Travel;
 public class CreateTravelLogDto
 {
 	/// <summary>
-	/// 出发地地址（例如：北京市朝阳区）
+	/// 出发地地址（例如：北京市朝阳区，或新加坡邮编如160149）
 	/// </summary>
 	[Required(ErrorMessage = "Origin address is required")]
 	[MaxLength(500, ErrorMessage = "Origin address cannot exceed 500 characters")]
 	public string OriginAddress { get; set; } = string.Empty;
 
 	/// <summary>
-	/// 目的地地址（例如：北京市海淀区）
+	/// 目的地地址（例如：北京市海淀区，或新加坡邮编如160149）
 	/// </summary>
 	[Required(ErrorMessage = "Destination address is required")]
 	[MaxLength(500, ErrorMessage = "Destination address cannot exceed 500 characters")]
@@ -35,7 +35,7 @@ public class CreateTravelLogDto
 	/// - 5: 出租车/网约车（Taxi）
 	/// - 6: 私家车（汽油）（CarGasoline）
 	/// - 7: 私家车（电动车）（CarElectric）
-	/// - 8: 火车（Train）
+	/// - 8: 轮船（Ship）
 	/// - 9: 飞机（Plane）
 	/// </remarks>
 	/// <example>3</example>

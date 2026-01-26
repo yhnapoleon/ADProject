@@ -127,7 +127,7 @@ Write-Host "`n=== Step 4: Manual OCR Testing Instructions ===" -ForegroundColor 
 Write-Host "To test OCR functionality with actual bill images:" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "1. Prepare a bill image file (JPG/PNG) or PDF:" -ForegroundColor White
-Write-Host "   - Supported formats: JPG, PNG, GIF, BMP, WEBP, PDF" -ForegroundColor Gray
+Write-Host "   - Supported formats: JPG, PNG, BMP, WEBP, PDF" -ForegroundColor Gray
 Write-Host "   - File size: Max 10MB" -ForegroundColor Gray
 Write-Host "   - Recommended: Clear image of Singapore utility bill (SP Group, PUB)" -ForegroundColor Gray
 Write-Host ""

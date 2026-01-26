@@ -40,7 +40,7 @@ public class UtilityBillController : ControllerBase
 	/// 上传账单文件并自动处理（OCR识别 → 数据提取 → 碳排放计算 → 保存）
 	/// </summary>
 	/// <remarks>
-	/// 上传账单文件（支持图片：JPG、PNG、GIF、BMP、WEBP，或PDF文件），系统会自动识别账单内容，
+	/// 上传账单文件（支持图片：JPG、PNG、BMP、WEBP，或PDF文件），系统会自动识别账单内容，
 	/// 提取用量数据和账单周期，计算碳排放，并保存到数据库。
 	/// 
 	/// **处理流程：**
@@ -51,7 +51,7 @@ public class UtilityBillController : ControllerBase
 	/// 5. 保存到数据库
 	/// 
 	/// **支持的文件格式：**
-	/// - 图片：JPG、JPEG、PNG、GIF、BMP、WEBP
+	/// - 图片：JPG、JPEG、PNG、BMP、WEBP
 	/// - 文档：PDF（支持多页）
 	/// 
 	/// **文件大小限制：**

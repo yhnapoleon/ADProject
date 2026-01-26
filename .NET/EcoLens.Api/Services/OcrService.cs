@@ -1,6 +1,9 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
+using SkiaSharp;
 
 namespace EcoLens.Api.Services;
 
@@ -56,6 +59,17 @@ public class OcrService : IOcrService
 			{
 				_logger.LogWarning("Image size exceeds 20MB limit: {Size} bytes", imageBytes.Length);
 				return null;
+			}
+
+			// 检查是否为PDF文件（通过文件头判断）
+			var isPdf = imageBytes.Length >= 4 && 
+			            imageBytes[0] == 0x25 && imageBytes[1] == 0x50 && 
+			            imageBytes[2] == 0x44 && imageBytes[3] == 0x46; // %PDF
+
+			if (isPdf)
+			{
+				_logger.LogInformation("Detected PDF file, converting to images for OCR");
+				return await ProcessPdfAsync(imageBytes, ct);
 			}
 
 			// 将图片转换为 base64
@@ -180,5 +194,98 @@ public class OcrService : IOcrService
 	private class Page
 	{
 		public double? Confidence { get; set; }
+	}
+
+	/// <summary>
+	/// 处理PDF文件：提取文本内容
+	/// </summary>
+	private Task<OcrResult?> ProcessPdfAsync(byte[] pdfBytes, CancellationToken ct = default)
+	{
+		try
+		{
+			using var pdfStream = new MemoryStream(pdfBytes);
+			using var document = PdfDocument.Open(pdfStream);
+
+			var allText = new StringBuilder();
+			var totalConfidence = 0.0;
+			var pageCount = 0;
+
+			// 处理每一页
+			foreach (var page in document.GetPages())
+			{
+				pageCount++;
+				_logger.LogDebug("Processing PDF page {PageNumber} of {TotalPages}", pageCount, document.NumberOfPages);
+
+				// 提取PDF页面的文本（如果PDF包含文本层）
+				var pageText = page.Text;
+				if (!string.IsNullOrWhiteSpace(pageText))
+				{
+					allText.AppendLine(pageText);
+					totalConfidence += 0.9; // PDF文本层通常置信度较高
+					continue;
+				}
+
+				// 如果PDF页面是图像型，尝试从图像中提取文本
+				// 对于图像型PDF，我们需要将页面渲染为图片后使用Google Vision API
+				_logger.LogWarning("PDF page {PageNumber} appears to be image-based, attempting image OCR", pageCount);
+				
+				// 尝试将PDF页面转换为图片并OCR
+				var pageImageBytes = ConvertPdfPageToImage(pdfBytes, pageCount - 1);
+				if (pageImageBytes != null && pageImageBytes.Length > 0)
+				{
+					// 对图片进行OCR识别
+					var imageOcrResult = RecognizeTextAsync(pageImageBytes, ct).Result;
+					if (imageOcrResult != null && !string.IsNullOrWhiteSpace(imageOcrResult.Text))
+					{
+						allText.AppendLine(imageOcrResult.Text);
+						totalConfidence += (double)imageOcrResult.Confidence;
+					}
+				}
+			}
+
+			if (allText.Length == 0)
+			{
+				_logger.LogWarning("No text extracted from PDF. The PDF may be corrupted or image-based.");
+				return Task.FromResult<OcrResult?>(null);
+			}
+
+			var averageConfidence = pageCount > 0 ? totalConfidence / pageCount : 0;
+
+			_logger.LogInformation("PDF OCR completed: {TextLength} characters from {PageCount} pages, Confidence: {Confidence}", 
+				allText.Length, pageCount, averageConfidence);
+
+			return Task.FromResult<OcrResult?>(new OcrResult
+			{
+				Text = allText.ToString(),
+				Confidence = (decimal)averageConfidence,
+				Pages = pageCount
+			});
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error processing PDF file");
+			return Task.FromResult<OcrResult?>(null);
+		}
+	}
+
+	/// <summary>
+	/// 将PDF页面转换为图片（用于图像型PDF的OCR）
+	/// </summary>
+	private byte[]? ConvertPdfPageToImage(byte[] pdfBytes, int pageIndex)
+	{
+		try
+		{
+			// 使用SkiaSharp将PDF页面渲染为图片
+			// 注意：这需要PDF渲染库，PdfPig本身不支持渲染
+			// 这里先返回null，如果PDF是文本型的，上面的文本提取应该已经成功了
+			// 如果PDF是图像型的，可能需要使用其他库如PdfiumViewer
+			_logger.LogDebug("Attempting to convert PDF page {PageIndex} to image", pageIndex);
+			return null; // 暂时返回null，优先使用文本提取
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error converting PDF page to image");
+			return null;
+		}
 	}
 }

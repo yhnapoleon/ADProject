@@ -87,14 +87,36 @@ public class UtilityBillService : IUtilityBillService
 				throw new InvalidOperationException($"提取的账单周期日期无效（开始年份: {startYear}, 结束年份: {endYear}），请使用手动输入");
 			}
 
-			// 5. 计算碳排放
+			// 5. 检查重复账单（同一用户、相同账单周期、相同类型、相同用量）
+			// 注意：decimal? 类型需要特殊处理，使用 HasValue 和 Value 比较
+			var existingBill = await _db.UtilityBills
+				.Where(b => b.UserId == userId &&
+				            b.BillType == extractedData.BillType &&
+				            b.BillPeriodStart == extractedData.BillPeriodStart.Value &&
+				            b.BillPeriodEnd == extractedData.BillPeriodEnd.Value &&
+				            ((b.ElectricityUsage.HasValue && extractedData.ElectricityUsage.HasValue && b.ElectricityUsage.Value == extractedData.ElectricityUsage.Value) ||
+				             (!b.ElectricityUsage.HasValue && !extractedData.ElectricityUsage.HasValue)) &&
+				            ((b.WaterUsage.HasValue && extractedData.WaterUsage.HasValue && b.WaterUsage.Value == extractedData.WaterUsage.Value) ||
+				             (!b.WaterUsage.HasValue && !extractedData.WaterUsage.HasValue)) &&
+				            ((b.GasUsage.HasValue && extractedData.GasUsage.HasValue && b.GasUsage.Value == extractedData.GasUsage.Value) ||
+				             (!b.GasUsage.HasValue && !extractedData.GasUsage.HasValue)))
+				.FirstOrDefaultAsync(ct);
+
+			if (existingBill != null)
+			{
+				_logger.LogWarning("Duplicate bill detected for user {UserId}: BillId={BillId}, Period={Start} to {End}, Type={Type}",
+					userId, existingBill.Id, extractedData.BillPeriodStart.Value, extractedData.BillPeriodEnd.Value, extractedData.BillType);
+				throw new InvalidOperationException($"检测到重复账单。该账单已存在（账单ID: {existingBill.Id}，账单周期: {extractedData.BillPeriodStart.Value:yyyy-MM-dd} 至 {extractedData.BillPeriodEnd.Value:yyyy-MM-dd}）。请勿重复上传相同账单。");
+			}
+
+			// 6. 计算碳排放
 			var carbonResult = await _calculationService.CalculateCarbonEmissionAsync(
 				extractedData.ElectricityUsage,
 				extractedData.WaterUsage,
 				extractedData.GasUsage,
 				ct);
 
-			// 6. 创建实体
+			// 7. 创建实体
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
@@ -113,13 +135,13 @@ public class UtilityBillService : IUtilityBillService
 				InputMethod = InputMethod.Auto
 			};
 
-			// 7. 保存到数据库
+			// 8. 保存到数据库
 			await _db.UtilityBills.AddAsync(utilityBill, ct);
 			await _db.SaveChangesAsync(ct);
 
 			_logger.LogInformation("Utility bill created successfully: UserId={UserId}, BillId={BillId}", userId, utilityBill.Id);
 
-			// 8. 转换为DTO返回
+			// 9. 转换为DTO返回
 			return ToResponseDto(utilityBill);
 		}
 		catch (Exception ex)
@@ -142,14 +164,36 @@ public class UtilityBillService : IUtilityBillService
 				throw new ArgumentException("账单周期开始日期必须早于结束日期");
 			}
 
-			// 2. 计算碳排放
+			// 2. 检查重复账单（同一用户、相同账单周期、相同类型、相同用量）
+			// 注意：decimal? 类型需要特殊处理，使用 HasValue 和 Value 比较
+			var existingBill = await _db.UtilityBills
+				.Where(b => b.UserId == userId &&
+				            b.BillType == dto.BillType &&
+				            b.BillPeriodStart == dto.BillPeriodStart &&
+				            b.BillPeriodEnd == dto.BillPeriodEnd &&
+				            ((b.ElectricityUsage.HasValue && dto.ElectricityUsage.HasValue && b.ElectricityUsage.Value == dto.ElectricityUsage.Value) ||
+				             (!b.ElectricityUsage.HasValue && !dto.ElectricityUsage.HasValue)) &&
+				            ((b.WaterUsage.HasValue && dto.WaterUsage.HasValue && b.WaterUsage.Value == dto.WaterUsage.Value) ||
+				             (!b.WaterUsage.HasValue && !dto.WaterUsage.HasValue)) &&
+				            ((b.GasUsage.HasValue && dto.GasUsage.HasValue && b.GasUsage.Value == dto.GasUsage.Value) ||
+				             (!b.GasUsage.HasValue && !dto.GasUsage.HasValue)))
+				.FirstOrDefaultAsync(ct);
+
+			if (existingBill != null)
+			{
+				_logger.LogWarning("Duplicate bill detected for user {UserId}: BillId={BillId}, Period={Start} to {End}, Type={Type}",
+					userId, existingBill.Id, dto.BillPeriodStart, dto.BillPeriodEnd, dto.BillType);
+				throw new InvalidOperationException($"检测到重复账单。该账单已存在（账单ID: {existingBill.Id}，账单周期: {dto.BillPeriodStart:yyyy-MM-dd} 至 {dto.BillPeriodEnd:yyyy-MM-dd}）。请勿重复输入相同账单。");
+			}
+
+			// 3. 计算碳排放
 			var carbonResult = await _calculationService.CalculateCarbonEmissionAsync(
 				dto.ElectricityUsage,
 				dto.WaterUsage,
 				dto.GasUsage,
 				ct);
 
-			// 3. 创建实体
+			// 4. 创建实体
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
@@ -354,7 +398,9 @@ public class UtilityBillService : IUtilityBillService
 		}
 
 		// 文件类型验证
-		var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".pdf" };
+		// 注意：虽然允许上传PDF，但Google Vision API不支持直接处理PDF
+		// 建议用户将PDF转换为图片（JPG/PNG）后再上传
+		var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".pdf" };
 		var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
 		if (!allowedExtensions.Contains(extension))
 		{
