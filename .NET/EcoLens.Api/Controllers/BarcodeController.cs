@@ -17,11 +17,13 @@ public class BarcodeController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IOpenFoodFactsService _openFoodFactsService;
+    private readonly IClimatiqService _climatiqService;
 
-    public BarcodeController(ApplicationDbContext db, IOpenFoodFactsService openFoodFactsService)
+    public BarcodeController(ApplicationDbContext db, IOpenFoodFactsService openFoodFactsService, IClimatiqService climatiqService)
     {
         _db = db;
         _openFoodFactsService = openFoodFactsService;
+        _climatiqService = climatiqService;
     }
 
     /// <summary>
@@ -62,6 +64,8 @@ public class BarcodeController : ControllerBase
                 CarbonReferenceLabel = b.CarbonReference!.LabelName,
                 Co2Factor = b.CarbonReference.Co2Factor,
                 Unit = b.CarbonReference.Unit,
+                Source = b.CarbonReference.Source,
+                ClimatiqActivityId = b.CarbonReference.ClimatiqActivityId,
                 Category = b.Category,
                 Brand = b.Brand
             })
@@ -71,10 +75,10 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// ???????????????????? Open Food Facts ???????
+     /// 根据条形码获取映射（优先本地；不存在时从 Open Food Facts 拉取并缓存）。
     /// </summary>
-    /// <param name="barcode">????</param>
-    /// <param name="refresh">? true ???? Open Food Facts ??????? Co2Factor????????/?????</param>
+    /// <param name="barcode">条形码</param>
+    /// <param name="refresh">为 true 时强制从 Open Food Facts 重新拉取并更新 Co2Factor（解决缓存了错误/旧数据）</param>
     [HttpGet("{barcode}")]
     public async Task<ActionResult<BarcodeReferenceResponseDto>> GetByBarcode(string barcode, [FromQuery(Name = "refresh")] bool? refresh = null, CancellationToken ct = default)
     {
@@ -85,16 +89,37 @@ public class BarcodeController : ControllerBase
         if (barcodeRef != null && refresh == true)
         {
             var offProduct = await _openFoodFactsService.GetProductByBarcodeAsync(barcode, ct);
-            if (offProduct?.Product != null && offProduct.Status == 1)
+            if (offProduct?.Product != null && offProduct.Status == 1 && barcodeRef.CarbonReference != null)
             {
                 var co2 = offProduct.Product.EcoScoreData?.Agribalyse?.Co2Total
                     ?? offProduct.Product.EcoScoreData?.AgribalyseCo2Total;
-                if (co2 != null && barcodeRef.CarbonReference != null)
+                if (co2 != null)
                 {
                     barcodeRef.CarbonReference.Co2Factor = co2.Value;
                     barcodeRef.CarbonReference.Unit = "kgCO2e/kg";
                     barcodeRef.CarbonReference.Source = "OpenFoodFacts";
+                    barcodeRef.CarbonReference.ClimatiqActivityId = null;
                     await _db.SaveChangesAsync(ct);
+                }
+                else
+                {
+                    // OFF 无 co2_total 时，尝试用 Climatiq 获取因子并更新
+                    try
+                    {
+                        var activityId = ClimatiqActivityMapping.GetActivityIdForFood(offProduct.Product.CategoriesTags);
+                        var estimate = await _climatiqService.GetCarbonEmissionEstimateAsync(activityId, 1m, "kg", ClimatiqActivityMapping.DefaultFoodRegion);
+                        if (estimate != null && estimate.Co2e > 0)
+                        {
+                            // 根据食物类别应用调整系数
+                            var multiplier = ClimatiqActivityMapping.GetCo2MultiplierForFood(offProduct.Product.CategoriesTags);
+                            barcodeRef.CarbonReference.Co2Factor = estimate.Co2e * multiplier;
+                            barcodeRef.CarbonReference.Unit = "kgCO2e/kg";
+                            barcodeRef.CarbonReference.Source = "Climatiq";
+                            barcodeRef.CarbonReference.ClimatiqActivityId = activityId;
+                            await _db.SaveChangesAsync(ct);
+                        }
+                    }
+                    catch { /* Climatiq 不可用时忽略 */ }
                 }
             }
         }
@@ -135,25 +160,53 @@ public class BarcodeController : ControllerBase
                     }
                 }
 
-                // ? Open Food Facts ? EcoScoreData.Agribalyse ??? CO2 Factor
-                // API ? co2_total ?? kg CO2e/kg?????????? 7622210449283 ? 3.59?
+                // 从 Open Food Facts 的 EcoScoreData.Agribalyse 取 CO2 Factor（kg CO2e/kg）
                 var co2Raw = offProduct.Product.EcoScoreData?.Agribalyse?.Co2Total
                     ?? offProduct.Product.EcoScoreData?.AgribalyseCo2Total;
                 if (co2Raw != null)
                     extractedCo2Factor = co2Raw.Value;
 
-                // ??????? category ? CarbonReference
+                string? climatiqActivityId = null;
+                var fromClimatiq = false;
+                // OFF 无 co2_total 时，用 Climatiq 作为后备获取重量型（kg）碳排放因子
+                if (!extractedCo2Factor.HasValue)
+                {
+                    try
+                    {
+                        var activityId = ClimatiqActivityMapping.GetActivityIdForFood(offProduct.Product.CategoriesTags);
+                        var estimate = await _climatiqService.GetCarbonEmissionEstimateAsync(activityId, 1m, "kg", ClimatiqActivityMapping.DefaultFoodRegion);
+                        if (estimate != null && estimate.Co2e > 0)
+                        {
+                            // 根据食物类别应用调整系数，使不同类别的食物有不同的 Co2Factor
+                            var multiplier = ClimatiqActivityMapping.GetCo2MultiplierForFood(offProduct.Product.CategoriesTags);
+                            extractedCo2Factor = estimate.Co2e * multiplier;
+                            climatiqActivityId = activityId;
+                            fromClimatiq = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Climatiq 不可用时继续，后续用 0.5 兜底
+                        // 临时输出错误信息以便调试（生产环境应使用 ILogger）
+                        System.Diagnostics.Debug.WriteLine($"Climatiq API call failed for barcode {barcode}: {ex.Message}");
+                        if (ex.InnerException != null)
+                            System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    }
+                }
+
+                // 查找或创建 category 对应的 CarbonReference
                 // ???Open Food Facts ??????Food ??
                 var carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
                     c => c.LabelName == categoryLabelName && c.Category == Models.Enums.CarbonCategory.Food, ct);
 
                 if (carbonRef != null)
                 {
-                    // ???????? CarbonReference???????? Co2Factor??????                    if (extractedCo2Factor.HasValue)
+                    if (extractedCo2Factor.HasValue)
                     {
                         carbonRef.Co2Factor = extractedCo2Factor.Value;
                         carbonRef.Unit = extractedUnit;
-                        carbonRef.Source = "OpenFoodFacts";
+                        carbonRef.Source = fromClimatiq ? "Climatiq" : "OpenFoodFacts";
+                        carbonRef.ClimatiqActivityId = fromClimatiq ? climatiqActivityId : null;
                         await _db.SaveChangesAsync(ct);
                     }
                 }
@@ -163,10 +216,11 @@ public class BarcodeController : ControllerBase
                     carbonRef = new CarbonReference
                     {
                         LabelName = categoryLabelName,
-                        Category = Models.Enums.CarbonCategory.Food, // Open Food Facts ??????
-                        Co2Factor = extractedCo2Factor ?? 0.5m, // ?????????????????????.5
+                        Category = Models.Enums.CarbonCategory.Food,
+                        Co2Factor = extractedCo2Factor ?? 0.5m,
                         Unit = extractedUnit,
-                        Source = extractedCo2Factor.HasValue ? "OpenFoodFacts" : "Local"
+                        Source = extractedCo2Factor.HasValue ? (fromClimatiq ? "Climatiq" : "OpenFoodFacts") : "Local",
+                        ClimatiqActivityId = fromClimatiq ? climatiqActivityId : null
                     };
                     await _db.CarbonReferences.AddAsync(carbonRef, ct);
                     await _db.SaveChangesAsync(ct);
@@ -200,6 +254,8 @@ public class BarcodeController : ControllerBase
             CarbonReferenceLabel = barcodeRef.CarbonReference?.LabelName,
             Co2Factor = barcodeRef.CarbonReference?.Co2Factor,
             Unit = barcodeRef.CarbonReference?.Unit,
+            Source = barcodeRef.CarbonReference?.Source,
+            ClimatiqActivityId = barcodeRef.CarbonReference?.ClimatiqActivityId,
             Category = barcodeRef.Category,
             Brand = barcodeRef.Brand
         });
@@ -298,5 +354,48 @@ public class BarcodeController : ControllerBase
         await _db.SaveChangesAsync(ct);
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// 临时测试端点：直接调用 Climatiq API（用于调试）
+    /// </summary>
+    [HttpGet("test-climatiq")]
+    public async Task<ActionResult> TestClimatiq(CancellationToken ct)
+    {
+        try
+        {
+            var activityId = ClimatiqActivityMapping.DefaultFoodActivityId;
+            var estimate = await _climatiqService.GetCarbonEmissionEstimateAsync(activityId, 1m, "kg", ClimatiqActivityMapping.DefaultFoodRegion);
+            return Ok(new { 
+                Success = true, 
+                ActivityId = activityId, 
+                Co2e = estimate?.Co2e, 
+                Co2eUnit = estimate?.Co2eUnit 
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { 
+                Success = false, 
+                Error = ex.Message, 
+                InnerException = ex.InnerException?.Message 
+            });
+        }
+    }
+
+    /// <summary>
+    /// 测试 activity_id 映射逻辑：根据 categories_tags 返回映射结果
+    /// </summary>
+    [HttpGet("test-mapping")]
+    [AllowAnonymous]
+    public ActionResult TestMapping([FromQuery] string[]? categoriesTags)
+    {
+        var activityId = ClimatiqActivityMapping.GetActivityIdForFood(categoriesTags);
+        return Ok(new
+        {
+            CategoriesTags = categoriesTags ?? Array.Empty<string>(),
+            MappedActivityId = activityId,
+            Region = ClimatiqActivityMapping.DefaultFoodRegion
+        });
     }
 }

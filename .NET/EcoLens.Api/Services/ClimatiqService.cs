@@ -15,8 +15,9 @@ namespace EcoLens.Api.Services
         {
             _httpClient = httpClient;
             _apiKey = configuration["Climatiq:ApiKey"] ?? throw new ArgumentNullException("Climatiq:ApiKey not found.");
-            _baseUrl = configuration["Climatiq:BaseUrl"] ?? throw new ArgumentNullException("Climatiq:BaseUrl not found.");
+            _baseUrl = configuration["Climatiq:BaseUrl"] ?? "https://api.climatiq.io";
 
+            // BaseUrl 应该是基础 URL（如 https://api.climatiq.io），endpoint 路径在 PostAsync 中指定
             _httpClient.BaseAddress = new Uri(_baseUrl);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -33,7 +34,8 @@ namespace EcoLens.Api.Services
                 EmissionFactor = new EmissionFactorRequestDto
                 {
                     ActivityId = activityId,
-                    Region = region
+                    Region = region,
+                    DataVersion = "^3" // 使用 data version 3（包含 2025 年的数据）
                 },
                 Parameters = new ParametersRequestDto
                 {
@@ -42,17 +44,29 @@ namespace EcoLens.Api.Services
                 }
             };
 
-            var jsonContent = new StringContent(
-                JsonSerializer.Serialize(requestDto, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
-                System.Text.Encoding.UTF8,
-                "application/json");
+            // Climatiq API 要求使用 snake_case，不使用 camelCase
+            var jsonOptions = new JsonSerializerOptions 
+            { 
+                DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull 
+            };
+            var jsonString = JsonSerializer.Serialize(requestDto, jsonOptions);
+            
+            // 调试输出（生产环境应使用 ILogger）
+            System.Diagnostics.Debug.WriteLine($"Climatiq request JSON: {jsonString}");
+            
+            var jsonContent = new StringContent(jsonString, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync("/estimate", jsonContent);
+            var response = await _httpClient.PostAsync("/data/v1/estimate", jsonContent);
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"Climatiq API error: {response.StatusCode} - {errorContent}");
+            }
 
             var content = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ClimatiqEstimateResponseDto>(content, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            // Climatiq 响应使用 snake_case，需要配置反序列化
+            return JsonSerializer.Deserialize<ClimatiqEstimateResponseDto>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
     }
 }
