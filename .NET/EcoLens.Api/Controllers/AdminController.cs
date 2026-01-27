@@ -382,6 +382,12 @@ public class AdminController : ControllerBase
 		return Ok(items);
 	}
 
+	/// <summary>
+	/// 路由别名：/api/regions/stats（与前端文档对齐，仍需 Admin 权限）
+	/// </summary>
+	[HttpGet("/api/regions/stats")]
+	public Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStatsAlias(CancellationToken ct) => RegionStats(ct);
+
 	[HttpGet("impact/weekly")]
 	public async Task<ActionResult<IEnumerable<object>>> WeeklyImpact(CancellationToken ct)
 	{
@@ -562,7 +568,7 @@ public class AdminController : ControllerBase
 
 			result.Add(new
 			{
-				month = monthStart.ToString("yyyy-MM"),
+				month = monthStart.ToString("MMM", System.Globalization.CultureInfo.InvariantCulture),
 				dau,
 				mau
 			});
@@ -580,6 +586,13 @@ public class AdminController : ControllerBase
 	/// </summary>
 	[HttpPut("users/batch")]
 	public Task<ActionResult<object>> BatchUpdateUsersAlias([FromBody] BatchUserUpdateRequest req, CancellationToken ct)
+		=> BatchUpdateUsers(req, ct);
+
+	/// <summary>
+	/// 路由别名：/api/admin/users/batch（PATCH），与前端文档对齐。
+	/// </summary>
+	[HttpPatch("users/batch")]
+	public Task<ActionResult<object>> BatchUpdateUsersPatch([FromBody] BatchUserUpdateRequest req, CancellationToken ct)
 		=> BatchUpdateUsers(req, ct);
 
 	#endregion

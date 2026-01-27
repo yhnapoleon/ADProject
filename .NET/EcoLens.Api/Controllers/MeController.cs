@@ -30,8 +30,8 @@ public class MeController : ControllerBase
 
   public class MeDto
   {
-    public int Id { get; set; }
-    public string Username { get; set; } = string.Empty;
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
     public string Nickname { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? Location { get; set; }
@@ -49,6 +49,7 @@ public class MeController : ControllerBase
     public string? Email { get; set; }
     public string? Location { get; set; }
     public string? BirthDate { get; set; } // YYYY-MM-DD
+    public string? Password { get; set; }
   }
 
   [HttpGet]
@@ -63,8 +64,8 @@ public class MeController : ControllerBase
     var days = (int)Math.Max(0, (DateTime.UtcNow.Date - u.CreatedAt.Date).TotalDays);
     var dto = new MeDto
     {
-      Id = u.Id,
-      Username = u.Username,
+      Id = u.Id.ToString(),
+      Name = u.Username,
       Nickname = u.Username,
       Email = u.Email,
       Location = u.Region,
@@ -103,6 +104,10 @@ public class MeController : ControllerBase
     if (!string.IsNullOrWhiteSpace(req.BirthDate) && DateTime.TryParse(req.BirthDate, out var bd))
     {
       u.BirthDate = bd.Date;
+    }
+    if (!string.IsNullOrWhiteSpace(req.Password))
+    {
+      u.PasswordHash = Utilities.PasswordHasher.Hash(req.Password);
     }
     await _db.SaveChangesAsync(ct);
     return await Get(ct);
@@ -174,7 +179,7 @@ public class MeController : ControllerBase
         // 忽略删除失败（例如文件被占用或不存在）
       }
     }
-    return Ok(new { avatarUrl = publicUrl });
+    return Ok(new { avatar = publicUrl, avatarUrl = publicUrl });
   }
 }
 

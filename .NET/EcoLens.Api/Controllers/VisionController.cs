@@ -68,5 +68,13 @@ public class VisionController : ControllerBase
 	[Consumes("multipart/form-data")]
 	public Task<ActionResult<VisionPredictionResponseDto>> MealDetect([FromForm] IFormFile image, CancellationToken ct)
 		=> Analyze(image, ct);
+
+	/// <summary>
+	/// 路由别名：/api/vision/meal-photo（与前端文档对齐）。
+	/// </summary>
+	[HttpPost("/api/vision/meal-photo")]
+	[Consumes("multipart/form-data")]
+	public Task<ActionResult<VisionPredictionResponseDto>> MealPhoto([FromForm] IFormFile image, CancellationToken ct)
+		=> Analyze(image, ct);
 }
 

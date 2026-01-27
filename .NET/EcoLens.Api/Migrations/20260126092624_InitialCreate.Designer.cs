@@ -4,6 +4,7 @@ using EcoLens.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EcoLens.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260126092624_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -180,7 +183,8 @@ namespace EcoLens.Api.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Category")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -257,55 +261,55 @@ namespace EcoLens.Api.Migrations
                             Id = 1,
                             Category = 0,
                             Co2Factor = 27.0m,
-                            CreatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8767),
+                            CreatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(170),
                             LabelName = "Beef",
                             Source = "Local",
                             Unit = "kgCO2",
-                            UpdatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8771)
+                            UpdatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(172)
                         },
                         new
                         {
                             Id = 2,
                             Category = 1,
                             Co2Factor = 0.03m,
-                            CreatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8779),
+                            CreatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(178),
                             LabelName = "Subway",
                             Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8779)
+                            UpdatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(179)
                         },
                         new
                         {
                             Id = 3,
                             Category = 2,
                             Co2Factor = 0.5m,
-                            CreatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8781),
+                            CreatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(180),
                             LabelName = "Electricity",
                             Source = "Local",
                             Unit = "kgCO2/kWh",
-                            UpdatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8781)
+                            UpdatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(180)
                         },
                         new
                         {
                             Id = 4,
                             Category = 2,
                             Co2Factor = 0.35m,
-                            CreatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8783),
+                            CreatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(181),
                             LabelName = "Water",
                             Source = "Local",
                             Unit = "kgCO2/m3",
-                            UpdatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8783)
+                            UpdatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(182)
                         },
                         new
                         {
                             Id = 5,
                             Category = 2,
                             Co2Factor = 2.3m,
-                            CreatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8785),
+                            CreatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(183),
                             LabelName = "Gas",
                             Source = "Local",
                             Unit = "kgCO2/unit",
-                            UpdatedAt = new DateTime(2026, 1, 27, 2, 17, 6, 784, DateTimeKind.Utc).AddTicks(8785)
+                            UpdatedAt = new DateTime(2026, 1, 26, 9, 26, 23, 701, DateTimeKind.Utc).AddTicks(183)
                         });
                 });
 
@@ -520,76 +524,6 @@ namespace EcoLens.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.TravelLog", b =>
-            {
-                b.Property<int>("Id")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                b.Property<decimal>("CarbonEmission")
-                    .HasColumnType("decimal(18,4)");
-
-                b.Property<DateTime>("CreatedAt")
-                    .HasColumnType("datetime2");
-
-                b.Property<string>("DestinationAddress")
-                    .IsRequired()
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
-                b.Property<decimal>("DestinationLatitude")
-                    .HasColumnType("decimal(10,7)");
-
-                b.Property<decimal>("DestinationLongitude")
-                    .HasColumnType("decimal(10,7)");
-
-                b.Property<decimal>("DistanceKilometers")
-                    .HasColumnType("decimal(10,2)");
-
-                b.Property<int>("DistanceMeters")
-                    .HasColumnType("int");
-
-                b.Property<int?>("DurationSeconds")
-                    .HasColumnType("int");
-
-                b.Property<string>("Notes")
-                    .HasMaxLength(1000)
-                    .HasColumnType("nvarchar(1000)");
-
-                b.Property<string>("OriginAddress")
-                    .IsRequired()
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
-
-                b.Property<decimal>("OriginLatitude")
-                    .HasColumnType("decimal(10,7)");
-
-                b.Property<decimal>("OriginLongitude")
-                    .HasColumnType("decimal(10,7)");
-
-                b.Property<string>("RoutePolyline")
-                    .HasMaxLength(5000)
-                    .HasColumnType("nvarchar(max)");
-
-                b.Property<int>("TransportMode")
-                    .HasColumnType("int");
-
-                b.Property<DateTime>("UpdatedAt")
-                    .HasColumnType("datetime2");
-
-                b.Property<int>("UserId")
-                    .HasColumnType("int");
-
-                b.HasKey("Id");
-
-                b.HasIndex("UserId");
-
-                b.ToTable("TravelLogs");
-            });
-
-
             modelBuilder.Entity("EcoLens.Api.Models.UserFollow", b =>
                 {
                     b.Property<int>("Id")
@@ -667,83 +601,6 @@ namespace EcoLens.Api.Migrations
                     b.ToTable("UtilityBills");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.UtilityBill", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("BillPeriodEnd")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("BillPeriodStart")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("BillType")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("ElectricityCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("ElectricityCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("ElectricityUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("GasCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("GasCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("GasUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<int>("InputMethod")
-                        .HasColumnType("int");
-
-                    b.Property<decimal?>("OcrConfidence")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<string>("OcrRawText")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("TotalCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("WaterCarbonEmission")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("WaterCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("WaterUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<string>("YearMonth")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("nvarchar(7)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UtilityBills");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.ActivityLog", b =>
                 {
                     b.HasOne("EcoLens.Api.Models.CarbonReference", "CarbonReference")
@@ -778,8 +635,7 @@ namespace EcoLens.Api.Migrations
                 {
                     b.HasOne("EcoLens.Api.Models.CarbonReference", "CarbonReference")
                         .WithMany()
-                        .HasForeignKey("CarbonReferenceId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("CarbonReferenceId");
 
                     b.Navigation("CarbonReference");
                 });
@@ -789,13 +645,13 @@ namespace EcoLens.Api.Migrations
                     b.HasOne("EcoLens.Api.Models.Post", "Post")
                         .WithMany("Comments")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Post");
@@ -836,29 +692,18 @@ namespace EcoLens.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("EcoLens.Api.Models.TravelLog", b =>
-                {
-                    b.HasOne("EcoLens.Api.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("EcoLens.Api.Models.UserFollow", b =>
                 {
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "Followee")
                         .WithMany()
                         .HasForeignKey("FolloweeId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("EcoLens.Api.Models.ApplicationUser", "Follower")
                         .WithMany()
                         .HasForeignKey("FollowerId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Followee");
