@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">EcoLens</string>
+
+    <string-array name="regions_array">
+        <item>West Region</item>
+        <item>North Region</item>
+        <item>North-East Region</item>
+        <item>Central Region</item>
+        <item>East Region</item>
+    </string-array>
+
+    <style name="CircleImage" parent="">
+        <item name="cornerSize">50%</item>
+    </style>
+</resources>
