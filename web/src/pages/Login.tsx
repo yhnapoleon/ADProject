@@ -59,15 +59,23 @@ const Login = () => {
             <Input.Password placeholder="Enter password" />
           </Form.Item>
 
-          <Button
-            block
-            type="primary"
-            size="large"
-            htmlType="submit"
-            style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 10, fontWeight: 700 }}
-          >
-            Sign In
-          </Button>
+          <div style={{ marginTop: -8, marginBottom: 16 }}>
+            <Link to="#" style={{ color: '#674fa3', fontSize: 14 }}>
+              Forgot Password?
+            </Link>
+          </div>
+
+          <Form.Item>
+            <Button
+              block
+              type="primary"
+              size="large"
+              htmlType="submit"
+              style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 10, fontWeight: 700 }}
+            >
+              Log In
+            </Button>
+          </Form.Item>
         </Form>
 
         <div style={{ marginTop: 16, textAlign: 'center' }}>

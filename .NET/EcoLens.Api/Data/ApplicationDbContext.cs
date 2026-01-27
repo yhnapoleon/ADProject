@@ -150,6 +150,23 @@ public class ApplicationDbContext : DbContext
 			.Property(p => p.GasCost)
 			.HasColumnType("decimal(18,2)");
 
+		// UtilityBill carbon emission precisions
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.ElectricityCarbonEmission)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.WaterCarbonEmission)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.GasCarbonEmission)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.TotalCarbonEmission)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<UtilityBill>()
+			.Property(p => p.OcrConfidence)
+			.HasColumnType("decimal(18,4)");
+
 		// CarbonReference unique constraint for (LabelName, Category, Region)
 		modelBuilder.Entity<CarbonReference>()
 			.HasIndex(c => new { c.LabelName, c.Category, c.Region })
@@ -166,11 +183,15 @@ public class ApplicationDbContext : DbContext
 			.HasMany(p => p.Comments)
 			.WithOne(c => c.Post!)
 			.HasForeignKey(c => c.PostId)
-			.OnDelete(DeleteBehavior.Cascade);
+			.OnDelete(DeleteBehavior.NoAction);
 
 		// PB-008: 全局过滤软删除帖子
 		modelBuilder.Entity<Post>()
 			.HasQueryFilter(p => !p.IsDeleted);
+
+		// 与 Post 的全局筛选匹配，避免必需端被过滤造成的异常
+		modelBuilder.Entity<Comment>()
+			.HasQueryFilter(c => c.Post != null && !c.Post.IsDeleted);
 
 		modelBuilder.Entity<Comment>()
 			.HasOne(c => c.User!)

@@ -10,6 +10,7 @@ import {
   UserOutlined,
   TrophyOutlined,
   RobotOutlined,
+  ReadOutlined,
 } from '@ant-design/icons';
 import './MainLayout.module.css';
 
@@ -32,6 +33,7 @@ const MainLayout: React.FC = () => {
     if (location.pathname.startsWith('/records')) return 'records';
     if (location.pathname.startsWith('/leaderboard')) return 'leaderboard';
     if (location.pathname.startsWith('/profile')) return 'profile';
+    if (location.pathname.startsWith('/about-me')) return 'about-me';
     if (location.pathname.startsWith('/ai-assistant')) return 'ai-assistant';
     return 'dashboard';
   };
@@ -61,6 +63,12 @@ const MainLayout: React.FC = () => {
       icon: <UserOutlined />,
       label: 'Profile',
       onClick: () => navigate('/profile'),
+    },
+    {
+      key: 'about-me',
+      icon: <ReadOutlined />,
+      label: 'About Me',
+      onClick: () => navigate('/about-me'),
     },
     {
       key: 'ai-assistant',
@@ -95,12 +103,6 @@ const MainLayout: React.FC = () => {
       icon: <BulbOutlined />,
       label: 'Utility',
       onClick: () => navigate('/log-utility'),
-    },
-    {
-      key: 'ai-assistant',
-      icon: <RobotOutlined />,
-      label: 'AI Assistant',
-      onClick: () => navigate('/ai-assistant'),
     },
   ];
 

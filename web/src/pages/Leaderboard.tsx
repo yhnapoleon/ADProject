@@ -1,6 +1,7 @@
 import { Avatar, Card, Segmented, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { mockLeaderboardData } from '../mock/data';
 import type { LeaderboardEntry } from '../types';
 import { getPoints, type PointsPeriod } from '../utils/points';
@@ -8,7 +9,23 @@ import { TrophyFilled } from '@ant-design/icons';
 import './Leaderboard.module.css';
 
 const Leaderboard = () => {
-  const [period, setPeriod] = useState<PointsPeriod>('month');
+  const location = useLocation();
+  const [period, setPeriod] = useState<PointsPeriod>(() => {
+    // Check if defaultTab is passed from navigation state
+    const defaultTab = (location.state as any)?.defaultTab;
+    if (defaultTab && ['today', 'week', 'month', 'all'].includes(defaultTab)) {
+      return defaultTab as PointsPeriod;
+    }
+    return 'month';
+  });
+
+  // Update period when location state changes
+  useEffect(() => {
+    const defaultTab = (location.state as any)?.defaultTab;
+    if (defaultTab && ['today', 'week', 'month', 'all'].includes(defaultTab)) {
+      setPeriod(defaultTab as PointsPeriod);
+    }
+  }, [location.state]);
 
   const dataSource = useMemo(() => {
     const sorted = [...mockLeaderboardData]
@@ -83,6 +100,7 @@ const Leaderboard = () => {
             value={period}
             onChange={(val) => setPeriod(val as PointsPeriod)}
             options={[
+              { label: 'Today', value: 'today' },
               { label: 'This Week', value: 'week' },
               { label: 'This Month', value: 'month' },
               { label: 'All Time', value: 'all' },

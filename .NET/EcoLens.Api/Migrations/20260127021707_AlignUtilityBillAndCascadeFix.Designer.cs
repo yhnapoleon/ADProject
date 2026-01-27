@@ -4,6 +4,7 @@ using EcoLens.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EcoLens.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260127021707_AlignUtilityBillAndCascadeFix")]
+    partial class AlignUtilityBillAndCascadeFix
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -521,74 +524,73 @@ namespace EcoLens.Api.Migrations
                 });
 
             modelBuilder.Entity("EcoLens.Api.Models.TravelLog", b =>
-            {
-                b.Property<int>("Id")
-                    .ValueGeneratedOnAdd()
-                    .HasColumnType("int");
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
 
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                b.Property<decimal>("CarbonEmission")
-                    .HasColumnType("decimal(18,4)");
+                    b.Property<decimal>("CarbonEmission")
+                        .HasColumnType("decimal(18,4)");
 
-                b.Property<DateTime>("CreatedAt")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
-                b.Property<string>("DestinationAddress")
-                    .IsRequired()
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
+                    b.Property<string>("DestinationAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
-                b.Property<decimal>("DestinationLatitude")
-                    .HasColumnType("decimal(10,7)");
+                    b.Property<decimal>("DestinationLatitude")
+                        .HasColumnType("decimal(10,7)");
 
-                b.Property<decimal>("DestinationLongitude")
-                    .HasColumnType("decimal(10,7)");
+                    b.Property<decimal>("DestinationLongitude")
+                        .HasColumnType("decimal(10,7)");
 
-                b.Property<decimal>("DistanceKilometers")
-                    .HasColumnType("decimal(10,2)");
+                    b.Property<decimal>("DistanceKilometers")
+                        .HasColumnType("decimal(10,2)");
 
-                b.Property<int>("DistanceMeters")
-                    .HasColumnType("int");
+                    b.Property<int>("DistanceMeters")
+                        .HasColumnType("int");
 
-                b.Property<int?>("DurationSeconds")
-                    .HasColumnType("int");
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("int");
 
-                b.Property<string>("Notes")
-                    .HasMaxLength(1000)
-                    .HasColumnType("nvarchar(1000)");
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
-                b.Property<string>("OriginAddress")
-                    .IsRequired()
-                    .HasMaxLength(500)
-                    .HasColumnType("nvarchar(500)");
+                    b.Property<string>("OriginAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
-                b.Property<decimal>("OriginLatitude")
-                    .HasColumnType("decimal(10,7)");
+                    b.Property<decimal>("OriginLatitude")
+                        .HasColumnType("decimal(10,7)");
 
-                b.Property<decimal>("OriginLongitude")
-                    .HasColumnType("decimal(10,7)");
+                    b.Property<decimal>("OriginLongitude")
+                        .HasColumnType("decimal(10,7)");
 
-                b.Property<string>("RoutePolyline")
-                    .HasMaxLength(5000)
-                    .HasColumnType("nvarchar(max)");
+                    b.Property<string>("RoutePolyline")
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
 
-                b.Property<int>("TransportMode")
-                    .HasColumnType("int");
+                    b.Property<int>("TransportMode")
+                        .HasColumnType("int");
 
-                b.Property<DateTime>("UpdatedAt")
-                    .HasColumnType("datetime2");
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
-                b.Property<int>("UserId")
-                    .HasColumnType("int");
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
 
-                b.HasKey("Id");
+                    b.HasKey("Id");
 
-                b.HasIndex("UserId");
+                    b.HasIndex("UserId");
 
-                b.ToTable("TravelLogs");
-            });
-
+                    b.ToTable("TravelLogs");
+                });
 
             modelBuilder.Entity("EcoLens.Api.Models.UserFollow", b =>
                 {
@@ -618,53 +620,6 @@ namespace EcoLens.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("UserFollows");
-                });
-
-            modelBuilder.Entity("EcoLens.Api.Models.UtilityBill", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("ElectricityCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("ElectricityUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<decimal>("GasCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("GasUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("WaterCost")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("WaterUsage")
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<string>("YearMonth")
-                        .IsRequired()
-                        .HasMaxLength(7)
-                        .HasColumnType("nvarchar(7)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UtilityBills");
                 });
 
             modelBuilder.Entity("EcoLens.Api.Models.UtilityBill", b =>

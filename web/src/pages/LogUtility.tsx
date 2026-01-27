@@ -1,6 +1,7 @@
-import { Button, Card, DatePicker, Form, InputNumber, Space, Typography, Upload } from 'antd';
+import { Button, Card, DatePicker, Form, InputNumber, Space, Typography, Upload, Input, message } from 'antd';
 import type { UploadProps } from 'antd';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
@@ -8,15 +9,13 @@ const inputBg = { background: '#F3F0FF' } as const;
 
 type FormValues = {
   electricityUsage?: number;
-  electricityCost?: number;
   waterUsage?: number;
-  waterCost?: number;
-  gasUsage?: number;
-  gasCost?: number;
   month?: any;
+  note?: string;
 };
 
 const LogUtility = () => {
+  const navigate = useNavigate();
   const [form] = Form.useForm<FormValues>();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -55,6 +54,7 @@ const LogUtility = () => {
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
+              width: '100%',
             }}
           >
             {!previewUrl ? (
@@ -80,36 +80,46 @@ const LogUtility = () => {
           </div>
         </Upload>
 
-        <Form<FormValues> form={form} layout="vertical" style={{ marginTop: 18 }}>
+        <Form<FormValues> form={form} layout="vertical" style={{ marginTop: 18 }} onFinish={async () => {
+          message.success('Utility logged successfully!');
+          navigate('/dashboard');
+        }}>
           <Title level={4} style={{ marginTop: 0 }}>
             Manual Entry
           </Title>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <Form.Item label="Electricity - Usage (kWh)" name="electricityUsage">
+            <Form.Item 
+              label="Electricity - Usage (kWh)" 
+              name="electricityUsage"
+              rules={[{ required: true, message: 'Please enter electricity usage' }]}
+            >
               <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
-            </Form.Item>
-            <Form.Item label="Electricity - Cost ($)" name="electricityCost">
-              <InputNumber style={{ width: '100%', ...inputBg }} min={0} step={0.01} />
             </Form.Item>
 
-            <Form.Item label="Water - Usage (Cu M)" name="waterUsage">
+            <Form.Item 
+              label="Water - Usage (Cu M)" 
+              name="waterUsage"
+              rules={[{ required: true, message: 'Please enter water usage' }]}
+            >
               <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
-            </Form.Item>
-            <Form.Item label="Water - Cost ($)" name="waterCost">
-              <InputNumber style={{ width: '100%', ...inputBg }} min={0} step={0.01} />
-            </Form.Item>
-
-            <Form.Item label="Gas - Usage (kWh/Units)" name="gasUsage">
-              <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
-            </Form.Item>
-            <Form.Item label="Gas - Cost ($)" name="gasCost">
-              <InputNumber style={{ width: '100%', ...inputBg }} min={0} step={0.01} />
             </Form.Item>
           </div>
 
-          <Form.Item label="Month" name="month">
+          <Form.Item 
+            label="Month" 
+            name="month"
+            rules={[{ required: true, message: 'Please select month' }]}
+          >
             <DatePicker picker="month" style={{ width: '100%', ...inputBg }} />
+          </Form.Item>
+
+          <Form.Item label="Note (optional)" name="note">
+            <Input.TextArea
+              placeholder="Add any additional notes..."
+              rows={3}
+              style={inputBg}
+            />
           </Form.Item>
 
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
@@ -117,10 +127,8 @@ const LogUtility = () => {
               block
               type="primary"
               size="large"
+              htmlType="submit"
               style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 12, fontWeight: 700 }}
-              onClick={() => {
-                // stored locally in future
-              }}
             >
               Save
             </Button>

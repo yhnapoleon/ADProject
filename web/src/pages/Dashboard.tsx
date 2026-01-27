@@ -1,78 +1,79 @@
 import { Row, Col, Card, Button, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import Lottie from 'lottie-react';
 import { mockLeaderboardData } from '../mock/data';
+import walkingAnimation from '../assets/icons/walking.json';
 import './Dashboard.module.css';
+import mainEatIcon from '../assets/icons/main_eat.svg';
+import mainTravelIcon from '../assets/icons/main_travel.svg';
+import mainWaterIcon from '../assets/icons/main_water.svg';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const numberFormatter = new Intl.NumberFormat('en-US');
 
   // Mock data
-  const todayEmissions = 0.0;
-  const todaySteps = 9277;
-  const goalProgress = 0;
-  const foodEmissions = 0.0;
-  const transportEmissions = 0.0;
-  const utilitiesEmissions = 0.0;
+  const thisMonthEmissions = 45.6;
+  const targetEmissions = 100.0;
+  const progressPercent = (thisMonthEmissions / targetEmissions) * 100;
+  const foodEmissions = 18.5;
+  const travelEmissions = 20.3;
+  const utilitiesEmissions = 6.8;
 
-  const weeklyLeaderboard = [...mockLeaderboardData]
-    .sort((a, b) => b.pointsWeek - a.pointsWeek)
+  const todayLeaderboard = [...mockLeaderboardData]
+    .sort((a, b) => (b.pointsToday || 0) - (a.pointsToday || 0))
     .slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Today's Emissions Card */}
+      {/* This Month's Emissions Card */}
       <Card style={{ background: 'linear-gradient(135deg, #674fa3 0%, #7d5fb8 100%)', border: 'none', borderRadius: '12px', color: 'white', boxShadow: '0 4px 12px rgba(103, 79, 163, 0.15)' }}>
         <div style={{ padding: '32px' }}>
           <Row gutter={24} align="middle">
             <Col span={12}>
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '8px' }}>Today's Emissions</div>
-                <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{todayEmissions.toFixed(2)} kg</div>
-                <Progress
-                  percent={0}
-                  strokeColor="rgba(255,255,255,0.8)"
-                  style={{ marginTop: '12px' }}
-                />
-                <div style={{ fontSize: '12px', opacity: '0.85', marginTop: '8px' }}>Target progress: {todayEmissions.toFixed(2)} kg</div>
+                <div style={{ fontSize: '35px', opacity: '0.9', marginBottom: '8px' }}>This Month's Emissions</div>
+                <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{thisMonthEmissions.toFixed(2)} kg</div>
               </div>
             </Col>
 
             <Col span={12}>
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', opacity: '0.9', marginBottom: '8px' }}>Steps Today</div>
-                <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{todaySteps} steps</div>
-                <Progress
-                  percent={goalProgress}
-                  strokeColor="rgba(255,255,255,0.8)"
-                  style={{ marginTop: '12px' }}
-                />
-                <div style={{ fontSize: '12px', opacity: '0.85', marginTop: '8px' }}>Goal progress</div>
+              <div style={{ marginBottom: '12px', textAlign: 'right' }}>
+                <div style={{ fontSize: '20px', opacity: '0.9', marginBottom: '8px' }}>Target</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>{targetEmissions.toFixed(2)} kg</div>
               </div>
             </Col>
           </Row>
 
+          <div style={{ marginTop: '16px', marginBottom: '24px' }}>
+            <Progress
+              percent={progressPercent}
+              strokeColor="#feda00"
+              showInfo={false}
+            />
+          </div>
+
           <Row gutter={24} style={{ marginTop: '24px' }}>
             <Col span={8}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto' }}>
-                <div style={{ fontSize: '20px', fontWeight: '700' }}>{foodEmissions.toFixed(2)}</div>
-                <div style={{ fontSize: '12px', opacity: '0.8' }}>kg</div>
+              <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <img src={mainEatIcon} alt="Food" style={{ width: '32px', height: '32px' }} />
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>Food</div>
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>{foodEmissions.toFixed(2)} kg</div>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '14px', color: 'white', textAlign: 'center' }}>Food</div>
             </Col>
             <Col span={8}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto' }}>
-                <div style={{ fontSize: '20px', fontWeight: '700' }}>{transportEmissions.toFixed(2)}</div>
-                <div style={{ fontSize: '12px', opacity: '0.8' }}>kg</div>
+              <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <img src={mainTravelIcon} alt="Travel" style={{ width: '32px', height: '32px' }} />
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>Travel</div>
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>{travelEmissions.toFixed(2)} kg</div>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '14px', color: 'white', textAlign: 'center' }}>Transport</div>
             </Col>
             <Col span={8}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '90px', height: '90px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto' }}>
-                <div style={{ fontSize: '20px', fontWeight: '700' }}>{utilitiesEmissions.toFixed(2)}</div>
-                <div style={{ fontSize: '12px', opacity: '0.8' }}>kg</div>
+              <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <img src={mainWaterIcon} alt="Utility" style={{ width: '32px', height: '32px' }} />
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>Utility</div>
+                <div style={{ fontSize: '18px', fontWeight: '700' }}>{utilitiesEmissions.toFixed(2)} kg</div>
               </div>
-              <div style={{ marginTop: '8px', fontSize: '14px', color: 'white', textAlign: 'center' }}>Utilities</div>
             </Col>
           </Row>
         </div>
@@ -83,24 +84,19 @@ const Dashboard = () => {
         <Col xs={24} sm={24} md={8}>
           <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0', transition: 'all 0.3s ease', height: '100%' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>🍴</div>
-              <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#333' }}>Food</div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '14px', color: '#666', textAlign: 'left', display: 'inline-block' }}>
-                <li style={{ marginBottom: '6px' }}><span style={{ color: '#674fa3', fontWeight: 'bold', marginRight: '6px' }}>•</span>Log meals</li>
-                <li style={{ marginBottom: '6px' }}><span style={{ color: '#674fa3', fontWeight: 'bold', marginRight: '6px' }}>•</span>kgCO2e</li>
-              </ul>
+              <img src={mainEatIcon} alt="Food" style={{ width: '48px', height: '48px', marginBottom: '12px', filter: 'brightness(0) saturate(100%) invert(35%) sepia(78%) saturate(1352%) hue-rotate(230deg) brightness(95%) contrast(90%)' }} />
+              <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#333' }}>Food</div>
               <Button
                 type="default"
                 block
                 style={{
                   borderColor: '#674fa3',
                   color: '#674fa3',
-                  marginTop: '16px',
                   fontWeight: '600',
                 }}
                 onClick={() => navigate('/log-meal')}
               >
-                Log Meal
+                Add Food
               </Button>
             </div>
           </Card>
@@ -109,24 +105,19 @@ const Dashboard = () => {
         <Col xs={24} sm={24} md={8}>
           <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0', transition: 'all 0.3s ease', height: '100%' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>🚗</div>
-              <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#333' }}>Transport</div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '14px', color: '#666', textAlign: 'left', display: 'inline-block' }}>
-                <li style={{ marginBottom: '6px' }}><span style={{ color: '#674fa3', fontWeight: 'bold', marginRight: '6px' }}>•</span>Mode</li>
-                <li style={{ marginBottom: '6px' }}><span style={{ color: '#674fa3', fontWeight: 'bold', marginRight: '6px' }}>•</span>Distance / Trips</li>
-              </ul>
+              <img src={mainTravelIcon} alt="Travel" style={{ width: '48px', height: '48px', marginBottom: '12px', filter: 'brightness(0) saturate(100%) invert(35%) sepia(78%) saturate(1352%) hue-rotate(230deg) brightness(95%) contrast(90%)' }} />
+              <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#333' }}>Travel</div>
               <Button
                 type="default"
                 block
                 style={{
                   borderColor: '#674fa3',
                   color: '#674fa3',
-                  marginTop: '16px',
                   fontWeight: '600',
                 }}
                 onClick={() => navigate('/log-travel')}
               >
-                Log Trip
+                Add Travel
               </Button>
             </div>
           </Card>
@@ -135,44 +126,81 @@ const Dashboard = () => {
         <Col xs={24} sm={24} md={8}>
           <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0', transition: 'all 0.3s ease', height: '100%' }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚡</div>
-              <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '12px', color: '#333' }}>Utilities</div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '14px', color: '#666', textAlign: 'left', display: 'inline-block' }}>
-                <li style={{ marginBottom: '6px' }}><span style={{ color: '#674fa3', fontWeight: 'bold', marginRight: '6px' }}>•</span>Water / Power / Gas</li>
-                <li style={{ marginBottom: '6px' }}><span style={{ color: '#674fa3', fontWeight: 'bold', marginRight: '6px' }}>•</span>Usage</li>
-              </ul>
+              <img src={mainWaterIcon} alt="Utility" style={{ width: '48px', height: '48px', marginBottom: '12px', filter: 'brightness(0) saturate(100%) invert(35%) sepia(78%) saturate(1352%) hue-rotate(230deg) brightness(95%) contrast(90%)' }} />
+              <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px', color: '#333' }}>Utility</div>
               <Button
                 type="default"
                 block
                 style={{
                   borderColor: '#674fa3',
                   color: '#674fa3',
-                  marginTop: '16px',
                   fontWeight: '600',
                 }}
                 onClick={() => navigate('/log-utility')}
               >
-                Log Usage
+                Add Utility
               </Button>
             </div>
           </Card>
         </Col>
       </Row>
 
+      {/* steps */}
+      <Row gutter={24} style={{ marginTop: '2px' }}>
+        <Col span={24}>
+          <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              padding: '5px 5px', 
+              overflow: 'hidden'    
+            }}>
+              <div style={{ flex: '0 0 auto' }}>
+                <Lottie 
+                  animationData={walkingAnimation} 
+                  loop 
+                  autoplay 
+                  style={{ width: 300, height: 300 }}
+                />
+              </div>
+              <div style={{
+                margin: '0 auto', 
+                display: 'flex', 
+                alignItems: 'baseline', 
+                gap: '20px',
+                fontFamily: 'sans-serif',
+                whiteSpace: 'nowrap',
+              }}>
+                <div style={{ fontSize: '20px', color: '#999' }}>Steps Today</div>
+                <div style={{ fontSize: '35px', fontWeight: 'bold', color: '#674fa3' }}>9,277</div>
+                <div style={{ fontSize: '20px', color: '#999' }}>Steps</div>
+              </div>
+
+              
+              <div style={{ 
+                flex: '0 0 150px', 
+                visibility: 'hidden'
+              }}></div>
+
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
       {/* Leaderboard */}
-      <Row gutter={24} style={{ marginTop: '24px' }}>
+      <Row gutter={24} style={{ marginTop: '2px' }}>
         <Col span={24}>
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Weekly Leaderboard</div>
+                <div style={{ fontSize: '16px', fontWeight: '600' }}>🏆 Today's Ranking</div>
               </div>
-              <Button type="link" onClick={() => navigate('/leaderboard')}>
+              <Button type="link" onClick={() => navigate('/leaderboard', { state: { defaultTab: 'today' } })}>
                 View all
               </Button>
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {weeklyLeaderboard.map((user, index) => (
+              {todayLeaderboard.map((user, index) => (
                 <div
                   key={user.username}
                   style={{
@@ -180,7 +208,7 @@ const Dashboard = () => {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '12px 0',
-                    borderBottom: index < weeklyLeaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    borderBottom: index < todayLeaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -197,7 +225,7 @@ const Dashboard = () => {
                     <span>{user.nickname}</span>
                   </div>
                   <span style={{ fontWeight: 700, color: '#674fa3' }}>
-                    {numberFormatter.format(user.pointsWeek)} pts
+                    {numberFormatter.format(user.pointsToday || 0)} pts
                   </span>
                 </div>
               ))}

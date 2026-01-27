@@ -5,24 +5,13 @@ import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-type FoodType = 'Beef' | 'Pork' | 'Chicken' | 'Vegetarian' | 'Vegan';
-type Unit = 'kg' | 'serving' | 'plate';
-
 type FormValues = {
   foodName: string;
-  foodType: FoodType;
   amount: number;
-  unit: Unit;
   note?: string;
 };
 
-const FACTORS: Record<FoodType, number> = {
-  Beef: 27.0,
-  Pork: 12.0,
-  Chicken: 6.9,
-  Vegetarian: 3.0,
-  Vegan: 2.0,
-};
+const FACTOR = 27.0; // Default emission factor
 
 const inputBg = { background: '#F3F0FF' } as const;
 
@@ -31,19 +20,13 @@ const LogMeal = () => {
   const [form] = Form.useForm<FormValues>();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const foodType = Form.useWatch('foodType', form);
   const amount = Form.useWatch('amount', form);
-
-  const factor = useMemo(() => {
-    if (!foodType) return 27.0;
-    return FACTORS[foodType];
-  }, [foodType]);
 
   const emissions = useMemo(() => {
     const a = typeof amount === 'number' ? amount : Number(amount);
     if (!a || Number.isNaN(a)) return null;
-    return a * factor;
-  }, [amount, factor]);
+    return a * FACTOR;
+  }, [amount]);
 
   const fileToBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -87,6 +70,7 @@ const LogMeal = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              width: '100%',
             }}
           >
             {!previewUrl ? (
@@ -117,11 +101,6 @@ const LogMeal = () => {
           form={form}
           layout="vertical"
           style={{ marginTop: 18 }}
-          initialValues={{
-            foodType: 'Beef',
-            unit: 'kg',
-            amount: 0.25,
-          }}
         >
             <Form.Item
               label="Food name"
@@ -132,24 +111,6 @@ const LogMeal = () => {
             </Form.Item>
 
             <Form.Item
-              label="Food type"
-              name="foodType"
-              rules={[{ required: true, message: 'Please select food type' }]}
-            >
-              <Select
-                placeholder="Select type"
-                style={inputBg}
-                options={[
-                  { value: 'Beef', label: 'Beef' },
-                  { value: 'Pork', label: 'Pork' },
-                  { value: 'Chicken', label: 'Chicken' },
-                  { value: 'Vegetarian', label: 'Vegetarian' },
-                  { value: 'Vegan', label: 'Vegan' },
-                ]}
-              />
-            </Form.Item>
-
-            <Form.Item
               label="Amount"
               name="amount"
               rules={[{ required: true, message: 'Please enter amount' }]}
@@ -157,35 +118,19 @@ const LogMeal = () => {
               <InputNumber
                 style={{ width: '100%', ...inputBg }}
                 min={0}
-                step={0.01}
+                step={0.1}
                 placeholder="e.g., 0.25"
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Unit"
-              name="unit"
-              rules={[{ required: true, message: 'Please select unit' }]}
-            >
-              <Select
-                style={inputBg}
-                options={[
-                  { value: 'kg', label: 'kg' },
-                  { value: 'serving', label: 'serving' },
-                  { value: 'plate', label: 'plate' },
-                ]}
+                addonAfter="kg"
               />
             </Form.Item>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Form.Item label="Emission factor">
-                <Input readOnly value={factor.toFixed(2)} style={inputBg} />
+              <Form.Item label="Emission factor (kg CO2e/kg)">
+                <Input readOnly style={inputBg} />
               </Form.Item>
-              <Form.Item label="Emissions">
+              <Form.Item label="Carbon Emissions (kg)">
                 <Input
                   readOnly
-                  value={emissions == null ? '' : emissions.toFixed(2)}
-                  placeholder="Auto-calculated"
                   style={inputBg}
                 />
               </Form.Item>
