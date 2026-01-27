@@ -1,65 +1,36 @@
-# OS-specific
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
 
-# IDE / Editors
+# Visual Studio
 .vs/
 .vscode/
-.idea/
-*.suo
-*.user
-*.userosscache
 *.sln.docstates
-*.DotSettings.user
 
-# Build outputs
-[Bb]in/
-[Oo]bj/
-out/
-artifacts/
+# 配置文件（包含敏感信息，不提交到 Git）
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
 
-# Logs & test results
+# 用户密钥
+secrets.json
+
+# 数据库
+*.db
+*.mdf
+*.ldf
+
+# 日志
 logs/
 *.log
-TestResults/
-TestResult*/
-*.coverage
-*.coveragexml
-*.trx
 
-# NuGet
-*.nupkg
-*.snupkg
-.nuget/
-packages/
-*.nuget.props
-*.nuget.targets
-
-# ReSharper
-_ReSharper*/
-*.[Rr]e[Ss]harper
-
-# MSBuild cache/temp
-*.cache
+# 临时文件
 *.tmp
-
-# Publish profiles
-*.publishsettings
-*.pubxml
-*.pubxml.user
-
-# Rider backend
-.idea/
-
-# Optional local appsettings overrides (keep main appsettings.json tracked)
-appsettings.*.local.json
-appsettings.Development.Local.json
-
-
-# Project-specific .NET outputs
-.NET/EcoLens.Api/bin/
-.NET/EcoLens.Api/obj/
-
-node_modules
+*.temp
+~$*

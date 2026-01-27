@@ -21,13 +21,14 @@ public class ApplicationDbContext : DbContext
 	public DbSet<Post> Posts => Set<Post>();
 	public DbSet<Comment> Comments => Set<Comment>();
 	public DbSet<UserFollow> UserFollows => Set<UserFollow>();
+	public DbSet<TravelLog> TravelLogs => Set<TravelLog>();
+	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
 	public DbSet<DietTemplate> DietTemplates => Set<DietTemplate>();
 	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
-    public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
-	public DbSet<UtilityBill> UtilityBills => Set<UtilityBill>();
+	public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
 	public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
 
-    public override int SaveChanges()
+	public override int SaveChanges()
 	{
 		ApplyTimestamps();
 		return base.SaveChanges();
@@ -92,6 +93,13 @@ public class ApplicationDbContext : DbContext
 			.WithMany()
 			.HasForeignKey(a => a.CarbonReferenceId)
 			.OnDelete(DeleteBehavior.Restrict);
+
+		// BarcodeReference -> CarbonReference
+		modelBuilder.Entity<BarcodeReference>()
+			.HasOne(b => b.CarbonReference!)
+			.WithMany()
+			.HasForeignKey(b => b.CarbonReferenceId)
+			.OnDelete(DeleteBehavior.SetNull);
 
 		// Decimal precisions (mirror annotations, explicit for safety)
 		modelBuilder.Entity<ApplicationUser>()

@@ -1,0 +1,1098 @@
+{
+  "apiInfo": {
+    "name": "EcoLens API",
+    "version": "v1",
+    "baseUrl": "http://localhost:5133",
+    "swaggerUrl": "http://localhost:5133/swagger",
+    "description": "Sustainable lifestyle application API - 前端对接API规范",
+    "lastUpdated": "2025-01-26"
+  },
+  "authentication": {
+    "type": "JWT Bearer Token",
+    "header": "Authorization",
+    "format": "Bearer {token}",
+    "note": "除注册/登录接口外，所有接口都需要在请求头中携带JWT Token"
+  },
+  "enums": {
+    "TransportMode": {
+      "0": "Walking - 步行",
+      "1": "Bicycle - 自行车",
+      "2": "ElectricBike - 电动车",
+      "3": "Subway - 地铁",
+      "4": "Bus - 公交车",
+      "5": "Taxi - 出租车/网约车",
+      "6": "CarGasoline - 私家车（汽油）",
+      "7": "CarElectric - 私家车（电动车）",
+      "8": "Ship - 轮船",
+      "9": "Plane - 飞机"
+    },
+    "UtilityBillType": {
+      "0": "Electricity - 电费账单",
+      "1": "Water - 水费账单",
+      "2": "Gas - 燃气费账单",
+      "3": "Combined - 综合账单"
+    },
+    "InputMethod": {
+      "0": "Auto - 自动识别（OCR）",
+      "1": "Manual - 手动输入"
+    },
+    "CarbonCategory": {
+      "0": "Food - 食物",
+      "1": "Transport - 交通",
+      "2": "Utility - 水电",
+      "3": "Other - 其他"
+    },
+    "PostType": {
+      "0": "User - 用户帖子",
+      "1": "Official - 官方帖子"
+    },
+    "UserRole": {
+      "0": "User - 普通用户",
+      "1": "Admin - 管理员"
+    }
+  },
+  "endpoints": {
+    "auth": {
+      "module": "认证模块",
+      "endpoints": [
+        {
+          "name": "用户注册",
+          "path": "/api/auth/register",
+          "method": "POST",
+          "authRequired": false,
+          "description": "用户注册并返回认证Token",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "username": "string (必填) - 用户名",
+              "email": "string (必填) - 邮箱",
+              "password": "string (必填) - 密码"
+            },
+            "example": {
+              "username": "testuser",
+              "email": "test@example.com",
+              "password": "Test123!"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "注册成功",
+              "example": {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "user": {
+                  "id": 1,
+                  "username": "testuser",
+                  "email": "test@example.com",
+                  "role": "User",
+                  "avatarUrl": null,
+                  "totalCarbonSaved": 0,
+                  "currentPoints": 0
+                }
+              }
+            },
+            "409": {
+              "description": "用户已存在",
+              "example": "User already exists."
+            }
+          }
+        },
+        {
+          "name": "用户登录",
+          "path": "/api/auth/login",
+          "method": "POST",
+          "authRequired": false,
+          "description": "用户登录并返回认证Token",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "email": "string (必填) - 邮箱",
+              "password": "string (必填) - 密码"
+            },
+            "example": {
+              "email": "test@example.com",
+              "password": "Test123!"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "登录成功",
+              "example": {
+                "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "user": {
+                  "id": 1,
+                  "username": "testuser",
+                  "email": "test@example.com",
+                  "role": "User",
+                  "avatarUrl": null,
+                  "totalCarbonSaved": 500.5,
+                  "currentPoints": 1000
+                }
+              }
+            },
+            "401": {
+              "description": "认证失败",
+              "example": "Invalid credentials."
+            }
+          }
+        }
+      ]
+    },
+    "user": {
+      "module": "用户资料模块",
+      "endpoints": [
+        {
+          "name": "获取用户资料",
+          "path": "/api/user/profile",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取当前登录用户的资料（包含排名）",
+          "request": {},
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "id": 1,
+                "username": "testuser",
+                "email": "test@example.com",
+                "avatarUrl": null,
+                "region": "Singapore",
+                "totalCarbonSaved": 500.5,
+                "currentPoints": 1000,
+                "rank": 5,
+                "role": "User"
+              }
+            }
+          }
+        },
+        {
+          "name": "更新用户资料",
+          "path": "/api/user/profile",
+          "method": "PUT",
+          "authRequired": true,
+          "description": "更新当前登录用户的头像、用户名与地区",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "nickname": "string (可选) - 新用户名",
+              "avatarUrl": "string (可选) - 头像URL",
+              "region": "string (可选) - 地区"
+            },
+            "example": {
+              "nickname": "新用户名",
+              "avatarUrl": "https://example.com/avatar.jpg",
+              "region": "Singapore"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "更新成功",
+              "example": {
+                "id": 1,
+                "username": "新用户名",
+                "email": "test@example.com",
+                "avatarUrl": "https://example.com/avatar.jpg",
+                "region": "Singapore",
+                "totalCarbonSaved": 500.5,
+                "currentPoints": 1000,
+                "rank": 5,
+                "role": "User"
+              }
+            },
+            "409": {
+              "description": "用户名已存在",
+              "example": "Username already in use."
+            }
+          }
+        },
+        {
+          "name": "修改密码",
+          "path": "/api/user/change-password",
+          "method": "POST",
+          "authRequired": true,
+          "description": "修改密码（验证旧密码后更新为新密码）",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "oldPassword": "string (必填) - 旧密码",
+              "newPassword": "string (必填) - 新密码"
+            },
+            "example": {
+              "oldPassword": "OldPass123!",
+              "newPassword": "NewPass123!"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "修改成功"
+            },
+            "401": {
+              "description": "旧密码错误",
+              "example": "Old password is incorrect."
+            }
+          }
+        }
+      ]
+    },
+    "travel": {
+      "module": "出行记录模块",
+      "endpoints": [
+        {
+          "name": "预览路线和碳排放",
+          "path": "/api/travel/preview",
+          "method": "POST",
+          "authRequired": true,
+          "description": "预览路线信息、距离、时间和预估碳排放，不保存到数据库。支持新加坡邮编直接输入（6位数字）",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "originAddress": "string (必填) - 出发地地址（支持新加坡邮编，如：160149）",
+              "destinationAddress": "string (必填) - 目的地地址（支持新加坡邮编，如：018956）",
+              "transportMode": "number (必填) - 出行方式（0-9，见TransportMode枚举）"
+            },
+            "example": {
+              "originAddress": "160149",
+              "destinationAddress": "018956",
+              "transportMode": 6
+            }
+          },
+          "response": {
+            "200": {
+              "description": "预览成功",
+              "example": {
+                "originAddress": "160149 Singapore",
+                "originLatitude": 1.2966,
+                "originLongitude": 103.7764,
+                "destinationAddress": "018956 Singapore",
+                "destinationLatitude": 1.2966,
+                "destinationLongitude": 103.7764,
+                "transportMode": 6,
+                "transportModeName": "私家车（汽油）",
+                "distanceMeters": 15500,
+                "distanceKilometers": 15.50,
+                "durationSeconds": 1800,
+                "durationText": "30分钟",
+                "estimatedCarbonEmission": 3.255,
+                "routePolyline": "编码后的路线字符串"
+              }
+            }
+          }
+        },
+        {
+          "name": "创建出行记录",
+          "path": "/api/travel",
+          "method": "POST",
+          "authRequired": true,
+          "description": "创建一条出行记录并保存到数据库",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "originAddress": "string (必填) - 出发地地址（支持新加坡邮编）",
+              "destinationAddress": "string (必填) - 目的地地址（支持新加坡邮编）",
+              "transportMode": "number (必填) - 出行方式（0-9）",
+              "notes": "string (可选) - 备注（最大1000字符）"
+            },
+            "example": {
+              "originAddress": "160149",
+              "destinationAddress": "018956",
+              "transportMode": 6,
+              "notes": "上班通勤"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "创建成功",
+              "example": {
+                "id": 1,
+                "createdAt": "2025-01-23T10:30:00Z",
+                "transportMode": 6,
+                "transportModeName": "私家车（汽油）",
+                "originAddress": "160149 Singapore",
+                "originLatitude": 1.2966,
+                "originLongitude": 103.7764,
+                "destinationAddress": "018956 Singapore",
+                "destinationLatitude": 1.2966,
+                "destinationLongitude": 103.7764,
+                "distanceMeters": 15500,
+                "distanceKilometers": 15.50,
+                "durationSeconds": 1800,
+                "durationText": "30分钟",
+                "carbonEmission": 3.255,
+                "routePolyline": "编码后的路线字符串",
+                "notes": "上班通勤"
+              }
+            }
+          }
+        },
+        {
+          "name": "获取出行记录列表",
+          "path": "/api/travel/my-travels",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取当前登录用户的所有出行记录，支持筛选和分页",
+          "request": {
+            "queryParams": {
+              "startDate": "string (可选) - 开始日期（格式：yyyy-MM-dd）",
+              "endDate": "string (可选) - 结束日期（格式：yyyy-MM-dd）",
+              "transportMode": "number (可选) - 出行方式筛选（0-9）",
+              "page": "number (可选) - 页码，默认1",
+              "pageSize": "number (可选) - 每页数量，默认20，最大100"
+            },
+            "example": "?startDate=2025-01-01&endDate=2025-01-31&transportMode=6&page=1&pageSize=20"
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "items": [],
+                "totalCount": 10,
+                "page": 1,
+                "pageSize": 20,
+                "totalPages": 1
+              }
+            }
+          }
+        },
+        {
+          "name": "获取出行记录详情",
+          "path": "/api/travel/{id}",
+          "method": "GET",
+          "authRequired": true,
+          "description": "根据ID获取单条出行记录的详细信息",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 出行记录ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "id": 1,
+                "createdAt": "2025-01-23T10:30:00Z",
+                "transportMode": 6,
+                "transportModeName": "私家车（汽油）",
+                "originAddress": "160149 Singapore",
+                "originLatitude": 1.2966,
+                "originLongitude": 103.7764,
+                "destinationAddress": "018956 Singapore",
+                "destinationLatitude": 1.2966,
+                "destinationLongitude": 103.7764,
+                "distanceMeters": 15500,
+                "distanceKilometers": 15.50,
+                "durationSeconds": 1800,
+                "durationText": "30分钟",
+                "carbonEmission": 3.255,
+                "routePolyline": "编码后的路线字符串",
+                "notes": "上班通勤"
+              }
+            },
+            "404": {
+              "description": "记录不存在",
+              "example": "出行记录不存在"
+            }
+          }
+        },
+        {
+          "name": "删除出行记录",
+          "path": "/api/travel/{id}",
+          "method": "DELETE",
+          "authRequired": true,
+          "description": "删除指定的出行记录",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 出行记录ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "删除成功",
+              "example": {
+                "message": "删除成功"
+              }
+            }
+          }
+        },
+        {
+          "name": "获取出行统计",
+          "path": "/api/travel/statistics",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取当前用户的出行统计信息",
+          "request": {
+            "queryParams": {
+              "startDate": "string (可选) - 开始日期（格式：yyyy-MM-dd）",
+              "endDate": "string (可选) - 结束日期（格式：yyyy-MM-dd）"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "totalRecords": 10,
+                "totalDistanceKilometers": 150.5,
+                "totalCarbonEmission": 30.5,
+                "byTransportMode": [
+                  {
+                    "transportMode": 6,
+                    "transportModeName": "私家车（汽油）",
+                    "recordCount": 5,
+                    "totalDistanceKilometers": 100.0,
+                    "totalCarbonEmission": 21.0
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "utilityBill": {
+      "module": "水电账单模块",
+      "endpoints": [
+        {
+          "name": "上传账单文件（OCR识别）",
+          "path": "/api/UtilityBill/upload",
+          "method": "POST",
+          "authRequired": true,
+          "description": "上传账单文件（图片或PDF），系统自动进行OCR识别、数据提取、碳排放计算并保存到数据库。支持格式：JPG、PNG、BMP、WEBP、PDF，最大10MB。如果检测到重复账单，会返回错误提示，不会保存。",
+          "request": {
+            "contentType": "multipart/form-data",
+            "body": {
+              "file": "File (必填) - 账单文件（JPG、PNG、BMP、WEBP、PDF，最大10MB）"
+            },
+            "note": "注意：不要设置Content-Type，浏览器会自动设置multipart/form-data"
+          },
+          "response": {
+            "200": {
+              "description": "上传成功",
+              "example": {
+                "id": 1,
+                "billType": 3,
+                "billTypeName": "综合账单",
+                "billPeriodStart": "2025-11-04T00:00:00Z",
+                "billPeriodEnd": "2025-12-02T00:00:00Z",
+                "electricityUsage": 468.0,
+                "waterUsage": 7.6,
+                "gasUsage": null,
+                "electricityCarbonEmission": 213.18,
+                "waterCarbonEmission": 0.0,
+                "gasCarbonEmission": 0.0,
+                "totalCarbonEmission": 213.18,
+                "inputMethod": 0,
+                "inputMethodName": "自动识别",
+                "ocrConfidence": 0.9173,
+                "createdAt": "2025-01-23T10:30:00Z"
+              }
+            },
+            "400": {
+              "description": "错误情况",
+              "examples": {
+                "文件格式不支持": "不支持的文件格式。支持的格式：JPG、PNG、BMP、WEBP、PDF",
+                "文件过大": "文件大小不能超过 10MB",
+                "OCR识别失败": "无法识别账单，请确保图片清晰或使用手动输入",
+                "重复账单": "检测到重复账单。该账单已存在（账单ID: 123，账单周期: 2025-11-04 至 2025-12-02）。请勿重复上传相同账单。"
+              }
+            }
+          }
+        },
+        {
+          "name": "手动创建账单",
+          "path": "/api/UtilityBill/manual",
+          "method": "POST",
+          "authRequired": true,
+          "description": "手动输入账单数据，系统自动计算碳排放并保存到数据库。如果检测到重复账单，会返回错误提示，不会保存。",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "billType": "number (必填) - 账单类型（0-3，见UtilityBillType枚举）",
+              "billPeriodStart": "string (必填) - 账单周期开始日期（ISO 8601格式）",
+              "billPeriodEnd": "string (必填) - 账单周期结束日期（ISO 8601格式）",
+              "electricityUsage": "number (可选) - 用电量（kWh）",
+              "waterUsage": "number (可选) - 用水量（m³）",
+              "gasUsage": "number (可选) - 用气量（kWh或m³）"
+            },
+            "example": {
+              "billType": 0,
+              "billPeriodStart": "2025-01-01T00:00:00Z",
+              "billPeriodEnd": "2025-01-31T23:59:59Z",
+              "electricityUsage": 150.5,
+              "waterUsage": null,
+              "gasUsage": null
+            }
+          },
+          "response": {
+            "200": {
+              "description": "创建成功",
+              "example": {
+                "id": 2,
+                "billType": 0,
+                "billTypeName": "电费",
+                "billPeriodStart": "2025-01-01T00:00:00Z",
+                "billPeriodEnd": "2025-01-31T23:59:59Z",
+                "electricityUsage": 150.5,
+                "waterUsage": null,
+                "gasUsage": null,
+                "electricityCarbonEmission": 69.99,
+                "waterCarbonEmission": 0.0,
+                "gasCarbonEmission": 0.0,
+                "totalCarbonEmission": 69.99,
+                "inputMethod": 1,
+                "inputMethodName": "手动输入",
+                "ocrConfidence": null,
+                "createdAt": "2025-01-23T10:35:00Z"
+              }
+            },
+            "400": {
+              "description": "重复账单",
+              "example": "检测到重复账单。该账单已存在（账单ID: 123，账单周期: 2025-01-01 至 2025-01-31）。请勿重复上传相同账单。"
+            }
+          }
+        },
+        {
+          "name": "获取账单列表",
+          "path": "/api/UtilityBill/my-bills",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取当前登录用户的所有账单记录，支持筛选和分页",
+          "request": {
+            "queryParams": {
+              "startDate": "string (可选) - 开始日期（格式：yyyy-MM-dd）",
+              "endDate": "string (可选) - 结束日期（格式：yyyy-MM-dd）",
+              "billType": "number (可选) - 账单类型筛选（0-3）",
+              "page": "number (可选) - 页码，默认1",
+              "pageSize": "number (可选) - 每页数量，默认20，最大100"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "items": [],
+                "totalCount": 2,
+                "page": 1,
+                "pageSize": 20,
+                "totalPages": 1
+              }
+            }
+          }
+        },
+        {
+          "name": "获取账单详情",
+          "path": "/api/UtilityBill/{id}",
+          "method": "GET",
+          "authRequired": true,
+          "description": "根据ID获取单条账单的详细信息",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 账单ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "id": 1,
+                "billType": 3,
+                "billTypeName": "综合账单",
+                "billPeriodStart": "2025-11-04T00:00:00Z",
+                "billPeriodEnd": "2025-12-02T00:00:00Z",
+                "electricityUsage": 468.0,
+                "waterUsage": 7.6,
+                "gasUsage": null,
+                "electricityCarbonEmission": 213.18,
+                "waterCarbonEmission": 0.0,
+                "gasCarbonEmission": 0.0,
+                "totalCarbonEmission": 213.18,
+                "inputMethod": 0,
+                "inputMethodName": "自动识别",
+                "ocrConfidence": 0.9173,
+                "createdAt": "2025-01-23T10:30:00Z"
+              }
+            }
+          }
+        },
+        {
+          "name": "删除账单",
+          "path": "/api/UtilityBill/{id}",
+          "method": "DELETE",
+          "authRequired": true,
+          "description": "删除指定的账单记录",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 账单ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "删除成功",
+              "example": {
+                "message": "Deleted successfully"
+              }
+            }
+          }
+        },
+        {
+          "name": "获取账单统计",
+          "path": "/api/UtilityBill/statistics",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取当前用户的账单统计信息",
+          "request": {
+            "queryParams": {
+              "startDate": "string (可选) - 开始日期（格式：yyyy-MM-dd）",
+              "endDate": "string (可选) - 结束日期（格式：yyyy-MM-dd）"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "totalRecords": 2,
+                "totalElectricityUsage": 674.6,
+                "totalWaterUsage": 17.0,
+                "totalGasUsage": 0.0,
+                "totalCarbonEmission": 283.17,
+                "byBillType": []
+              }
+            }
+          }
+        }
+      ]
+    },
+    "activity": {
+      "module": "活动记录模块",
+      "endpoints": [
+        {
+          "name": "上传活动记录",
+          "path": "/api/Activity/upload",
+          "method": "POST",
+          "authRequired": true,
+          "description": "上传活动记录（图片或手动输入），根据标签查找参考，计算排放并保存",
+          "request": {
+            "contentType": "multipart/form-data",
+            "body": {
+              "label": "string (必填) - 活动标签（如：Beef, Chicken, Electricity等）",
+              "category": "number (必填) - 活动类别（0=Food, 1=Transport, 2=Utility, 3=Other）",
+              "quantity": "number (必填) - 数量",
+              "unit": "string (必填) - 单位（如：kg, km, kWh等）",
+              "image": "File (可选) - 活动图片",
+              "region": "string (可选) - 地区（用于Utility类别匹配）"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "上传成功",
+              "example": {
+                "id": 1,
+                "label": "Beef",
+                "category": 0,
+                "quantity": 1.5,
+                "unit": "kg",
+                "carbonEmission": 45.0,
+                "createdAt": "2025-01-23T10:30:00Z"
+              }
+            }
+          }
+        },
+        {
+          "name": "获取活动日志列表",
+          "path": "/api/Activity/my-logs",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取当前用户的活动日志列表",
+          "request": {},
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": []
+            }
+          }
+        }
+      ]
+    },
+    "community": {
+      "module": "社区模块",
+      "endpoints": [
+        {
+          "name": "获取帖子列表",
+          "path": "/api/community/posts",
+          "method": "GET",
+          "authRequired": true,
+          "description": "分页获取帖子列表（可选type=User/Official）",
+          "request": {
+            "queryParams": {
+              "type": "string (可选) - 帖子类型（User/Official）",
+              "page": "number (可选) - 页码，默认1",
+              "pageSize": "number (可选) - 每页数量，默认10，最大100"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": []
+            }
+          }
+        },
+        {
+          "name": "获取帖子详情",
+          "path": "/api/community/posts/{id}",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取帖子详情及评论列表，同时自增浏览量",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 帖子ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "id": 1,
+                "title": "我的环保心得",
+                "content": "分享一些环保小贴士...",
+                "imageUrls": "https://example.com/image1.jpg,https://example.com/image2.jpg",
+                "type": 0,
+                "viewCount": 100,
+                "createdAt": "2025-01-23T10:30:00Z",
+                "userId": 1,
+                "username": "testuser",
+                "avatarUrl": null,
+                "comments": []
+              }
+            }
+          }
+        },
+        {
+          "name": "创建帖子",
+          "path": "/api/community/posts",
+          "method": "POST",
+          "authRequired": true,
+          "description": "创建新的社区帖子",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "title": "string (必填) - 标题",
+              "content": "string (必填) - 内容",
+              "imageUrls": "string (可选) - 图片URL（多个用逗号分隔）",
+              "type": "number (可选) - 帖子类型（0=User, 1=Official），默认0"
+            },
+            "example": {
+              "title": "我的环保心得",
+              "content": "分享一些环保小贴士...",
+              "imageUrls": "https://example.com/image1.jpg,https://example.com/image2.jpg",
+              "type": 0
+            }
+          },
+          "response": {
+            "200": {
+              "description": "创建成功",
+              "example": {
+                "id": 1,
+                "title": "我的环保心得",
+                "content": "分享一些环保小贴士...",
+                "imageUrls": "https://example.com/image1.jpg,https://example.com/image2.jpg",
+                "type": 0,
+                "viewCount": 0,
+                "createdAt": "2025-01-23T10:30:00Z",
+                "userId": 1,
+                "username": "testuser",
+                "avatarUrl": null
+              }
+            }
+          }
+        },
+        {
+          "name": "点赞/取消点赞",
+          "path": "/api/community/posts/{id}/like",
+          "method": "POST",
+          "authRequired": true,
+          "description": "点赞或取消点赞帖子",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 帖子ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "操作成功"
+            }
+          }
+        },
+        {
+          "name": "评论帖子",
+          "path": "/api/community/posts/{id}/comments",
+          "method": "POST",
+          "authRequired": true,
+          "description": "对帖子进行评论",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "content": "string (必填) - 评论内容"
+            },
+            "example": {
+              "content": "很好的分享！"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "评论成功",
+              "example": {
+                "id": 1,
+                "userId": 1,
+                "username": "testuser",
+                "content": "很好的分享！",
+                "createdAt": "2025-01-23T10:30:00Z"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "leaderboard": {
+      "module": "排行榜模块",
+      "endpoints": [
+        {
+          "name": "获取总排行榜",
+          "path": "/api/leaderboard/top-users",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取总减排量前10名用户",
+          "request": {},
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": [
+                {
+                  "username": "user1",
+                  "avatarUrl": "https://example.com/avatar1.jpg",
+                  "totalCarbonSaved": 1000.5
+                },
+                {
+                  "username": "user2",
+                  "avatarUrl": null,
+                  "totalCarbonSaved": 950.2
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "关注用户",
+          "path": "/api/leaderboard/follow/{targetUserId}",
+          "method": "POST",
+          "authRequired": true,
+          "description": "关注某个用户",
+          "request": {
+            "pathParams": {
+              "targetUserId": "number (必填) - 目标用户ID"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "关注成功"
+            },
+            "400": {
+              "description": "不能关注自己",
+              "example": "Cannot follow yourself."
+            }
+          }
+        },
+        {
+          "name": "获取关注列表排行榜",
+          "path": "/api/leaderboard/friends",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取我关注的人的排行榜数据（按总减排量排序）",
+          "request": {},
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": []
+            }
+          }
+        }
+      ]
+    },
+    "barcode": {
+      "module": "条形码模块",
+      "endpoints": [
+        {
+          "name": "获取条形码列表",
+          "path": "/api/barcode",
+          "method": "GET",
+          "authRequired": true,
+          "description": "获取条形码参考列表，支持搜索",
+          "request": {
+            "queryParams": {
+              "barcode": "string (可选) - 条形码搜索",
+              "productName": "string (可选) - 产品名称搜索",
+              "category": "string (可选) - 类别搜索",
+              "brand": "string (可选) - 品牌搜索"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": []
+            }
+          }
+        },
+        {
+          "name": "根据条形码获取产品信息",
+          "path": "/api/barcode/{barcode}",
+          "method": "GET",
+          "authRequired": true,
+          "description": "根据条形码获取产品信息和碳排放数据（优先本地；不存在时从Open Food Facts拉取并缓存）",
+          "request": {
+            "pathParams": {
+              "barcode": "string (必填) - 条形码"
+            },
+            "queryParams": {
+              "refresh": "boolean (可选) - 为true时强制从Open Food Facts重新拉取并更新Co2Factor",
+              "useClimatiq": "boolean (可选) - 是否使用Climatiq API作为后备数据源，默认false"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "barcode": "1234567890123",
+                "productName": "Product Name",
+                "category": "Food",
+                "brand": "Brand Name",
+                "carbonReference": {
+                  "labelName": "Product",
+                  "co2Factor": 2.5,
+                  "unit": "kgCO2/kg",
+                  "source": "OpenFoodFacts"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aiChat": {
+      "module": "AI聊天模块",
+      "endpoints": [
+        {
+          "name": "AI聊天",
+          "path": "/api/ai/chat",
+          "method": "POST",
+          "authRequired": true,
+          "description": "与AI助手聊天，获取环保建议",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "message": "string (必填) - 消息内容"
+            },
+            "example": {
+              "message": "如何减少碳排放？"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "聊天成功",
+              "example": {
+                "reply": "减少碳排放的方法包括：1. 使用公共交通... 2. 节约用电..."
+              }
+            }
+          }
+        }
+      ]
+    },
+    "insight": {
+      "module": "洞察模块",
+      "endpoints": [
+        {
+          "name": "获取周报洞察",
+          "path": "/api/insight/weekly-report",
+          "method": "GET",
+          "authRequired": true,
+          "description": "生成一条模拟周报洞见（最近7天）",
+          "request": {},
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "id": 0,
+                "content": "Based on your eating habits over the last week, try substituting steak with plant-based options twice to reduce your emissions.",
+                "type": 0,
+                "isRead": false,
+                "createdAt": "2025-01-23T10:30:00Z"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "carbonFactor": {
+      "module": "碳排放因子模块",
+      "endpoints": [
+        {
+          "name": "获取碳排放因子列表",
+          "path": "/api/carbon/factors",
+          "method": "GET",
+          "authRequired": false,
+          "description": "获取碳排放因子列表，支持按类别过滤",
+          "request": {
+            "queryParams": {
+              "category": "string (可选) - 类别过滤（Food, Transport, Utility, Other）"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": [
+                {
+                  "id": 1,
+                  "labelName": "Beef",
+                  "category": 0,
+                  "co2Factor": 27.0,
+                  "unit": "kgCO2/kg"
+                },
+                {
+                  "id": 2,
+                  "labelName": "CarGasoline",
+                  "category": 1,
+                  "co2Factor": 0.21,
+                  "unit": "kgCO2/km"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "errorCodes": {
+    "200": "成功",
+    "400": "请求参数错误 - 显示验证错误信息",
+    "401": "未授权 - 跳转到登录页面，重新获取Token",
+    "404": "资源不存在 - 显示'记录不存在'",
+    "409": "冲突 - 显示冲突信息（如：用户已存在、重复账单等）",
+    "500": "服务器错误 - 显示'服务器错误，请稍后重试'"
+  },
+  "commonNotes": {
+    "singaporePostalCode": "地址输入支持新加坡邮编直接输入（6位数字，如：160149），系统会自动添加'Singapore'后缀以提高识别率",
+    "duplicateBillDetection": "水电账单上传和手动创建时，系统会自动检测重复账单（相同用户、相同账单周期、相同类型、相同用量）。如果检测到重复，会返回错误提示，不会保存。",
+    "fileUpload": {
+      "supportedFormats": ["JPG", "PNG", "BMP", "WEBP", "PDF"],
+      "maxSize": "10MB",
+      "note": "上传文件时不要设置Content-Type，浏览器会自动设置multipart/form-data"
+    },
+    "pagination": {
+      "defaultPage": 1,
+      "defaultPageSize": 20,
+      "maxPageSize": 100,
+      "note": "所有分页接口都使用统一的响应格式：{ items: [], totalCount: number, page: number, pageSize: number, totalPages: number }"
+    },
+    "dateFormat": {
+      "request": "ISO 8601格式：yyyy-MM-ddTHH:mm:ssZ（如：2025-01-23T10:30:00Z）",
+      "query": "日期查询参数使用格式：yyyy-MM-dd（如：2025-01-23）",
+      "response": "ISO 8601格式：yyyy-MM-ddTHH:mm:ssZ"
+    },
+    "routePolyline": "出行记录返回的routePolyline是Google Maps编码的路线字符串，可用于前端绘制地图路线。支持Google Maps JavaScript API或Leaflet.js等地图库。"
+  }
+}

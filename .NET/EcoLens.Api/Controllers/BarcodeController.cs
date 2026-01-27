@@ -17,11 +17,13 @@ public class BarcodeController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IOpenFoodFactsService _openFoodFactsService;
+    private readonly IClimatiqService _climatiqService;
 
-    public BarcodeController(ApplicationDbContext db, IOpenFoodFactsService openFoodFactsService)
+    public BarcodeController(ApplicationDbContext db, IOpenFoodFactsService openFoodFactsService, IClimatiqService climatiqService)
     {
         _db = db;
         _openFoodFactsService = openFoodFactsService;
+        _climatiqService = climatiqService;
     }
 
     /// <summary>
@@ -62,6 +64,8 @@ public class BarcodeController : ControllerBase
                 CarbonReferenceLabel = b.CarbonReference!.LabelName,
                 Co2Factor = b.CarbonReference.Co2Factor,
                 Unit = b.CarbonReference.Unit,
+                Source = b.CarbonReference.Source,
+                ClimatiqActivityId = b.CarbonReference.ClimatiqActivityId,
                 Category = b.Category,
                 Brand = b.Brand
             })
@@ -71,10 +75,10 @@ public class BarcodeController : ControllerBase
     }
 
     /// <summary>
-    /// ???????????????????? Open Food Facts ???????
+     /// 根据条形码获取映射（优先本地；不存在时从 Open Food Facts 拉取并缓存）。
     /// </summary>
-    /// <param name="barcode">????</param>
-    /// <param name="refresh">? true ???? Open Food Facts ??????? Co2Factor????????/?????</param>
+    /// <param name="barcode">条形码</param>
+    /// <param name="refresh">为 true 时强制从 Open Food Facts 重新拉取并更新 Co2Factor（解决缓存了错误/旧数据）</param>
     [HttpGet("{barcode}")]
     public async Task<ActionResult<BarcodeReferenceResponseDto>> GetByBarcode(string barcode, [FromQuery(Name = "refresh")] bool? refresh = null, CancellationToken ct = default)
     {
@@ -85,16 +89,37 @@ public class BarcodeController : ControllerBase
         if (barcodeRef != null && refresh == true)
         {
             var offProduct = await _openFoodFactsService.GetProductByBarcodeAsync(barcode, ct);
-            if (offProduct?.Product != null && offProduct.Status == 1)
+            if (offProduct?.Product != null && offProduct.Status == 1 && barcodeRef.CarbonReference != null)
             {
                 var co2 = offProduct.Product.EcoScoreData?.Agribalyse?.Co2Total
                     ?? offProduct.Product.EcoScoreData?.AgribalyseCo2Total;
-                if (co2 != null && barcodeRef.CarbonReference != null)
+                if (co2 != null)
                 {
                     barcodeRef.CarbonReference.Co2Factor = co2.Value;
                     barcodeRef.CarbonReference.Unit = "kgCO2e/kg";
                     barcodeRef.CarbonReference.Source = "OpenFoodFacts";
+                    barcodeRef.CarbonReference.ClimatiqActivityId = null;
                     await _db.SaveChangesAsync(ct);
+                }
+                else
+                {
+                    // OFF 无 co2_total 时，尝试用 Climatiq 获取因子并更新
+                    try
+                    {
+                        var activityId = ClimatiqActivityMapping.GetActivityIdForFood(offProduct.Product.CategoriesTags);
+                        var estimate = await _climatiqService.GetCarbonEmissionEstimateAsync(activityId, 1m, "kg", ClimatiqActivityMapping.DefaultFoodRegion);
+                        if (estimate != null && estimate.Co2e > 0)
+                        {
+                            // 根据食物类别应用调整系数
+                            var multiplier = ClimatiqActivityMapping.GetCo2MultiplierForFood(offProduct.Product.CategoriesTags);
+                            barcodeRef.CarbonReference.Co2Factor = estimate.Co2e * multiplier;
+                            barcodeRef.CarbonReference.Unit = "kgCO2e/kg";
+                            barcodeRef.CarbonReference.Source = "Climatiq";
+                            barcodeRef.CarbonReference.ClimatiqActivityId = activityId;
+                            await _db.SaveChangesAsync(ct);
+                        }
+                    }
+                    catch { /* Climatiq 不可用时忽略 */ }
                 }
             }
         }
@@ -135,25 +160,53 @@ public class BarcodeController : ControllerBase
                     }
                 }
 
-                // ? Open Food Facts ? EcoScoreData.Agribalyse ??? CO2 Factor
-                // API ? co2_total ?? kg CO2e/kg?????????? 7622210449283 ? 3.59?
+                // 从 Open Food Facts 的 EcoScoreData.Agribalyse 取 CO2 Factor（kg CO2e/kg）
                 var co2Raw = offProduct.Product.EcoScoreData?.Agribalyse?.Co2Total
                     ?? offProduct.Product.EcoScoreData?.AgribalyseCo2Total;
                 if (co2Raw != null)
                     extractedCo2Factor = co2Raw.Value;
 
-                // ??????? category ? CarbonReference
+                string? climatiqActivityId = null;
+                var fromClimatiq = false;
+                // OFF 无 co2_total 时，用 Climatiq 作为后备获取重量型（kg）碳排放因子
+                if (!extractedCo2Factor.HasValue)
+                {
+                    try
+                    {
+                        var activityId = ClimatiqActivityMapping.GetActivityIdForFood(offProduct.Product.CategoriesTags);
+                        var estimate = await _climatiqService.GetCarbonEmissionEstimateAsync(activityId, 1m, "kg", ClimatiqActivityMapping.DefaultFoodRegion);
+                        if (estimate != null && estimate.Co2e > 0)
+                        {
+                            // 根据食物类别应用调整系数，使不同类别的食物有不同的 Co2Factor
+                            var multiplier = ClimatiqActivityMapping.GetCo2MultiplierForFood(offProduct.Product.CategoriesTags);
+                            extractedCo2Factor = estimate.Co2e * multiplier;
+                            climatiqActivityId = activityId;
+                            fromClimatiq = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Climatiq 不可用时继续，后续用 0.5 兜底
+                        // 临时输出错误信息以便调试（生产环境应使用 ILogger）
+                        System.Diagnostics.Debug.WriteLine($"Climatiq API call failed for barcode {barcode}: {ex.Message}");
+                        if (ex.InnerException != null)
+                            System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    }
+                }
+
+                // 查找或创建 category 对应的 CarbonReference
                 // ???Open Food Facts ??????Food ??
                 var carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
                     c => c.LabelName == categoryLabelName && c.Category == Models.Enums.CarbonCategory.Food, ct);
 
                 if (carbonRef != null)
                 {
-                    // ???????? CarbonReference???????? Co2Factor??????                    if (extractedCo2Factor.HasValue)
+                    if (extractedCo2Factor.HasValue)
                     {
                         carbonRef.Co2Factor = extractedCo2Factor.Value;
                         carbonRef.Unit = extractedUnit;
-                        carbonRef.Source = "OpenFoodFacts";
+                        carbonRef.Source = fromClimatiq ? "Climatiq" : "OpenFoodFacts";
+                        carbonRef.ClimatiqActivityId = fromClimatiq ? climatiqActivityId : null;
                         await _db.SaveChangesAsync(ct);
                     }
                 }
@@ -163,10 +216,11 @@ public class BarcodeController : ControllerBase
                     carbonRef = new CarbonReference
                     {
                         LabelName = categoryLabelName,
-                        Category = Models.Enums.CarbonCategory.Food, // Open Food Facts ??????
-                        Co2Factor = extractedCo2Factor ?? 0.5m, // ?????????????????????.5
+                        Category = Models.Enums.CarbonCategory.Food,
+                        Co2Factor = extractedCo2Factor ?? 0.5m,
                         Unit = extractedUnit,
-                        Source = extractedCo2Factor.HasValue ? "OpenFoodFacts" : "Local"
+                        Source = extractedCo2Factor.HasValue ? (fromClimatiq ? "Climatiq" : "OpenFoodFacts") : "Local",
+                        ClimatiqActivityId = fromClimatiq ? climatiqActivityId : null
                     };
                     await _db.CarbonReferences.AddAsync(carbonRef, ct);
                     await _db.SaveChangesAsync(ct);
@@ -200,98 +254,20 @@ public class BarcodeController : ControllerBase
             CarbonReferenceLabel = barcodeRef.CarbonReference?.LabelName,
             Co2Factor = barcodeRef.CarbonReference?.Co2Factor,
             Unit = barcodeRef.CarbonReference?.Unit,
+            Source = barcodeRef.CarbonReference?.Source,
+            ClimatiqActivityId = barcodeRef.CarbonReference?.ClimatiqActivityId,
             Category = barcodeRef.Category,
             Brand = barcodeRef.Brand
         });
     }
 
     /// <summary>
-    /// ???????????    /// </summary>
-    [HttpPost]
-    public async Task<ActionResult<BarcodeReferenceResponseDto>> Create([FromBody] CreateBarcodeReferenceDto dto, CancellationToken ct)
+    /// 根据条形码删除记录
+    /// </summary>
+    [HttpDelete("{barcode}")]
+    public async Task<IActionResult> DeleteByBarcode(string barcode, CancellationToken ct)
     {
-        if (await _db.BarcodeReferences.AnyAsync(b => b.Barcode == dto.Barcode, ct))
-        {
-            return Conflict("Barcode already exists.");
-        }
-
-        // ??CarbonReferenceId ????
-        if (dto.CarbonReferenceId.HasValue && !await _db.CarbonReferences.AnyAsync(c => c.Id == dto.CarbonReferenceId.Value, ct))
-        {
-            return BadRequest("Invalid CarbonReferenceId.");
-        }
-
-        var newBarcodeRef = new BarcodeReference
-        {
-            Barcode = dto.Barcode,
-            ProductName = dto.ProductName,
-            CarbonReferenceId = dto.CarbonReferenceId,
-            Category = dto.Category,
-            Brand = dto.Brand
-        };
-
-        await _db.BarcodeReferences.AddAsync(newBarcodeRef, ct);
-        await _db.SaveChangesAsync(ct);
-
-        var responseDto = new BarcodeReferenceResponseDto
-        {
-            Id = newBarcodeRef.Id,
-            Barcode = newBarcodeRef.Barcode,
-            ProductName = newBarcodeRef.ProductName,
-            CarbonReferenceId = newBarcodeRef.CarbonReferenceId,
-            // CarbonReferenceLabel, Co2Factor, Unit ???? Include ??????
-            Category = newBarcodeRef.Category,
-            Brand = newBarcodeRef.Brand
-        };
-
-        // ?? CarbonReferenceId ????????????????
-        if (newBarcodeRef.CarbonReferenceId.HasValue)
-        {
-            var loadedRef = await _db.BarcodeReferences
-                .Include(b => b.CarbonReference)
-                .FirstOrDefaultAsync(b => b.Id == newBarcodeRef.Id, ct);
-            if (loadedRef?.CarbonReference != null)
-            {
-                responseDto.CarbonReferenceLabel = loadedRef.CarbonReference.LabelName;
-                responseDto.Co2Factor = loadedRef.CarbonReference.Co2Factor;
-                responseDto.Unit = loadedRef.CarbonReference.Unit;
-            }
-        }
-
-        return CreatedAtAction(nameof(GetByBarcode), new { barcode = newBarcodeRef.Barcode }, responseDto);
-    }
-
-    /// <summary>
-    /// ?????????    /// </summary>
-    [HttpPut]
-    public async Task<IActionResult> Update([FromBody] UpdateBarcodeReferenceDto dto, CancellationToken ct)
-    {
-        var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Id == dto.Id, ct);
-        if (barcodeRef is null) return NotFound("Barcode reference not found.");
-
-        // ??CarbonReferenceId ????
-        if (dto.CarbonReferenceId.HasValue && !await _db.CarbonReferences.AnyAsync(c => c.Id == dto.CarbonReferenceId.Value, ct))
-        {
-            return BadRequest("Invalid CarbonReferenceId.");
-        }
-
-        barcodeRef.ProductName = dto.ProductName ?? barcodeRef.ProductName;
-        barcodeRef.CarbonReferenceId = dto.CarbonReferenceId ?? barcodeRef.CarbonReferenceId;
-        barcodeRef.Category = dto.Category ?? barcodeRef.Category;
-        barcodeRef.Brand = dto.Brand ?? barcodeRef.Brand;
-
-        _db.BarcodeReferences.Update(barcodeRef);
-        await _db.SaveChangesAsync(ct);
-
-        return NoContent();
-    }
-
-    /// <summary>
-    /// ???????    /// </summary>
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id, CancellationToken ct)
-    {
-        var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Id == id, ct);
+        var barcodeRef = await _db.BarcodeReferences.FirstOrDefaultAsync(b => b.Barcode == barcode, ct);
         if (barcodeRef is null) return NotFound("Barcode reference not found.");
 
         _db.BarcodeReferences.Remove(barcodeRef);

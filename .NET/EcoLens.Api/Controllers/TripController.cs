@@ -30,9 +30,16 @@ public class TripController : ControllerBase
 		// 可选：这些因子也可以改为从数据库 CarbonReferences 中读取（Category=Transport）
 		decimal factorPerKm = dto.TransportMode switch
 		{
-			TransportMode.Driving => 0.21m, // 约 0.21 kgCO2/km
-			TransportMode.Transit => 0.05m, // 地铁/公交较低
+			TransportMode.CarGasoline => 0.21m, // 约 0.21 kgCO2/km
+			TransportMode.Taxi => 0.20m, // 出租车
+			TransportMode.Subway => 0.03m, // 地铁
+			TransportMode.Bus => 0.05m, // 公交
+			TransportMode.Ship => 0.03m, // 轮船
 			TransportMode.Walking => 0.00m, // 步行为 0
+			TransportMode.Bicycle => 0.00m, // 自行车为 0
+			TransportMode.ElectricBike => 0.02m, // 电动车
+			TransportMode.CarElectric => 0.05m, // 电动车
+			TransportMode.Plane => 0.25m, // 飞机
 			_ => 0.10m
 		};
 

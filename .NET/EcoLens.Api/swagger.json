@@ -1,0 +1,3253 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "EcoLens API",
+    "description": "Sustainable lifestyle application API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/Activity/upload": {
+      "post": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "上传活动记录：根据标签查找参考，计算排放并保存。",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "Label",
+                  "Quantity"
+                ],
+                "type": "object",
+                "properties": {
+                  "Base64Image": {
+                    "type": "string"
+                  },
+                  "ImageFile": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "Label": {
+                    "maxLength": 200,
+                    "type": "string"
+                  },
+                  "Quantity": {
+                    "type": "number",
+                    "format": "double"
+                  }
+                }
+              },
+              "encoding": {
+                "Base64Image": {
+                  "style": "form"
+                },
+                "ImageFile": {
+                  "style": "form"
+                },
+                "Label": {
+                  "style": "form"
+                },
+                "Quantity": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Activity/my-logs": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "获取当前用户的活动日志列表。",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityLogResponseDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityLogResponseDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ActivityLogResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Activity/stats": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "获取当前用户的统计信息（总排放/记录数量/折算树木/全服排名）。",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityStatsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityStatsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityStatsDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Activity/chart-data": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "获取过去 N 天的每日碳排放总量（当前用户）。",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChartDataPointDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChartDataPointDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChartDataPointDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Activity/heatmap": {
+      "get": {
+        "tags": [
+          "Activity"
+        ],
+        "summary": "按 Region 统计总碳减排量（基于用户的 TotalCarbonSaved）。",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegionHeatmapDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegionHeatmapDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegionHeatmapDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/chat": {
+      "post": {
+        "tags": [
+          "AiChat"
+        ],
+        "summary": "模拟 AI 对话接口。\r\n- 若用户问“如何减排”，返回环保建议；\r\n- 若用户问“我的数据”，查询该用户 TotalCarbonSaved 并生成表扬语。\r\n\r\n替换为真实大模型调用（Google Gemini / OpenAI）的方法：\r\n1) 注入配置与 SDK 客户端（例如 IOpenAIClient 或 GeminiClient）；\r\n2) 将历史对话与当前 message 拼接为 prompt；\r\n3) 调用 chat/completions 或 generateContent 接口，返回模型输出。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "用户注册并返回认证 Token。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "用户登录并返回认证 Token。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/carbon/factors": {
+      "get": {
+        "tags": [
+          "CarbonFactor"
+        ],
+        "summary": "获取碳排放因子（支持按 Category 过滤）。",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CarbonFactorDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CarbonFactorDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CarbonFactorDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/factor": {
+      "post": {
+        "tags": [
+          "CarbonFactor"
+        ],
+        "summary": "新增或更新碳排放因子（仅登录用户，暂不限制角色）。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertCarbonFactorDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertCarbonFactorDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertCarbonFactorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarbonFactorDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarbonFactorDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CarbonFactorDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Community/posts": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "分页获取帖子列表（可选 type=User/Official）。",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostListItemDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostListItemDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostListItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "发布新帖子。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Community/posts/{id}": {
+      "get": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "获取帖子详情及评论列表，同时自增浏览量。",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetailDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Community/posts/{id}/comments": {
+      "post": {
+        "tags": [
+          "Community"
+        ],
+        "summary": "对帖子进行评论。",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Insight/weekly-report": {
+      "get": {
+        "tags": [
+          "Insight"
+        ],
+        "summary": "生成一条模拟周报洞见（最近 7 天）。\r\nTODO: Send logs to Gemini/OpenAI API and return response",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiInsightDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiInsightDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiInsightDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Leaderboard/top-users": {
+      "get": {
+        "tags": [
+          "Leaderboard"
+        ],
+        "summary": "获取总减排量前 10 名用户。",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardItemDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardItemDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Leaderboard/follow/{targetUserId}": {
+      "post": {
+        "tags": [
+          "Leaderboard"
+        ],
+        "summary": "关注某个用户。",
+        "parameters": [
+          {
+            "name": "targetUserId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Leaderboard/friends": {
+      "get": {
+        "tags": [
+          "Leaderboard"
+        ],
+        "summary": "获取我关注的人的排行榜数据（按总减排量排序）。",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardItemDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardItemDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Travel": {
+      "post": {
+        "tags": [
+          "Travel"
+        ],
+        "summary": "创建出行记录",
+        "description": "根据出发地和目的地地址，调用 Google Maps API 计算路线和距离，\r\n根据出行方式计算碳排放量，并保存到数据库。\r\n\r\n**处理流程：**\r\n1. 地址转坐标（Geocoding API）\r\n2. 获取路线信息（Directions API，包含距离、时间、polyline）\r\n3. 根据出行方式查找碳排放因子\r\n4. 计算碳排放（距离 × 碳排放因子）\r\n5. 保存到数据库\r\n\r\n**示例请求：**\r\n```json\r\n{\r\n  \"originAddress\": \"北京市朝阳区\",\r\n  \"destinationAddress\": \"北京市海淀区\",\r\n  \"transportMode\": 3,\r\n  \"notes\": \"上班通勤\"\r\n}\r\n```",
+        "requestBody": {
+          "description": "创建出行记录的请求数据",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTravelLogDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTravelLogDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTravelLogDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功，返回出行记录详情（包含路线 polyline）",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误、地址无法解析或路线获取失败",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权，需要登录（Token 无效或过期）",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/api/Travel/preview": {
+      "post": {
+        "tags": [
+          "Travel"
+        ],
+        "summary": "预览路线和碳排放（不保存到数据库）",
+        "description": "预览功能，用于在保存前查看路线信息、距离、时间和预估碳排放量。\r\n不会创建数据库记录，适合在用户确认前预览结果。\r\n\r\n**处理流程：**\r\n1. 地址转坐标（Geocoding API）\r\n2. 获取路线信息（Directions API）\r\n3. 计算预估碳排放\r\n4. 返回预览结果（不保存）\r\n\r\n**示例请求：**\r\n```json\r\n{\r\n  \"originAddress\": \"北京市朝阳区\",\r\n  \"destinationAddress\": \"北京市海淀区\",\r\n  \"transportMode\": 3\r\n}\r\n```",
+        "requestBody": {
+          "description": "创建出行记录的请求数据",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTravelLogDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTravelLogDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTravelLogDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "预览成功，返回路线和碳排放信息",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutePreviewDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutePreviewDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutePreviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误或地址无法解析",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权，需要登录",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/api/Travel/my-travels": {
+      "get": {
+        "tags": [
+          "Travel"
+        ],
+        "parameters": [
+          {
+            "name": "StartDate",
+            "in": "query",
+            "description": "开始日期（可选，格式：yyyy-MM-dd）",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "EndDate",
+            "in": "query",
+            "description": "结束日期（可选，格式：yyyy-MM-dd）",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "TransportMode",
+            "in": "query",
+            "description": "出行方式筛选（可选）",
+            "schema": {
+              "$ref": "#/components/schemas/TransportMode"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "description": "页码（从1开始，默认1）",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "description": "每页数量（默认20，最大100）",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDtoPagedResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDtoPagedResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDtoPagedResultDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/Travel/{id}": {
+      "get": {
+        "tags": [
+          "Travel"
+        ],
+        "summary": "根据ID获取单条出行记录详情",
+        "description": "获取指定ID的出行记录详细信息。只能获取当前用户自己的记录。\r\n\r\n**返回数据：**\r\n- 完整的出行记录信息\r\n- 包含路线 polyline，可用于前端绘制地图\r\n- 包含出发地和目的地的坐标，可用于地图标记",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出行记录ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功，返回出行记录详情",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelLogResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权，需要登录",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不存在或不属于当前用户",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Travel"
+        ],
+        "summary": "删除出行记录",
+        "description": "删除指定ID的出行记录。只能删除当前用户自己的记录。\r\n\r\n**注意：**\r\n- 删除操作不可恢复\r\n- 只能删除自己的记录",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "出行记录ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权，需要登录",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "记录不存在或不属于当前用户",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/api/Travel/statistics": {
+      "get": {
+        "tags": [
+          "Travel"
+        ],
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelStatisticsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelStatisticsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TravelStatisticsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/user/profile": {
+      "get": {
+        "tags": [
+          "UserProfile"
+        ],
+        "summary": "获取当前登录用户的资料（含 Rank）。",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "UserProfile"
+        ],
+        "summary": "更新当前登录用户的头像、用户名与地区。",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/UtilityBill/upload": {
+      "post": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "summary": "上传账单文件并自动处理（OCR识别 → 数据提取 → 碳排放计算 → 保存）",
+        "description": "上传账单文件（支持图片：JPG、PNG、GIF、BMP、WEBP，或PDF文件），系统会自动识别账单内容，\r\n提取用量数据和账单周期，计算碳排放，并保存到数据库。\r\n\r\n**处理流程：**\r\n1. 文件验证（类型、大小）\r\n2. OCR识别（Google Cloud Vision API）\r\n3. 数据提取（从OCR文本中提取用量、日期等）\r\n4. 碳排放计算（根据用量和排放因子）\r\n5. 保存到数据库\r\n\r\n**支持的文件格式：**\r\n- 图片：JPG、JPEG、PNG、GIF、BMP、WEBP\r\n- 文档：PDF（支持多页）\r\n\r\n**文件大小限制：**\r\n- 最大 10MB\r\n\r\n**示例请求：**\r\n```\r\nPOST /api/utility-bills/upload\r\nContent-Type: multipart/form-data\r\n\r\nfile: [账单图片或PDF文件]\r\n```\r\n\r\n**注意事项：**\r\n- 如果OCR识别失败，会返回错误，建议使用手动输入\r\n- 如果数据提取不完整，会返回错误，建议使用手动输入补充\r\n- 上传的文件不会保存，只保存提取的数据",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "File"
+                ],
+                "type": "object",
+                "properties": {
+                  "File": {
+                    "type": "string",
+                    "description": "账单文件（支持图片：JPG、PNG、GIF、BMP、WEBP，或PDF文件）",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "File": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "处理成功，返回账单详情（包含识别的数据和计算的碳排放）",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "文件验证失败、OCR识别失败或数据提取失败",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权，需要登录（Token 无效或过期）",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/api/UtilityBill/manual": {
+      "post": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "summary": "手动创建账单（碳排放计算 → 保存）",
+        "description": "手动输入账单数据，系统会自动计算碳排放并保存到数据库。\r\n\r\n**处理流程：**\r\n1. 输入验证（日期范围、用量等）\r\n2. 碳排放计算（根据用量和排放因子）\r\n3. 保存到数据库\r\n\r\n**账单类型说明：**\r\n- 0: 电费（Electricity）\r\n- 1: 水费（Water）\r\n- 2: 燃气费（Gas）\r\n- 3: 综合账单（Combined）\r\n\r\n**用量单位：**\r\n- 用电量：kWh\r\n- 用水量：m³\r\n- 用气量：kWh 或 m³\r\n\r\n**示例请求：**\r\n```json\r\n{\r\n  \"billType\": 0,\r\n  \"billPeriodStart\": \"2024-01-01T00:00:00\",\r\n  \"billPeriodEnd\": \"2024-01-31T23:59:59\",\r\n  \"electricityUsage\": 150.5,\r\n  \"waterUsage\": null,\r\n  \"gasUsage\": null\r\n}\r\n```",
+        "requestBody": {
+          "description": "手动输入账单数据",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUtilityBillManuallyDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUtilityBillManuallyDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUtilityBillManuallyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功，返回账单详情（包含计算的碳排放）",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数验证失败",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权，需要登录",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/api/UtilityBill/my-bills": {
+      "get": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "parameters": [
+          {
+            "name": "StartDate",
+            "in": "query",
+            "description": "开始日期（可选，格式：yyyy-MM-dd）",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "EndDate",
+            "in": "query",
+            "description": "结束日期（可选，格式：yyyy-MM-dd）",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "BillType",
+            "in": "query",
+            "description": "账单类型筛选（可选）",
+            "schema": {
+              "$ref": "#/components/schemas/UtilityBillType"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "description": "页码（从1开始，默认1）",
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "description": "每页数量（默认20，最大100）",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDtoPagedResultDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDtoPagedResultDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDtoPagedResultDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/UtilityBill/{id}/debug": {
+      "get": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "summary": "调试端点：获取OCR文本和日期解析信息（临时，用于调试）",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/UtilityBill/{id}": {
+      "get": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "summary": "删除账单",
+        "description": "删除指定ID的账单。只能删除当前用户自己的记录。\r\n\r\n**注意：**\r\n- 删除操作不可恢复\r\n- 只能删除自己的记录\r\n\r\n**示例请求：**\r\n```\r\nDELETE /api/utility-bills/1\r\n```",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "账单ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "401": {
+            "description": "未授权，需要登录",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "账单不存在或不属于当前用户",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/api/UtilityBill/statistics": {
+      "get": {
+        "tags": [
+          "UtilityBill"
+        ],
+        "parameters": [
+          {
+            "name": "startDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillStatisticsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillStatisticsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilityBillStatisticsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server Error"
+          }
+        }
+      }
+    },
+    "/api/Vision/analyze": {
+      "post": {
+        "tags": [
+          "Vision"
+        ],
+        "summary": "模拟分析图片并返回识别标签。\r\nTODO: Call Python Microservice via HttpClient here",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ContentType": {
+                    "type": "string"
+                  },
+                  "ContentDisposition": {
+                    "type": "string"
+                  },
+                  "Headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "Length": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "Name": {
+                    "type": "string"
+                  },
+                  "FileName": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "ContentType": {
+                  "style": "form"
+                },
+                "ContentDisposition": {
+                  "style": "form"
+                },
+                "Headers": {
+                  "style": "form"
+                },
+                "Length": {
+                  "style": "form"
+                },
+                "Name": {
+                  "style": "form"
+                },
+                "FileName": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ActivityLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalEmission": {
+            "type": "number",
+            "format": "double"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ActivityStatsDto": {
+        "type": "object",
+        "properties": {
+          "totalEmission": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalItems": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "treesSaved": {
+            "type": "number",
+            "format": "double"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AiInsightDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/InsightType"
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "nullable": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummaryDto"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BillTypeStatisticsDto": {
+        "type": "object",
+        "properties": {
+          "billType": {
+            "$ref": "#/components/schemas/UtilityBillType"
+          },
+          "billTypeName": {
+            "type": "string",
+            "description": "账单类型名称（中文）",
+            "nullable": true
+          },
+          "recordCount": {
+            "type": "integer",
+            "description": "记录数",
+            "format": "int32"
+          },
+          "totalElectricityUsage": {
+            "type": "number",
+            "description": "总用电量（kWh）",
+            "format": "double"
+          },
+          "totalWaterUsage": {
+            "type": "number",
+            "description": "总用水量（m³）",
+            "format": "double"
+          },
+          "totalGasUsage": {
+            "type": "number",
+            "description": "总用气量（kWh 或 m³）",
+            "format": "double"
+          },
+          "totalCarbonEmission": {
+            "type": "number",
+            "description": "总碳排放（kg CO2）",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "按账单类型的统计信息"
+      },
+      "CarbonCategory": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "CarbonFactorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "labelName": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "$ref": "#/components/schemas/CarbonCategory"
+          },
+          "co2Factor": {
+            "type": "number",
+            "format": "double"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChartDataPointDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "nullable": true
+          },
+          "emission": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChatRequestDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChatResponseDto": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateCommentDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreatePostDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrls": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/PostType"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateTravelLogDto": {
+        "required": [
+          "destinationAddress",
+          "originAddress",
+          "transportMode"
+        ],
+        "type": "object",
+        "properties": {
+          "originAddress": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string",
+            "description": "出发地地址（例如：北京市朝阳区）"
+          },
+          "destinationAddress": {
+            "maxLength": 500,
+            "minLength": 1,
+            "type": "string",
+            "description": "目的地地址（例如：北京市海淀区）"
+          },
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "notes": {
+            "maxLength": 1000,
+            "type": "string",
+            "description": "备注（可选）",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "创建出行记录的请求 DTO"
+      },
+      "CreateUtilityBillManuallyDto": {
+        "required": [
+          "billPeriodEnd",
+          "billPeriodStart",
+          "billType"
+        ],
+        "type": "object",
+        "properties": {
+          "billType": {
+            "$ref": "#/components/schemas/UtilityBillType"
+          },
+          "billPeriodStart": {
+            "type": "string",
+            "description": "账单周期开始日期",
+            "format": "date-time"
+          },
+          "billPeriodEnd": {
+            "type": "string",
+            "description": "账单周期结束日期",
+            "format": "date-time"
+          },
+          "electricityUsage": {
+            "minimum": 0,
+            "type": "number",
+            "description": "用电量（kWh），可选",
+            "format": "double",
+            "nullable": true
+          },
+          "waterUsage": {
+            "minimum": 0,
+            "type": "number",
+            "description": "用水量（m³），可选",
+            "format": "double",
+            "nullable": true
+          },
+          "gasUsage": {
+            "minimum": 0,
+            "type": "number",
+            "description": "用气量（kWh 或 m³），可选",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "手动创建账单的请求 DTO"
+      },
+      "InputMethod": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "description": "账单输入方式枚举",
+        "format": "int32"
+      },
+      "InsightType": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "LeaderboardItemDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalCarbonSaved": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LoginRequestDto": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PostDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrls": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/PostType"
+          },
+          "viewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommentDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PostListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrls": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/PostType"
+          },
+          "viewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PostType": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": { }
+      },
+      "RegionHeatmapDto": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalSaved": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisterRequestDto": {
+        "required": [
+          "email",
+          "password",
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "username": {
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RoutePreviewDto": {
+        "type": "object",
+        "properties": {
+          "originAddress": {
+            "type": "string",
+            "description": "出发地地址",
+            "nullable": true
+          },
+          "originLatitude": {
+            "type": "number",
+            "description": "出发地纬度",
+            "format": "double"
+          },
+          "originLongitude": {
+            "type": "number",
+            "description": "出发地经度",
+            "format": "double"
+          },
+          "destinationAddress": {
+            "type": "string",
+            "description": "目的地地址",
+            "nullable": true
+          },
+          "destinationLatitude": {
+            "type": "number",
+            "description": "目的地纬度",
+            "format": "double"
+          },
+          "destinationLongitude": {
+            "type": "number",
+            "description": "目的地经度",
+            "format": "double"
+          },
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "transportModeName": {
+            "type": "string",
+            "description": "出行方式名称（中文）",
+            "nullable": true
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "description": "路线距离（米）",
+            "format": "int32"
+          },
+          "distanceKilometers": {
+            "type": "number",
+            "description": "路线距离（公里）",
+            "format": "double"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "description": "预计行驶时间（秒）",
+            "format": "int32",
+            "nullable": true
+          },
+          "durationText": {
+            "type": "string",
+            "description": "预计行驶时间（格式化字符串，例如：30分钟）",
+            "nullable": true
+          },
+          "estimatedCarbonEmission": {
+            "type": "number",
+            "description": "预估碳排放量（kg CO2）",
+            "format": "double"
+          },
+          "routePolyline": {
+            "type": "string",
+            "description": "路线编码（Google Maps polyline，用于前端绘制地图路线）",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "路线预览 DTO（不保存到数据库，仅用于预览）"
+      },
+      "TransportMode": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "type": "integer",
+        "description": "出行方式枚举",
+        "format": "int32"
+      },
+      "TransportModeStatisticsDto": {
+        "type": "object",
+        "properties": {
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "transportModeName": {
+            "type": "string",
+            "description": "出行方式名称",
+            "nullable": true
+          },
+          "recordCount": {
+            "type": "integer",
+            "description": "记录数",
+            "format": "int32"
+          },
+          "totalDistanceKilometers": {
+            "type": "number",
+            "description": "总距离（公里）",
+            "format": "double"
+          },
+          "totalCarbonEmission": {
+            "type": "number",
+            "description": "总碳排放量（kg CO2）",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "按出行方式的统计信息"
+      },
+      "TravelLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "记录ID",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间",
+            "format": "date-time"
+          },
+          "transportMode": {
+            "$ref": "#/components/schemas/TransportMode"
+          },
+          "transportModeName": {
+            "type": "string",
+            "description": "出行方式名称（中文）",
+            "nullable": true
+          },
+          "originAddress": {
+            "type": "string",
+            "description": "出发地地址",
+            "nullable": true
+          },
+          "originLatitude": {
+            "type": "number",
+            "description": "出发地纬度",
+            "format": "double"
+          },
+          "originLongitude": {
+            "type": "number",
+            "description": "出发地经度",
+            "format": "double"
+          },
+          "destinationAddress": {
+            "type": "string",
+            "description": "目的地地址",
+            "nullable": true
+          },
+          "destinationLatitude": {
+            "type": "number",
+            "description": "目的地纬度",
+            "format": "double"
+          },
+          "destinationLongitude": {
+            "type": "number",
+            "description": "目的地经度",
+            "format": "double"
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "description": "路线距离（米）",
+            "format": "int32"
+          },
+          "distanceKilometers": {
+            "type": "number",
+            "description": "路线距离（公里）",
+            "format": "double"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "description": "预计行驶时间（秒）",
+            "format": "int32",
+            "nullable": true
+          },
+          "durationText": {
+            "type": "string",
+            "description": "预计行驶时间（格式化字符串，例如：30分钟）",
+            "nullable": true
+          },
+          "carbonEmission": {
+            "type": "number",
+            "description": "碳排放量（kg CO2）",
+            "format": "double"
+          },
+          "routePolyline": {
+            "type": "string",
+            "description": "路线编码（Google Maps polyline，用于前端绘制地图路线）",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "description": "备注",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "出行记录的响应 DTO"
+      },
+      "TravelLogResponseDtoPagedResultDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TravelLogResponseDto"
+            },
+            "description": "数据列表",
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "总记录数",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "当前页码",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页数量",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "总页数",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "是否有上一页",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "是否有下一页",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "分页结果"
+      },
+      "TravelStatisticsDto": {
+        "type": "object",
+        "properties": {
+          "totalRecords": {
+            "type": "integer",
+            "description": "总记录数",
+            "format": "int32"
+          },
+          "totalDistanceKilometers": {
+            "type": "number",
+            "description": "总距离（公里）",
+            "format": "double"
+          },
+          "totalCarbonEmission": {
+            "type": "number",
+            "description": "总碳排放量（kg CO2）",
+            "format": "double"
+          },
+          "byTransportMode": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransportModeStatisticsDto"
+            },
+            "description": "按出行方式统计",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "出行记录统计信息"
+      },
+      "UpdateUserProfileDto": {
+        "type": "object",
+        "properties": {
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpsertCarbonFactorDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "labelName": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "$ref": "#/components/schemas/CarbonCategory"
+          },
+          "co2Factor": {
+            "type": "number",
+            "format": "double"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserProfileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "region": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalCarbonSaved": {
+            "type": "number",
+            "format": "double"
+          },
+          "currentPoints": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserRole": {
+        "enum": [
+          0,
+          1
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "UserSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalCarbonSaved": {
+            "type": "number",
+            "format": "double"
+          },
+          "currentPoints": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UtilityBillResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "账单ID",
+            "format": "int32"
+          },
+          "billType": {
+            "$ref": "#/components/schemas/UtilityBillType"
+          },
+          "billTypeName": {
+            "type": "string",
+            "description": "账单类型名称（中文）",
+            "nullable": true
+          },
+          "billPeriodStart": {
+            "type": "string",
+            "description": "账单周期开始日期",
+            "format": "date-time"
+          },
+          "billPeriodEnd": {
+            "type": "string",
+            "description": "账单周期结束日期",
+            "format": "date-time"
+          },
+          "electricityUsage": {
+            "type": "number",
+            "description": "用电量（kWh）",
+            "format": "double",
+            "nullable": true
+          },
+          "waterUsage": {
+            "type": "number",
+            "description": "用水量（m³）",
+            "format": "double",
+            "nullable": true
+          },
+          "gasUsage": {
+            "type": "number",
+            "description": "用气量（kWh 或 m³）",
+            "format": "double",
+            "nullable": true
+          },
+          "electricityCarbonEmission": {
+            "type": "number",
+            "description": "电力碳排放（kg CO2）",
+            "format": "double"
+          },
+          "waterCarbonEmission": {
+            "type": "number",
+            "description": "水碳排放（kg CO2）",
+            "format": "double"
+          },
+          "gasCarbonEmission": {
+            "type": "number",
+            "description": "燃气碳排放（kg CO2）",
+            "format": "double"
+          },
+          "totalCarbonEmission": {
+            "type": "number",
+            "description": "总碳排放（kg CO2）",
+            "format": "double"
+          },
+          "inputMethod": {
+            "$ref": "#/components/schemas/InputMethod"
+          },
+          "inputMethodName": {
+            "type": "string",
+            "description": "输入方式名称（中文）",
+            "nullable": true
+          },
+          "ocrConfidence": {
+            "type": "number",
+            "description": "OCR识别置信度（0-1，仅自动识别时有值）",
+            "format": "double",
+            "nullable": true
+          },
+          "ocrRawText": {
+            "type": "string",
+            "description": "OCR识别的原始文本（仅用于调试，生产环境可移除）",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "创建时间",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "账单响应 DTO"
+      },
+      "UtilityBillResponseDtoPagedResultDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UtilityBillResponseDto"
+            },
+            "description": "数据列表",
+            "nullable": true
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "总记录数",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "description": "当前页码",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "每页数量",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "总页数",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "是否有上一页",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "是否有下一页",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "分页结果"
+      },
+      "UtilityBillStatisticsDto": {
+        "type": "object",
+        "properties": {
+          "totalRecords": {
+            "type": "integer",
+            "description": "总记录数",
+            "format": "int32"
+          },
+          "totalElectricityUsage": {
+            "type": "number",
+            "description": "总用电量（kWh）",
+            "format": "double"
+          },
+          "totalWaterUsage": {
+            "type": "number",
+            "description": "总用水量（m³）",
+            "format": "double"
+          },
+          "totalGasUsage": {
+            "type": "number",
+            "description": "总用气量（kWh 或 m³）",
+            "format": "double"
+          },
+          "totalCarbonEmission": {
+            "type": "number",
+            "description": "总碳排放（kg CO2）",
+            "format": "double"
+          },
+          "byBillType": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BillTypeStatisticsDto"
+            },
+            "description": "按账单类型统计",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "账单统计信息响应 DTO"
+      },
+      "UtilityBillType": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "description": "水电账单类型枚举",
+        "format": "int32"
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Enter JWT below. Example: Bearer {token}",
+        "scheme": "Bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
+}
