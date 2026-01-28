@@ -197,20 +197,20 @@ public class ApplicationDbContext : DbContext
 			.HasOne(c => c.User!)
 			.WithMany()
 			.HasForeignKey(c => c.UserId)
-			.OnDelete(DeleteBehavior.NoAction);
+			.OnDelete(DeleteBehavior.Restrict);
 
 		// Social follow relations
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Follower!)
 			.WithMany()
 			.HasForeignKey(f => f.FollowerId)
-			.OnDelete(DeleteBehavior.NoAction);
+			.OnDelete(DeleteBehavior.Restrict);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasOne(f => f.Followee!)
 			.WithMany()
 			.HasForeignKey(f => f.FolloweeId)
-			.OnDelete(DeleteBehavior.NoAction);
+			.OnDelete(DeleteBehavior.Restrict);
 
 		modelBuilder.Entity<UserFollow>()
 			.HasIndex(f => new { f.FollowerId, f.FolloweeId })

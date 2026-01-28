@@ -55,19 +55,28 @@ public class AuthController : ControllerBase
 
 		var token = await _authService.GenerateTokenAsync(user.Id.ToString(), claims);
 
+		var joinDaysReg = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
 		var response = new AuthResponseDto
 		{
 			Token = token,
 			User = new UserSummaryDto
 			{
-				Id = user.Id,
+				Id = user.Id.ToString(),
 				Username = user.Username,
+				Name = user.Username,
 				Nickname = user.Username,
 				Email = user.Email,
+				Location = user.Region,
+				BirthDate = user.BirthDate?.ToString("yyyy-MM-dd"),
 				Role = user.Role,
+				Avatar = user.AvatarUrl,
 				AvatarUrl = user.AvatarUrl,
 				TotalCarbonSaved = user.TotalCarbonSaved,
-				CurrentPoints = user.CurrentPoints
+				CurrentPoints = user.CurrentPoints,
+				PointsWeek = user.CurrentPoints,
+				PointsMonth = user.CurrentPoints,
+				PointsTotal = user.CurrentPoints,
+				JoinDays = joinDaysReg
 			}
 		};
 
@@ -108,19 +117,28 @@ public class AuthController : ControllerBase
 
 		var token = await _authService.GenerateTokenAsync(user.Id.ToString(), claims);
 
+		var joinDays = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
 		var response = new AuthResponseDto
 		{
 			Token = token,
 			User = new UserSummaryDto
 			{
-				Id = user.Id,
+				Id = user.Id.ToString(),
 				Username = user.Username,
+				Name = user.Username,
 				Nickname = user.Username,
 				Email = user.Email,
+				Location = user.Region,
+				BirthDate = user.BirthDate?.ToString("yyyy-MM-dd"),
 				Role = user.Role,
+				Avatar = user.AvatarUrl,
 				AvatarUrl = user.AvatarUrl,
 				TotalCarbonSaved = user.TotalCarbonSaved,
-				CurrentPoints = user.CurrentPoints
+				CurrentPoints = user.CurrentPoints,
+				PointsWeek = user.CurrentPoints,
+				PointsMonth = user.CurrentPoints,
+				PointsTotal = user.CurrentPoints,
+				JoinDays = joinDays
 			}
 		};
 

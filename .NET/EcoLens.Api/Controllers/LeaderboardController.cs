@@ -20,17 +20,74 @@ public class LeaderboardController : ControllerBase
 	}
 
 	/// <summary>
-	/// /leaderboard?period=week|month|all
+	/// /leaderboard?period=today|week|month|all&limit=50
 	/// </summary>
 	[HttpGet]
 	[AllowAnonymous]
-	public async Task<ActionResult<IEnumerable<object>>> Get([FromQuery] string period = "all", CancellationToken ct = default)
+	public async Task<ActionResult<IEnumerable<object>>> Get([FromQuery] string period = "month", [FromQuery] int limit = 50, CancellationToken ct = default)
 	{
 		// 简化实现：按总减排（all），或最近7/30天排放求和排行
 		var users = _db.ApplicationUsers.AsQueryable();
 		var logs = _db.ActivityLogs.AsQueryable();
 		DateTime? from = null;
-		if (string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-6);
+		if (string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date;
+		else if (string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-6);
+		else if (string.Equals(period, "month", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-29);
+		if (limit <= 0 || limit > 100) limit = 50;
+
+		var emissions = logs
+			.Where(l => !from.HasValue || l.CreatedAt.Date >= from.Value)
+			.GroupBy(l => l.UserId)
+			.Select(g => new { UserId = g.Key, Emission = g.Sum(x => x.TotalEmission) });
+
+		var query = from u in users
+					join e in emissions on u.Id equals e.UserId into ue
+					from e in ue.DefaultIfEmpty()
+					select new
+					{
+						userId = u.Id,
+						username = u.Username,
+						nickname = u.Username,
+						avatarUrl = u.AvatarUrl,
+						emissions = (decimal?)e.Emission ?? 0m,
+						pointsWeek = u.CurrentPoints,
+						pointsMonth = u.CurrentPoints,
+						pointsTotal = u.CurrentPoints
+					};
+
+		var list = await query.OrderByDescending(x => x.emissions).Take(limit).ToListAsync(ct);
+		var ranked = list.Select((x, i) => new
+		{
+			rank = i + 1,
+			username = x.username,
+			nickname = x.nickname,
+			emissions = x.emissions,
+			avatarUrl = x.avatarUrl,
+			pointsWeek = x.pointsWeek,
+			pointsMonth = x.pointsMonth,
+			pointsTotal = x.pointsTotal
+		});
+		return Ok(ranked);
+	}
+
+	private int? GetUserId()
+	{
+		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+		return int.TryParse(id, out var uid) ? uid : null;
+	}
+
+	/// <summary>
+	/// 获取指定用户名的排行榜条目（同列表字段）。
+	/// </summary>
+	[HttpGet("{username}")]
+	[AllowAnonymous]
+	public async Task<ActionResult<object>> GetByUsername([FromRoute] string username, [FromQuery] string period = "month", CancellationToken ct = default)
+	{
+		var users = _db.ApplicationUsers.AsQueryable();
+		var logs = _db.ActivityLogs.AsQueryable();
+		DateTime? from = null;
+		if (string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date;
+		else if (string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-6);
 		else if (string.Equals(period, "month", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-29);
 
 		var emissions = logs
@@ -53,8 +110,8 @@ public class LeaderboardController : ControllerBase
 						pointsTotal = u.CurrentPoints
 					};
 
-		var list = await query.OrderByDescending(x => x.emissions).Take(100).ToListAsync(ct);
-		var ranked = list.Select((x, i) => new
+		var all = await query.OrderByDescending(x => x.emissions).ToListAsync(ct);
+		var item = all.Select((x, i) => new
 		{
 			rank = i + 1,
 			username = x.username,
@@ -64,14 +121,10 @@ public class LeaderboardController : ControllerBase
 			pointsWeek = x.pointsWeek,
 			pointsMonth = x.pointsMonth,
 			pointsTotal = x.pointsTotal
-		});
-		return Ok(ranked);
-	}
+		}).FirstOrDefault(x => string.Equals(x.username, username, StringComparison.OrdinalIgnoreCase));
 
-	private int? GetUserId()
-	{
-		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-		return int.TryParse(id, out var uid) ? uid : null;
+		if (item == null) return NotFound();
+		return Ok(item);
 	}
 
 	/// <summary>
