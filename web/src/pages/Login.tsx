@@ -1,6 +1,8 @@
 import { Button, Card, Form, Input, message, Typography } from 'antd';
 import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
 import splashIcon from '../assets/icons/splash.svg';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
@@ -9,13 +11,46 @@ type FormValues = {
   password: string;
 };
 
+type AuthResponse = {
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    nickname?: string;
+  };
+};
+
 const Login = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = (_values: FormValues) => {
-    localStorage.setItem('isLoggedIn', 'true');
-    message.success('Welcome back!');
-    navigate('/dashboard', { replace: true });
+  const onFinish = async (values: FormValues) => {
+    setLoading(true);
+    try {
+      const response: any = await request.post('/auth/login', {
+        email: values.email,
+        password: values.password,
+      });
+      
+      // 保存 token 和登录状态（API 返回 Token 或 token）
+      const token = response.token || response.Token || response.accessToken || response.AccessToken;
+      if (!token) {
+        throw new Error('No token received from server');
+      }
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('isLoggedIn', 'true');
+      
+      message.success('Welcome back!');
+      navigate('/dashboard', { replace: true });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,6 +106,7 @@ const Login = () => {
               type="primary"
               size="large"
               htmlType="submit"
+              loading={loading}
               style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 10, fontWeight: 700 }}
             >
               Log In

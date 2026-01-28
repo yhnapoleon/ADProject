@@ -27,17 +27,13 @@ service.interceptors.response.use(
   },
   (error: AxiosError) => {
     console.error('Request Error:', error);
-    // 处理401未授权错误，清除token并跳转到登录页
+    // 处理401未授权错误，清除token
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('adminToken');
       localStorage.removeItem('adminAuthenticated');
-      // 如果是admin页面，跳转到admin登录页
-      if (window.location.pathname.startsWith('/admin')) {
-        window.location.href = '/admin/login';
-      } else {
-        window.location.href = '/login';
-      }
+      // 注意：不再在这里自动跳转，让调用方决定如何处理
+      // 这样可以避免在上传图片等操作时意外跳转
     }
     return Promise.reject(error);
   }
