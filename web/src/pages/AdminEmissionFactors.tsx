@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import request from '../utils/request';
 import './AdminEmissionFactors.css';
 
 interface EmissionFactor {
@@ -13,13 +14,7 @@ interface EmissionFactor {
 }
 
 const AdminEmissionFactors: React.FC = () => {
-  const [factors, setFactors] = useState<EmissionFactor[]>([
-    { id: 'EF-001', category: 'Food', itemName: 'Beef (High Impact)', factor: 27.0, unit: 'kg CO2/kg', source: 'IPCC 2023', status: 'Published', lastUpdated: '2024-05-20' },
-    { id: 'EF-004', category: 'Food', itemName: 'Chicken Breast', factor: 6.9, unit: 'kg CO2/kg', source: 'OurWorldInData', status: 'Published', lastUpdated: '2024-05-15' },
-    { id: 'EF-008', category: 'Transport', itemName: 'Gasoline Car (Avg)', factor: 0.192, unit: 'kg CO2/km', source: 'EPA', status: 'Published', lastUpdated: '2024-04-10' },
-    { id: 'EF-012', category: 'Energy', itemName: 'Grid Electricity (US)', factor: 0.385, unit: 'kg CO2/kWh', source: 'EIA 2022', status: 'Review Pending', lastUpdated: '2024-05-21' },
-    { id: 'EF-045', category: 'Goods', itemName: 'Cotton T-Shirt', factor: 10.5, unit: 'kg CO2/unit', source: 'Mfg Data', status: 'Draft', lastUpdated: '2024-05-21' },
-  ]);
+  const [factors, setFactors] = useState<EmissionFactor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
@@ -35,8 +30,45 @@ const AdminEmissionFactors: React.FC = () => {
     status: 'Draft',
     lastUpdated: new Date().toISOString().split('T')[0],
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const categories = ['All', 'Food', 'Transport', 'Energy', 'Goods'];
+
+  const fetchFactors = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await request.get('/admin/emission-factors', {
+        params: {
+          q: searchTerm || undefined,
+          category: selectedCategory === 'All' ? undefined : selectedCategory,
+          page: 1,
+          pageSize: 50,
+        },
+      });
+
+      const items: EmissionFactor[] = Array.isArray(res)
+        ? res
+        : res?.items || res?.data || [];
+      setFactors(items);
+    } catch (e: any) {
+      console.error('Failed to load emission factors:', e);
+      setError(
+        e?.response?.data?.error ||
+          e?.response?.data?.message ||
+          e?.message ||
+          'Failed to load emission factors.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFactors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory]);
 
   const filteredFactors = factors.filter(
     (factor) => {
@@ -63,22 +95,42 @@ const AdminEmissionFactors: React.FC = () => {
     setShowBulkImportModal(true);
   };
 
-  const handleSaveNew = () => {
+  const handleSaveNew = async () => {
     if (newFactor.id && newFactor.itemName && newFactor.factor !== undefined) {
-      setFactors([...factors, newFactor as EmissionFactor]);
-      setNewFactor({
-        id: '',
-        category: 'Food',
-        itemName: '',
-        factor: 0,
-        unit: 'kg CO2/kg',
-        source: '',
-        status: 'Draft',
-        lastUpdated: new Date().toISOString().split('T')[0],
-      });
-      setShowAddModal(false);
-      // Add API call here to save to backend
-      console.log('Add new factor:', newFactor);
+      try {
+        const payload: EmissionFactor = {
+          id: newFactor.id,
+          category: newFactor.category || 'Food',
+          itemName: newFactor.itemName,
+          factor: newFactor.factor,
+          unit: newFactor.unit || 'kg CO2/kg',
+          source: newFactor.source || '',
+          status: newFactor.status || 'Draft',
+          lastUpdated: newFactor.lastUpdated || new Date().toISOString().split('T')[0],
+        };
+
+        const created = await request.post('/admin/emission-factors', payload);
+        setFactors([...factors, (created as EmissionFactor) || payload]);
+        setNewFactor({
+          id: '',
+          category: 'Food',
+          itemName: '',
+          factor: 0,
+          unit: 'kg CO2/kg',
+          source: '',
+          status: 'Draft',
+          lastUpdated: new Date().toISOString().split('T')[0],
+        });
+        setShowAddModal(false);
+      } catch (e: any) {
+        console.error('Failed to add emission factor:', e);
+        alert(
+          e?.response?.data?.error ||
+            e?.response?.data?.message ||
+            e?.message ||
+            'Failed to add emission factor.'
+        );
+      }
     }
   };
 
@@ -87,20 +139,26 @@ const AdminEmissionFactors: React.FC = () => {
     const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
     if (fileInput && fileInput.files && fileInput.files[0]) {
       const file = fileInput.files[0];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const text = event.target?.result as string;
-          // Parse CSV or JSON file
-          // For demo, we'll just show an alert
-          alert(`File "${file.name}" imported successfully! (This is a demo - implement actual parsing logic)`);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      request
+        .post('/admin/emission-factors/import', formData)
+        .then((res: any) => {
+          const importedCount = res?.importedCount ?? res?.imported ?? 0;
+          alert(`Imported ${importedCount} factors successfully.`);
           setShowBulkImportModal(false);
-          // Add API call here to bulk import to backend
-        } catch (error) {
-          alert('Error importing file. Please check the file format.');
-        }
-      };
-      reader.readAsText(file);
+          fetchFactors();
+        })
+        .catch((err: any) => {
+          console.error('Failed to import emission factors:', err);
+          alert(
+            err?.response?.data?.error ||
+              err?.response?.data?.message ||
+              err?.message ||
+              'Error importing file. Please check the file format.'
+          );
+        });
     }
   };
 
@@ -120,9 +178,21 @@ const AdminEmissionFactors: React.FC = () => {
           placeholder="Search by ID or Item Name..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onBlur={fetchFactors}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              fetchFactors();
+            }
+          }}
           className="search-input"
         />
       </div>
+
+      {error && (
+        <div className="factors-error">
+          {error}
+        </div>
+      )}
 
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
@@ -242,67 +312,79 @@ const AdminEmissionFactors: React.FC = () => {
       )}
 
       <div className="table-card">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th className="category-header">
-                <div className="category-header-content">
-                  <span>Category</span>
-                  <div className="category-filter-wrapper">
-                    <button
-                      className="category-filter-btn"
-                      onClick={() => setShowCategoryFilter(!showCategoryFilter)}
-                      title="Filter by Category"
-                    >
-                      🔽
-                    </button>
-                    {showCategoryFilter && (
-                      <div className="category-filter-dropdown" onClick={(e) => e.stopPropagation()}>
-                        {categories.map((category) => (
-                          <div
-                            key={category}
-                            className={`category-filter-option ${selectedCategory === category ? 'active' : ''}`}
-                            onClick={() => {
-                              setSelectedCategory(category);
-                              setShowCategoryFilter(false);
-                            }}
-                          >
-                            {category === 'All' ? 'All Categories' : category}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+        {loading ? (
+          <div style={{ padding: '20px', textAlign: 'center' }}>Loading emission factors...</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th className="category-header">
+                  <div className="category-header-content">
+                    <span>Category</span>
+                    <div className="category-filter-wrapper">
+                      <button
+                        className="category-filter-btn"
+                        onClick={() => setShowCategoryFilter(!showCategoryFilter)}
+                        title="Filter by Category"
+                      >
+                        🔽
+                      </button>
+                      {showCategoryFilter && (
+                        <div className="category-filter-dropdown" onClick={(e) => e.stopPropagation()}>
+                          {categories.map((category) => (
+                            <div
+                              key={category}
+                              className={`category-filter-option ${selectedCategory === category ? 'active' : ''}`}
+                              onClick={() => {
+                                setSelectedCategory(category);
+                                setShowCategoryFilter(false);
+                              }}
+                            >
+                              {category === 'All' ? 'All Categories' : category}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </th>
-              <th>Item Name</th>
-              <th>Factor</th>
-              <th>Unit</th>
-              <th>Source/Ref</th>
-              <th>Status</th>
-              <th>Last Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredFactors.map((factor) => (
-              <tr key={factor.id}>
-                <td>{factor.id}</td>
-                <td>{factor.category}</td>
-                <td>{factor.itemName}</td>
-                <td>{factor.factor}</td>
-                <td>{factor.unit}</td>
-                <td>{factor.source}</td>
-                <td>
-                  <span className={`status-badge ${getStatusClass(factor.status)}`}>
-                    {factor.status}
-                  </span>
-                </td>
-                <td>{factor.lastUpdated}</td>
+                </th>
+                <th>Item Name</th>
+                <th>Factor</th>
+                <th>Unit</th>
+                <th>Source/Ref</th>
+                <th>Status</th>
+                <th>Last Updated</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredFactors.length > 0 ? (
+                filteredFactors.map((factor) => (
+                  <tr key={factor.id}>
+                    <td>{factor.id}</td>
+                    <td>{factor.category}</td>
+                    <td>{factor.itemName}</td>
+                    <td>{factor.factor}</td>
+                    <td>{factor.unit}</td>
+                    <td>{factor.source}</td>
+                    <td>
+                      <span className={`status-badge ${getStatusClass(factor.status)}`}>
+                        {factor.status}
+                      </span>
+                    </td>
+                    <td>{factor.lastUpdated}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '20px' }}>
+                    No emission factors found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

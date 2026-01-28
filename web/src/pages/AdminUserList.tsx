@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import request from '../utils/request';
 import './AdminUserList.css';
 
 interface User {
@@ -13,16 +14,45 @@ interface User {
 
 const AdminUserList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [users, setUsers] = useState<User[]>([
-    { id: 'U-1024', username: 'eco_warrior_99', email: 'warrior@email.com', joinedDate: '2024-01-15', totalReduction: 450.5, points: 1250, status: 'Active' },
-    { id: 'U-1025', username: 'sarah_j', email: 'sarah.j@email.com', joinedDate: '2024-01-16', totalReduction: 120.0, points: 850, status: 'Active' },
-    { id: 'U-1026', username: 'mike_steaklover', email: 'mike@email.com', joinedDate: '2024-01-18', totalReduction: 10.2, points: 320, status: 'Active' },
-    { id: 'U-1027', username: 'spammer_bot', email: 'bot@spam.com', joinedDate: '2024-01-20', totalReduction: 0.0, points: 0, status: 'Banned' },
-    { id: 'U-1028', username: 'new_user_01', email: 'new01@email.com', joinedDate: '2024-01-21', totalReduction: 5.5, points: 150, status: 'Active' },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPoints, setEditingPoints] = useState<Record<string, number>>({});
   const [editingStatus, setEditingStatus] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await request.get('/admin/users', {
+        params: {
+          q: searchTerm || undefined,
+          page: 1,
+          pageSize: 50,
+        },
+      });
+
+      const items: User[] = Array.isArray(res) ? res : res?.items || res?.data || res || [];
+      setUsers(items);
+    } catch (e: any) {
+      console.error('Failed to load users:', e);
+      setError(
+        e?.response?.data?.error ||
+          e?.response?.data?.message ||
+          e?.message ||
+          'Failed to load users.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredUsers = users.filter(
     (user) =>
@@ -59,16 +89,54 @@ const AdminUserList: React.FC = () => {
     });
   };
 
-  const handleSave = () => {
-    // Update all users' points and status
-    setUsers(users.map(user => ({
-      ...user,
-      points: editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points,
-      status: editingStatus[user.id] !== undefined ? editingStatus[user.id] : user.status
-    })));
-    setIsEditMode(false);
-    // Add API call here to batch save to backend
-    console.log('Save all user information:', { points: editingPoints, status: editingStatus });
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updates = users
+        .map((user) => {
+          const newPoints = editingPoints[user.id];
+          const newStatus = editingStatus[user.id];
+
+          const payload: { id: string; points?: number; status?: 'Active' | 'Banned' } = {
+            id: user.id,
+          };
+
+          if (newPoints !== undefined && newPoints !== user.points) {
+            payload.points = newPoints;
+          }
+          if (newStatus !== undefined && newStatus !== user.status) {
+            payload.status = newStatus as 'Active' | 'Banned';
+          }
+
+          return payload;
+        })
+        .filter((u) => u.points !== undefined || u.status !== undefined);
+
+      if (updates.length > 0) {
+        await request.post('/admin/users/batch-update', { updates });
+        // 本地同步更新
+        setUsers(users.map(user => ({
+          ...user,
+          points: editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points,
+          status: editingStatus[user.id] !== undefined ? editingStatus[user.id] : user.status,
+        })));
+      }
+
+      setIsEditMode(false);
+      setEditingPoints({});
+      setEditingStatus({});
+    } catch (e: any) {
+      console.error('Failed to save users:', e);
+      setError(
+        e?.response?.data?.error ||
+          e?.response?.data?.message ||
+          e?.message ||
+          'Failed to save user updates.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -84,8 +152,8 @@ const AdminUserList: React.FC = () => {
         <div className="header-actions">
           {isEditMode ? (
             <>
-              <button onClick={handleSave} className="action-btn save-btn">
-                ✓ Save
+              <button onClick={handleSave} className="action-btn save-btn" disabled={saving}>
+                {saving ? 'Saving...' : '✓ Save'}
               </button>
               <button onClick={handleCancel} className="action-btn cancel-btn">
                 ✕ Cancel
@@ -105,64 +173,88 @@ const AdminUserList: React.FC = () => {
           placeholder="Search by username or email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onBlur={fetchUsers}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              fetchUsers();
+            }
+          }}
           className="search-input"
         />
       </div>
 
+      {error && (
+        <div className="userlist-error">
+          {error}
+        </div>
+      )}
+
       <div className="table-card">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>User ID</th>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Joined Date</th>
-              <th>Total Reduction (kg)</th>
-              <th>Points</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.map((user) => (
-              <tr key={user.id}>
-                <td>{user.id}</td>
-                <td>{user.username}</td>
-                <td>{user.email}</td>
-                <td>{user.joinedDate}</td>
-                <td>{user.totalReduction}</td>
-                <td className="points-cell">
-                  {isEditMode ? (
-                    <input
-                      type="number"
-                      value={editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points}
-                      onChange={(e) => handlePointsChange(user.id, Number(e.target.value))}
-                      className="points-input"
-                      min="0"
-                    />
-                  ) : (
-                    <span className="points-value">{user.points}</span>
-                  )}
-                </td>
-                <td className="status-cell">
-                  {isEditMode ? (
-                    <select
-                      value={editingStatus[user.id] !== undefined ? editingStatus[user.id] : user.status}
-                      onChange={(e) => handleStatusChange(user.id, e.target.value)}
-                      className="status-select"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Banned">Banned</option>
-                    </select>
-                  ) : (
-                    <span className={`status-badge ${user.status.toLowerCase()}`}>
-                      {user.status}
-                    </span>
-                  )}
-                </td>
+        {loading ? (
+          <div style={{ padding: '20px', textAlign: 'center' }}>Loading users...</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>User ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Joined Date</th>
+                <th>Total Reduction (kg)</th>
+                <th>Points</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.id}</td>
+                    <td>{user.username}</td>
+                    <td>{user.email}</td>
+                    <td>{user.joinedDate}</td>
+                    <td>{user.totalReduction}</td>
+                    <td className="points-cell">
+                      {isEditMode ? (
+                        <input
+                          type="number"
+                          value={editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points}
+                          onChange={(e) => handlePointsChange(user.id, Number(e.target.value))}
+                          className="points-input"
+                          min="0"
+                        />
+                      ) : (
+                        <span className="points-value">{user.points}</span>
+                      )}
+                    </td>
+                    <td className="status-cell">
+                      {isEditMode ? (
+                        <select
+                          value={editingStatus[user.id] !== undefined ? editingStatus[user.id] : user.status}
+                          onChange={(e) => handleStatusChange(user.id, e.target.value)}
+                          className="status-select"
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Banned">Banned</option>
+                        </select>
+                      ) : (
+                        <span className={`status-badge ${user.status.toLowerCase()}`}>
+                          {user.status}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '20px' }}>
+                    No users found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

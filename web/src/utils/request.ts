@@ -7,7 +7,12 @@ const service: AxiosInstance = axios.create({
 
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // TODO: Add token logic here
+    // 从localStorage获取token并添加到请求头
+    const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error: AxiosError) => {
@@ -22,6 +27,18 @@ service.interceptors.response.use(
   },
   (error: AxiosError) => {
     console.error('Request Error:', error);
+    // 处理401未授权错误，清除token并跳转到登录页
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminAuthenticated');
+      // 如果是admin页面，跳转到admin登录页
+      if (window.location.pathname.startsWith('/admin')) {
+        window.location.href = '/admin/login';
+      } else {
+        window.location.href = '/login';
+      }
+    }
     return Promise.reject(error);
   }
 );
