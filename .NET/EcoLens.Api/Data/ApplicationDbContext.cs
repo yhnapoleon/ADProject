@@ -27,6 +27,7 @@ public class ApplicationDbContext : DbContext
 	public DbSet<DietTemplateItem> DietTemplateItems => Set<DietTemplateItem>();
 	public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
 	public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
+	public DbSet<FoodRecord> FoodRecords => Set<FoodRecord>();
 
 	public override int SaveChanges()
 	{
@@ -120,6 +121,14 @@ public class ApplicationDbContext : DbContext
 
 		modelBuilder.Entity<ActivityLog>()
 			.Property(p => p.TotalEmission)
+			.HasColumnType("decimal(18,4)");
+
+		// FoodRecord precisions
+		modelBuilder.Entity<FoodRecord>()
+			.Property(p => p.EmissionFactor)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<FoodRecord>()
+			.Property(p => p.Emission)
 			.HasColumnType("decimal(18,4)");
 
 		modelBuilder.Entity<StepRecord>()
