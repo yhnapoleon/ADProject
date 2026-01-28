@@ -16,5 +16,12 @@ public class RegisterRequestDto
 	[Required]
 	[MaxLength(128)]
 	public string Password { get; set; } = string.Empty;
+
+	[Required]
+	[MaxLength(100)]
+	public string Region { get; set; } = string.Empty;
+
+	[Required]
+	public DateTime BirthDate { get; set; }
 }
 

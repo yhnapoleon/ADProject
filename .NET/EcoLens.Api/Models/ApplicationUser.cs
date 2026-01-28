@@ -32,9 +32,11 @@ public class ApplicationUser : BaseEntity
 	public int CurrentPoints { get; set; }
 
 	[MaxLength(100)]
-	public string? Region { get; set; }
+	[Required]
+	public string Region { get; set; } = string.Empty;
 
-	public DateTime? BirthDate { get; set; }
+	[Required]
+	public DateTime BirthDate { get; set; }
 
 	public bool IsActive { get; set; } = true;
 

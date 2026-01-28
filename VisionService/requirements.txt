@@ -1,8 +1,12 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2+cpu
-transformers
-fastapi
-uvicorn
-pydantic
-Pillow
-python-multipart
+fastapi==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.2
+pillow==10.2.0
+# FIX 1: Pin numpy to avoid 2.0 conflicts
+numpy<2.0.0
+# FIX 2: Upgrade transformers to a stable recent version
+transformers==4.48.0
+# FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0

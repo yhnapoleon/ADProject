@@ -39,7 +39,9 @@ public class AuthController : ControllerBase
 		{
 			Username = dto.Username,
 			Email = dto.Email,
-			PasswordHash = PasswordHasher.Hash(dto.Password)
+			PasswordHash = PasswordHasher.Hash(dto.Password),
+			Region = dto.Region,
+			BirthDate = dto.BirthDate
 		};
 
 		await _db.ApplicationUsers.AddAsync(user, ct);
@@ -67,7 +69,7 @@ public class AuthController : ControllerBase
 				Nickname = user.Username,
 				Email = user.Email,
 				Location = user.Region,
-				BirthDate = user.BirthDate?.ToString("yyyy-MM-dd"),
+				BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
 				Role = user.Role,
 				Avatar = user.AvatarUrl,
 				AvatarUrl = user.AvatarUrl,
@@ -129,7 +131,7 @@ public class AuthController : ControllerBase
 				Nickname = user.Username,
 				Email = user.Email,
 				Location = user.Region,
-				BirthDate = user.BirthDate?.ToString("yyyy-MM-dd"),
+				BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
 				Role = user.Role,
 				Avatar = user.AvatarUrl,
 				AvatarUrl = user.AvatarUrl,

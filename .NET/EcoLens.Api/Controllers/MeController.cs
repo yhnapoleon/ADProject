@@ -69,7 +69,7 @@ public class MeController : ControllerBase
       Nickname = u.Username,
       Email = u.Email,
       Location = u.Region,
-      BirthDate = u.BirthDate?.ToString("yyyy-MM-dd"),
+      BirthDate = u.BirthDate.ToString("yyyy-MM-dd"),
       Avatar = u.AvatarUrl,
       PointsWeek = u.CurrentPoints, // 简化：复用 CurrentPoints
       PointsMonth = u.CurrentPoints,
