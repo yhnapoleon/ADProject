@@ -20,18 +20,19 @@ const AdminLogin: React.FC = () => {
 
     try {
       // 调用管理员登录API
-      const response = await request.post('/admin/auth/login', {
+      // 注意：request 的响应拦截器已经返回了 response.data，所以这里直接是响应数据
+      const response: any = await request.post('/admin/auth/login', {
         username,
         password,
       });
 
       // 保存token和用户信息
-      if (response.accessToken || response.token) {
+      if (response?.accessToken || response?.token) {
         const token = response.accessToken || response.token;
         localStorage.setItem('adminToken', token);
         localStorage.setItem('token', token); // 同时保存为通用token
         localStorage.setItem('adminAuthenticated', 'true');
-        localStorage.setItem('adminUsername', response.admin?.username || username);
+        localStorage.setItem('adminUsername', response?.admin?.username || username);
         
         // 跳转到管理面板
         navigate('/admin');

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import MainLayout from './components/MainLayout';
 import SplashScreen from './components/SplashScreen';
@@ -44,6 +44,21 @@ const RedirectIfAuthed = () => {
   return <Outlet />;
 };
 
+// 动态设置页面标题的组件
+const TitleUpdater: React.FC = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/admin')) {
+      document.title = 'EcoLens Admin Portal';
+    } else {
+      document.title = 'EcoLens';
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(true);
@@ -69,6 +84,7 @@ const App: React.FC = () => {
       }}
     >
       <BrowserRouter>
+        <TitleUpdater />
         <Routes>
           {/* Public Auth Routes (no MainLayout) */}
           <Route element={<RedirectIfAuthed />}>

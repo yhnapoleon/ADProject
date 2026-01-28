@@ -30,34 +30,34 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 	{
 		try
 		{
-			// 1. 从数据库读取排放因子
-			var electricityFactor = await _db.CarbonReferences
-				.FirstOrDefaultAsync(c => c.LabelName == "Electricity_SG", ct);
+		// 1. 从数据库读取排放因子
+		var electricityFactor = await _db.CarbonReferences
+			.FirstOrDefaultAsync(c => c.LabelName == "Electricity", ct);
 
-			var waterFactor = await _db.CarbonReferences
-				.FirstOrDefaultAsync(c => c.LabelName == "Water_SG", ct);
+		var waterFactor = await _db.CarbonReferences
+			.FirstOrDefaultAsync(c => c.LabelName == "Water", ct);
 
-			var gasFactor = await _db.CarbonReferences
-				.FirstOrDefaultAsync(c => c.LabelName == "Gas_SG", ct);
+		var gasFactor = await _db.CarbonReferences
+			.FirstOrDefaultAsync(c => c.LabelName == "Gas", ct);
 
-			// 2. 验证排放因子是否存在
-			if (electricityFactor == null)
-			{
-				_logger.LogError("Electricity_SG carbon factor not found in database");
-				throw new InvalidOperationException("Electricity carbon emission factor not found");
-			}
+		// 2. 验证排放因子是否存在
+		if (electricityFactor == null)
+		{
+			_logger.LogError("Electricity carbon factor not found in database");
+			throw new InvalidOperationException("Electricity carbon emission factor not found");
+		}
 
-			if (waterFactor == null)
-			{
-				_logger.LogError("Water_SG carbon factor not found in database");
-				throw new InvalidOperationException("Water carbon emission factor not found");
-			}
+		if (waterFactor == null)
+		{
+			_logger.LogError("Water carbon factor not found in database");
+			throw new InvalidOperationException("Water carbon emission factor not found");
+		}
 
-			if (gasFactor == null)
-			{
-				_logger.LogError("Gas_SG carbon factor not found in database");
-				throw new InvalidOperationException("Gas carbon emission factor not found");
-			}
+		if (gasFactor == null)
+		{
+			_logger.LogError("Gas carbon factor not found in database");
+			throw new InvalidOperationException("Gas carbon emission factor not found");
+		}
 
 			// 3. 计算各项碳排放
 			var electricityCarbon = electricityUsage.HasValue && electricityUsage.Value > 0

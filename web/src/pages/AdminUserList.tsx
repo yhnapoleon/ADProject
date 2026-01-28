@@ -15,6 +15,7 @@ interface User {
 const AdminUserList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<User[]>([]);
+  const [totalUsers, setTotalUsers] = useState<number>(0);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingPoints, setEditingPoints] = useState<Record<string, number>>({});
   const [editingStatus, setEditingStatus] = useState<Record<string, string>>({});
@@ -35,7 +36,9 @@ const AdminUserList: React.FC = () => {
       });
 
       const items: User[] = Array.isArray(res) ? res : res?.items || res?.data || res || [];
+      const total = typeof res === 'object' && !Array.isArray(res) ? (res?.total || items.length) : items.length;
       setUsers(items);
+      setTotalUsers(total);
     } catch (e: any) {
       console.error('Failed to load users:', e);
       setError(
@@ -148,7 +151,7 @@ const AdminUserList: React.FC = () => {
   return (
     <div className="user-list">
       <div className="page-header">
-        <h1 className="page-title">User Management</h1>
+        <h1 className="page-title">User Management {totalUsers > 0 && `(${totalUsers} total)`}</h1>
         <div className="header-actions">
           {isEditMode ? (
             <>

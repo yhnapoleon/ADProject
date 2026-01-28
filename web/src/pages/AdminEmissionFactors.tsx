@@ -15,6 +15,7 @@ interface EmissionFactor {
 
 const AdminEmissionFactors: React.FC = () => {
   const [factors, setFactors] = useState<EmissionFactor[]>([]);
+  const [totalFactors, setTotalFactors] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
@@ -32,8 +33,18 @@ const AdminEmissionFactors: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>(['All']);
 
-  const categories = ['All', 'Food', 'Transport', 'Energy', 'Goods'];
+  // 从排放因子数据中提取唯一的分类
+  const extractCategories = (factors: EmissionFactor[]): string[] => {
+    const uniqueCategories = new Set<string>();
+    factors.forEach(factor => {
+      if (factor.category) {
+        uniqueCategories.add(factor.category);
+      }
+    });
+    return ['All', ...Array.from(uniqueCategories).sort()];
+  };
 
   const fetchFactors = async () => {
     setLoading(true);
@@ -51,7 +62,11 @@ const AdminEmissionFactors: React.FC = () => {
       const items: EmissionFactor[] = Array.isArray(res)
         ? res
         : res?.items || res?.data || [];
+      const total = typeof res === 'object' && !Array.isArray(res) ? (res?.total || items.length) : items.length;
       setFactors(items);
+      setTotalFactors(total);
+      // 从数据中提取分类列表
+      setCategories(extractCategories(items));
     } catch (e: any) {
       console.error('Failed to load emission factors:', e);
       setError(
@@ -64,6 +79,30 @@ const AdminEmissionFactors: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // 初始化时加载所有分类
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        // 加载所有数据（不筛选）以获取所有分类
+        const res = await request.get('/admin/emission-factors', {
+          params: {
+            page: 1,
+            pageSize: 1000, // 获取足够多的数据以提取所有分类
+          },
+        });
+        const items: EmissionFactor[] = Array.isArray(res)
+          ? res
+          : res?.items || res?.data || [];
+        setCategories(extractCategories(items));
+      } catch (e) {
+        console.error('Failed to load categories:', e);
+        // 如果失败，使用默认分类
+        setCategories(['All', 'Food', 'Transport', 'Utility']);
+      }
+    };
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     fetchFactors();
@@ -165,7 +204,7 @@ const AdminEmissionFactors: React.FC = () => {
   return (
     <div className="emission-factors">
       <div className="page-header">
-        <h1 className="page-title">Emission Factor Database</h1>
+        <h1 className="page-title">Emission Factor Database {totalFactors > 0 && `(${totalFactors} total)`}</h1>
         <div className="action-buttons">
           <button className="btn-primary" onClick={handleAddNew}>+ Add New</button>
           <button className="btn-secondary" onClick={handleBulkImport}>Bulk Import</button>
