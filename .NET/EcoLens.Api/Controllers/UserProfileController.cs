@@ -58,7 +58,7 @@ public class UserProfileController : ControllerBase
 		{
 			Id = user.Id.ToString(),
 			Name = user.Username,
-			Nickname = user.Username,
+			Nickname = user.Nickname ?? user.Username,
 			Email = user.Email,
 			Location = user.Region,
 			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
@@ -82,14 +82,10 @@ public class UserProfileController : ControllerBase
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (user is null) return NotFound();
 
-		// Nickname -> Username，唯一性检查（当修改时）
-		if (!string.IsNullOrWhiteSpace(dto.Nickname) && !dto.Nickname.Equals(user.Username, StringComparison.Ordinal))
+		// Nickname -> ApplicationUser.Nickname（展示昵称；允许重复）
+		if (dto.Nickname is not null)
 		{
-			var exists = await _db.ApplicationUsers
-				.AnyAsync(u => u.Username == dto.Nickname && u.Id != user.Id, ct);
-			if (exists) return Conflict("Username already in use.");
-
-			user.Username = dto.Nickname;
+			user.Nickname = string.IsNullOrWhiteSpace(dto.Nickname) ? null : dto.Nickname.Trim();
 		}
 
 		if (dto.Avatar is not null)
@@ -126,7 +122,7 @@ public class UserProfileController : ControllerBase
 		{
 			Id = user.Id.ToString(),
 			Name = user.Username,
-			Nickname = user.Username,
+			Nickname = user.Nickname ?? user.Username,
 			Email = user.Email,
 			Location = user.Region,
 			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
