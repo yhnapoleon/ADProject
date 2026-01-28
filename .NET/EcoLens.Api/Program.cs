@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -185,11 +186,17 @@ builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
 builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>();
 
 // Vision settings binding & HttpClient
-builder.Services.Configure<VisionSettings>(configuration.GetSection("VisionService"));
-var visionBaseUrl = configuration["VisionService:BaseUrl"] ?? "http://localhost:8000";
-builder.Services.AddHttpClient<IVisionService, PythonVisionService>(client =>
+builder.Services.Configure<VisionSettings>(configuration.GetSection("Vision"));
+builder.Services.AddHttpClient<IVisionService, PythonVisionService>((sp, client) =>
 {
-	client.BaseAddress = new Uri(visionBaseUrl.TrimEnd('/') + "/");
+	var options = sp.GetRequiredService<IOptions<VisionSettings>>().Value;
+	var config = sp.GetRequiredService<IConfiguration>();
+
+	var baseUrl = (options.BaseUrl ?? "http://localhost:8000/").TrimEnd('/') + "/";
+	client.BaseAddress = new Uri(baseUrl);
+
+	var timeoutSeconds = config.GetValue<int?>("Vision:TimeoutSeconds") ?? 30;
+	client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 
 // Diet Template services
