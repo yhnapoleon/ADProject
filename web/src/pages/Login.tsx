@@ -1,6 +1,8 @@
 import { Button, Card, Form, Input, message, Typography } from 'antd';
 import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
 import splashIcon from '../assets/icons/splash.svg';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
@@ -11,11 +13,45 @@ type FormValues = {
 
 const Login = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-  const onFinish = (_values: FormValues) => {
-    localStorage.setItem('isLoggedIn', 'true');
-    message.success('Welcome back!');
-    navigate('/dashboard', { replace: true });
+  const onFinish = async (values: FormValues) => {
+    setLoading(true);
+    try {
+      // 调用登录 API
+      const response: any = await request.post('/api/Auth/login', {
+        email: values.email,
+        password: values.password,
+      });
+
+      // 保存 token 和用户信息
+      if (response?.accessToken || response?.token) {
+        const token = response.accessToken || response.token;
+        localStorage.setItem('token', token);
+        localStorage.setItem('isLoggedIn', 'true');
+        
+        // 如果响应中包含用户信息，也保存
+        if (response?.user) {
+          localStorage.setItem('user', JSON.stringify(response.user));
+        }
+        
+        message.success('Welcome back!');
+        navigate('/dashboard', { replace: true });
+      } else {
+        message.error('Login failed: No token received');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      // 显示错误提示
+      const errorMessage = 
+        error.response?.data?.error || 
+        error.response?.data?.message || 
+        error.message || 
+        'Login failed. Please check your credentials.';
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,6 +107,7 @@ const Login = () => {
               type="primary"
               size="large"
               htmlType="submit"
+              loading={loading}
               style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 10, fontWeight: 700 }}
             >
               Log In
