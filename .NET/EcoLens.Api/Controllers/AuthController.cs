@@ -38,6 +38,7 @@ public class AuthController : ControllerBase
 		var user = new ApplicationUser
 		{
 			Username = dto.Username,
+			Nickname = dto.Username, // 默认展示昵称 = username（可后续修改）
 			Email = dto.Email,
 			PasswordHash = PasswordHasher.Hash(dto.Password),
 			Region = dto.Region,
@@ -66,7 +67,7 @@ public class AuthController : ControllerBase
 				Id = user.Id.ToString(),
 				Username = user.Username,
 				Name = user.Username,
-				Nickname = user.Username,
+				Nickname = user.Nickname ?? user.Username,
 				Email = user.Email,
 				Location = user.Region,
 				BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
@@ -128,7 +129,7 @@ public class AuthController : ControllerBase
 				Id = user.Id.ToString(),
 				Username = user.Username,
 				Name = user.Username,
-				Nickname = user.Username,
+				Nickname = user.Nickname ?? user.Username,
 				Email = user.Email,
 				Location = user.Region,
 				BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),

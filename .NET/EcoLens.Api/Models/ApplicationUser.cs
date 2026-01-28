@@ -12,6 +12,10 @@ public class ApplicationUser : BaseEntity
 	[MaxLength(100)]
 	public string Username { get; set; } = string.Empty;
 
+	// 展示昵称（可与 Username 不同；允许重复）
+	[MaxLength(100)]
+	public string? Nickname { get; set; }
+
 	[Required]
 	[MaxLength(256)]
 	public string Email { get; set; } = string.Empty;

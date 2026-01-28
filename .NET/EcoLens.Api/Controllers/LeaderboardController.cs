@@ -47,7 +47,7 @@ public class LeaderboardController : ControllerBase
 					{
 						userId = u.Id,
 						username = u.Username,
-						nickname = u.Username,
+						nickname = u.Nickname ?? u.Username,
 						avatarUrl = u.AvatarUrl,
 						emissions = (decimal?)e.Emission ?? 0m,
 						pointsWeek = u.CurrentPoints,
@@ -100,7 +100,7 @@ public class LeaderboardController : ControllerBase
 					{
 						userId = u.Id,
 						username = u.Username,
-						nickname = u.Username,
+						nickname = u.Nickname ?? u.Username,
 						avatarUrl = u.AvatarUrl,
 						emissions = (decimal?)e.Emission ?? 0m,
 						pointsWeek = u.CurrentPoints,

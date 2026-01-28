@@ -66,7 +66,7 @@ public class MeController : ControllerBase
     {
       Id = u.Id.ToString(),
       Name = u.Username,
-      Nickname = u.Username,
+      Nickname = u.Nickname ?? u.Username,
       Email = u.Email,
       Location = u.Region,
       BirthDate = u.BirthDate.ToString("yyyy-MM-dd"),
@@ -94,11 +94,9 @@ public class MeController : ControllerBase
       if (exists) return Conflict("Email already in use.");
       u.Email = req.Email;
     }
-    if (!string.IsNullOrWhiteSpace(req.Nickname) && !string.Equals(req.Nickname, u.Username, StringComparison.Ordinal))
+    if (req.Nickname is not null)
     {
-      var existsName = await _db.ApplicationUsers.AnyAsync(x => x.Username == req.Nickname && x.Id != u.Id, ct);
-      if (existsName) return Conflict("Username already in use.");
-      u.Username = req.Nickname;
+      u.Nickname = string.IsNullOrWhiteSpace(req.Nickname) ? null : req.Nickname.Trim();
     }
     if (req.Location is not null) u.Region = req.Location;
     if (!string.IsNullOrWhiteSpace(req.BirthDate) && DateTime.TryParse(req.BirthDate, out var bd))
