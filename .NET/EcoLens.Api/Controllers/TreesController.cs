@@ -20,6 +20,38 @@ public class TreesController : ControllerBase
 		_db = db;
 	}
 
+		// 兼容别名：/api/getTree 与 /api/postTree（与前端约定）
+		[HttpGet("/api/getTree")]
+		public Task<ActionResult<object>> GetTreeAlias(CancellationToken ct) => GetState(ct);
+
+		public sealed class PostTreeRequest
+		{
+			public int? TotalTrees { get; set; }
+			public int? CurrentProgress { get; set; }
+		}
+
+		[HttpPost("/api/postTree")]
+		public Task<ActionResult<object>> PostTreeAlias([FromBody] PostTreeRequest req, CancellationToken ct)
+		{
+			var dto = new UpdateTreeStateRequest
+			{
+				TotalTrees = req.TotalTrees,
+				CurrentProgress = req.CurrentProgress
+			};
+			return UpdateState(dto, ct);
+		}
+
+		private static object BuildState(int totalTrees, int currentProgress)
+		{
+			var status = currentProgress >= 100 ? "completed" : (currentProgress > 0 ? "growing" : "idle");
+			return new
+			{
+				totalTrees,
+				currentProgress, // 0-100
+				status
+			};
+		}
+
 	private int? GetUserId()
 	{
 		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
@@ -56,6 +88,66 @@ public class TreesController : ControllerBase
 
 		return Ok(BuildStats(todaySteps, totalSteps));
 	}
+
+		/// <summary>
+		/// 获取当前树的数量与状态（包含：totalTrees、currentProgress、status）。
+		/// </summary>
+		[HttpGet("state")]
+		public async Task<ActionResult<object>> GetState(CancellationToken ct)
+		{
+			var userId = GetUserId();
+			if (userId is null) return Unauthorized();
+
+			var user = await _db.ApplicationUsers
+				.Where(u => u.Id == userId.Value)
+				.Select(u => new { u.TreesTotalCount, u.CurrentTreeProgress })
+				.FirstOrDefaultAsync(ct);
+
+			if (user is null) return NotFound();
+
+			return Ok(BuildState(user.TreesTotalCount, user.CurrentTreeProgress));
+		}
+
+		public sealed class UpdateTreeStateRequest
+		{
+			public int? TotalTrees { get; set; }      // 可选：不传则不更新
+			public int? CurrentProgress { get; set; } // 可选：不传则不更新（0-100）
+		}
+
+		/// <summary>
+		/// 更新当前树的数量与状态（通过 currentProgress 表达状态）。
+		/// </summary>
+		[HttpPut("state")]
+		public async Task<ActionResult<object>> UpdateState([FromBody] UpdateTreeStateRequest req, CancellationToken ct)
+		{
+			var userId = GetUserId();
+			if (userId is null) return Unauthorized();
+
+			if (req.TotalTrees is null && req.CurrentProgress is null)
+			{
+				return BadRequest("At least one field is required: TotalTrees or CurrentProgress.");
+			}
+
+			if (req.TotalTrees is < 0)
+			{
+				return BadRequest("TotalTrees must be >= 0.");
+			}
+
+			if (req.CurrentProgress is < 0 or > 100)
+			{
+				return BadRequest("CurrentProgress must be in range [0, 100].");
+			}
+
+			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+			if (user is null) return NotFound();
+
+			if (req.TotalTrees.HasValue) user.TreesTotalCount = req.TotalTrees.Value;
+			if (req.CurrentProgress.HasValue) user.CurrentTreeProgress = req.CurrentProgress.Value;
+
+			await _db.SaveChangesAsync(ct);
+
+			return Ok(BuildState(user.TreesTotalCount, user.CurrentTreeProgress));
+		}
 
 	public sealed class ConvertStepsRequest
 	{

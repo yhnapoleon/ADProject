@@ -40,6 +40,10 @@ public class ApplicationUser : BaseEntity
 
 	public bool IsActive { get; set; } = true;
 
+	// 植树相关：总树数与当前树生长进度（0-100）
+	public int TreesTotalCount { get; set; }
+	public int CurrentTreeProgress { get; set; }
+
 	public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
 	public ICollection<AiInsight> AiInsights { get; set; } = new List<AiInsight>();
 	public ICollection<StepRecord> StepRecords { get; set; } = new List<StepRecord>();
