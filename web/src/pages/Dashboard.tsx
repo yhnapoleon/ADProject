@@ -148,7 +148,21 @@ const Dashboard = () => {
       {/* steps */}
       <Row gutter={24} style={{ marginTop: '2px' }}>
         <Col span={24}>
-          <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0' }}>
+          <Card 
+            style={{ 
+              borderRadius: '12px', 
+              border: '1px solid #f0f0f0',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+            }}
+            onClick={() => navigate('/tree-planting', { state: { todaySteps: 9277 } })}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(103, 79, 163, 0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
