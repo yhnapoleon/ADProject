@@ -121,6 +121,9 @@ namespace EcoLens.Api.Migrations
                     b.Property<int>("CurrentPoints")
                         .HasColumnType("int");
 
+                    b.Property<int>("CurrentTreeProgress")
+                        .HasColumnType("int");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -130,6 +133,10 @@ namespace EcoLens.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
+
+                    b.Property<string>("Nickname")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -146,6 +153,9 @@ namespace EcoLens.Api.Migrations
 
                     b.Property<decimal>("TotalCarbonSaved")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("TreesTotalCount")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -258,55 +268,55 @@ namespace EcoLens.Api.Migrations
                             Id = 1,
                             Category = 0,
                             Co2Factor = 27.0m,
-                            CreatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1382),
+                            CreatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9673),
                             LabelName = "Beef",
                             Source = "Local",
                             Unit = "kgCO2",
-                            UpdatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1388)
+                            UpdatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9680)
                         },
                         new
                         {
                             Id = 2,
                             Category = 1,
                             Co2Factor = 0.03m,
-                            CreatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1399),
+                            CreatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9690),
                             LabelName = "Subway",
                             Source = "Local",
                             Unit = "kgCO2/km",
-                            UpdatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1400)
+                            UpdatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9691)
                         },
                         new
                         {
                             Id = 3,
                             Category = 2,
                             Co2Factor = 0.5m,
-                            CreatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1402),
+                            CreatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9693),
                             LabelName = "Electricity",
                             Source = "Local",
                             Unit = "kgCO2/kWh",
-                            UpdatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1402)
+                            UpdatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9693)
                         },
                         new
                         {
                             Id = 4,
                             Category = 2,
                             Co2Factor = 0.35m,
-                            CreatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1404),
+                            CreatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9695),
                             LabelName = "Water",
                             Source = "Local",
                             Unit = "kgCO2/m3",
-                            UpdatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1405)
+                            UpdatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9695)
                         },
                         new
                         {
                             Id = 5,
                             Category = 2,
                             Co2Factor = 2.3m,
-                            CreatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1407),
+                            CreatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9696),
                             LabelName = "Gas",
                             Source = "Local",
                             Unit = "kgCO2/unit",
-                            UpdatedAt = new DateTime(2026, 1, 28, 4, 8, 35, 161, DateTimeKind.Utc).AddTicks(1407)
+                            UpdatedAt = new DateTime(2026, 1, 28, 8, 35, 14, 821, DateTimeKind.Utc).AddTicks(9697)
                         });
                 });
 

@@ -47,7 +47,7 @@ public class LeaderboardController : ControllerBase
 					{
 						userId = u.Id,
 						username = u.Username,
-						nickname = u.Username,
+						nickname = u.Nickname ?? u.Username,
 						avatarUrl = u.AvatarUrl,
 						emissions = (decimal?)e.Emission ?? 0m,
 						pointsWeek = u.CurrentPoints,
@@ -61,10 +61,8 @@ public class LeaderboardController : ControllerBase
 			rank = i + 1,
 			username = x.username,
 			nickname = x.nickname,
-			emissions = x.emissions,
+			emissionsTotal = x.emissions,
 			avatarUrl = x.avatarUrl,
-			pointsWeek = x.pointsWeek,
-			pointsMonth = x.pointsMonth,
 			pointsTotal = x.pointsTotal
 		});
 		return Ok(ranked);
@@ -102,7 +100,7 @@ public class LeaderboardController : ControllerBase
 					{
 						userId = u.Id,
 						username = u.Username,
-						nickname = u.Username,
+						nickname = u.Nickname ?? u.Username,
 						avatarUrl = u.AvatarUrl,
 						emissions = (decimal?)e.Emission ?? 0m,
 						pointsWeek = u.CurrentPoints,
@@ -116,10 +114,8 @@ public class LeaderboardController : ControllerBase
 			rank = i + 1,
 			username = x.username,
 			nickname = x.nickname,
-			emissions = x.emissions,
+			emissionsTotal = x.emissions,
 			avatarUrl = x.avatarUrl,
-			pointsWeek = x.pointsWeek,
-			pointsMonth = x.pointsMonth,
 			pointsTotal = x.pointsTotal
 		}).FirstOrDefault(x => string.Equals(x.username, username, StringComparison.OrdinalIgnoreCase));
 

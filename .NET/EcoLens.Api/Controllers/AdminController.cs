@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs.Admin;
 using EcoLens.Api.Models;
@@ -18,6 +19,15 @@ public class AdminController : ControllerBase
 	public AdminController(ApplicationDbContext db)
 	{
 		_db = db;
+	}
+
+	/// <summary>
+	/// 获取当前登录的管理员用户ID。
+	/// </summary>
+	private int? GetCurrentAdminId()
+	{
+		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
 	/// <summary>
@@ -321,8 +331,29 @@ public class AdminController : ControllerBase
 	[HttpPost("users/{id:int}/ban")]
 	public async Task<IActionResult> BanUser([FromRoute] int id, [FromBody] BanUserRequestDto dto, CancellationToken ct)
 	{
+		var currentAdminId = GetCurrentAdminId();
+		if (currentAdminId is null) return Unauthorized();
+
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == id, ct);
 		if (user is null) return NotFound();
+
+		// 保护机制1：防止管理员封禁自己
+		if (user.Id == currentAdminId.Value)
+		{
+			return BadRequest("Cannot ban yourself. Please ask another admin to perform this action.");
+		}
+
+		// 保护机制2：如果目标用户是管理员，检查是否是最后一个活跃的管理员
+		if (user.Role == UserRole.Admin && dto.Ban)
+		{
+			var activeAdminCount = await _db.ApplicationUsers
+				.CountAsync(u => u.Role == UserRole.Admin && u.IsActive && u.Id != id, ct);
+			
+			if (activeAdminCount == 0)
+			{
+				return BadRequest("Cannot ban the last active admin. At least one admin must remain active.");
+			}
+		}
 
 		user.IsActive = !dto.Ban;
 		await _db.SaveChangesAsync(ct);
@@ -448,17 +479,58 @@ public class AdminController : ControllerBase
 	[HttpPost("users/batch-update")]
 	public async Task<ActionResult<object>> BatchUpdateUsers([FromBody] BatchUserUpdateRequest req, CancellationToken ct)
 	{
+		var currentAdminId = GetCurrentAdminId();
+		if (currentAdminId is null) return Unauthorized();
+
 		int updated = 0;
+		var errors = new List<string>();
+
 		foreach (var x in req.Updates)
 		{
 			if (!int.TryParse(x.Id, out var uid)) continue;
 			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == uid, ct);
 			if (user is null) continue;
+
+			// 保护机制1：防止管理员封禁自己
+			if (user.Id == currentAdminId.Value && !string.IsNullOrWhiteSpace(x.Status))
+			{
+				var isActive = string.Equals(x.Status, "Active", StringComparison.OrdinalIgnoreCase);
+				if (!isActive)
+				{
+					errors.Add($"User {user.Username}: Cannot ban yourself.");
+					continue;
+				}
+			}
+
+			// 保护机制2：如果目标用户是管理员且要封禁，检查是否是最后一个活跃的管理员
+			if (user.Role == UserRole.Admin && !string.IsNullOrWhiteSpace(x.Status))
+			{
+				var isActive = string.Equals(x.Status, "Active", StringComparison.OrdinalIgnoreCase);
+				if (!isActive)
+				{
+					var activeAdminCount = await _db.ApplicationUsers
+						.CountAsync(u => u.Role == UserRole.Admin && u.IsActive && u.Id != uid, ct);
+					
+					if (activeAdminCount == 0)
+					{
+						errors.Add($"User {user.Username}: Cannot ban the last active admin.");
+						continue;
+					}
+				}
+			}
+
 			if (x.Points.HasValue) user.CurrentPoints = x.Points.Value;
 			if (!string.IsNullOrWhiteSpace(x.Status)) user.IsActive = string.Equals(x.Status, "Active", StringComparison.OrdinalIgnoreCase);
 			updated++;
 		}
+
 		await _db.SaveChangesAsync(ct);
+		
+		if (errors.Count > 0)
+		{
+			return Ok(new { updatedCount = updated, errors });
+		}
+
 		return Ok(new { updatedCount = updated });
 	}
 

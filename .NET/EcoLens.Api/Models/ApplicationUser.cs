@@ -12,6 +12,10 @@ public class ApplicationUser : BaseEntity
 	[MaxLength(100)]
 	public string Username { get; set; } = string.Empty;
 
+	// 展示昵称（可与 Username 不同；允许重复）
+	[MaxLength(100)]
+	public string? Nickname { get; set; }
+
 	[Required]
 	[MaxLength(256)]
 	public string Email { get; set; } = string.Empty;
@@ -39,6 +43,10 @@ public class ApplicationUser : BaseEntity
 	public DateTime BirthDate { get; set; }
 
 	public bool IsActive { get; set; } = true;
+
+	// 植树相关：总树数与当前树生长进度（0-100）
+	public int TreesTotalCount { get; set; }
+	public int CurrentTreeProgress { get; set; }
 
 	public ICollection<ActivityLog> ActivityLogs { get; set; } = new List<ActivityLog>();
 	public ICollection<AiInsight> AiInsights { get; set; } = new List<AiInsight>();

@@ -29,16 +29,15 @@ public class UserProfileController : ControllerBase
 
 	public class UserProfileResponseDto
 	{
-		public int Id { get; set; }
-		public string Username { get; set; } = string.Empty;
-		public string Nickname { get; set; } = string.Empty;
-		public string Email { get; set; } = string.Empty;
-		public string? AvatarUrl { get; set; }
-		public string? Region { get; set; }
-		public decimal TotalCarbonSaved { get; set; }
-		public int CurrentPoints { get; set; }
-		public int Rank { get; set; }
-		public UserRole Role { get; set; }
+		public string Id { get; set; } = string.Empty;          // string
+		public string Name { get; set; } = string.Empty;        // name
+		public string Nickname { get; set; } = string.Empty;    // nickname
+		public string Email { get; set; } = string.Empty;       // email
+		public string Location { get; set; } = string.Empty;    // LocationEnum -> 先返回字符串
+		public string BirthDate { get; set; } = string.Empty;   // yyyy-MM-dd
+		public string? Avatar { get; set; }                     // avatar url
+		public int JoinDays { get; set; }                       // joinDays
+		public int PointsTotal { get; set; }                    // pointsTotal
 	}
 
 	/// <summary>
@@ -53,28 +52,26 @@ public class UserProfileController : ControllerBase
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (user is null) return NotFound();
 
-		var rank = await _db.ApplicationUsers
-			.CountAsync(u => u.TotalCarbonSaved > user.TotalCarbonSaved, ct) + 1;
+		var joinDays = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
 
 		var dto = new UserProfileResponseDto
 		{
-			Id = user.Id,
-			Username = user.Username,
-			Nickname = user.Username,
+			Id = user.Id.ToString(),
+			Name = user.Username,
+			Nickname = user.Nickname ?? user.Username,
 			Email = user.Email,
-			AvatarUrl = user.AvatarUrl,
-			Region = user.Region,
-			TotalCarbonSaved = user.TotalCarbonSaved,
-			CurrentPoints = user.CurrentPoints,
-			Rank = rank,
-			Role = user.Role
+			Location = user.Region,
+			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
+			Avatar = user.AvatarUrl,
+			JoinDays = joinDays,
+			PointsTotal = user.CurrentPoints
 		};
 
 		return Ok(dto);
 	}
 
 	/// <summary>
-	/// 更新当前登录用户的头像、用户名与地区。
+	/// 更新当前登录用户资料：nickname、email、location、birthDate、avatar。
 	/// </summary>
 	[HttpPut("profile")]
 	public async Task<ActionResult<UserProfileResponseDto>> UpdateProfile([FromBody] UpdateUserProfileDto dto, CancellationToken ct)
@@ -85,43 +82,53 @@ public class UserProfileController : ControllerBase
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (user is null) return NotFound();
 
-		// Nickname -> Username，唯一性检查（当修改时）
-		if (!string.IsNullOrWhiteSpace(dto.Nickname) && !dto.Nickname.Equals(user.Username, StringComparison.Ordinal))
+		// Nickname -> ApplicationUser.Nickname（展示昵称；允许重复）
+		if (dto.Nickname is not null)
 		{
-			var exists = await _db.ApplicationUsers
-				.AnyAsync(u => u.Username == dto.Nickname && u.Id != user.Id, ct);
-			if (exists) return Conflict("Username already in use.");
-
-			user.Username = dto.Nickname;
+			user.Nickname = string.IsNullOrWhiteSpace(dto.Nickname) ? null : dto.Nickname.Trim();
 		}
 
-		if (dto.AvatarUrl is not null)
+		if (dto.Avatar is not null)
 		{
-			user.AvatarUrl = dto.AvatarUrl;
+			user.AvatarUrl = dto.Avatar;
 		}
 
-		if (dto.Region is not null)
+		if (dto.Location is not null)
 		{
-			user.Region = dto.Region;
+			user.Region = dto.Location;
+		}
+
+		if (dto.Email is not null && !dto.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+		{
+			var emailExists = await _db.ApplicationUsers.AnyAsync(u => u.Email == dto.Email && u.Id != user.Id, ct);
+			if (emailExists) return Conflict("Email already in use.");
+			user.Email = dto.Email;
+		}
+
+		if (!string.IsNullOrWhiteSpace(dto.BirthDate))
+		{
+			if (!DateTime.TryParse(dto.BirthDate, out var bd))
+			{
+				return BadRequest("Invalid BirthDate format. Expected yyyy-MM-dd.");
+			}
+			user.BirthDate = bd.Date;
 		}
 
 		await _db.SaveChangesAsync(ct);
 
-		var rank = await _db.ApplicationUsers
-			.CountAsync(u => u.TotalCarbonSaved > user.TotalCarbonSaved, ct) + 1;
+		var joinDays = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
 
 		var result = new UserProfileResponseDto
 		{
-			Id = user.Id,
-			Username = user.Username,
-			Nickname = user.Username,
+			Id = user.Id.ToString(),
+			Name = user.Username,
+			Nickname = user.Nickname ?? user.Username,
 			Email = user.Email,
-			AvatarUrl = user.AvatarUrl,
-			Region = user.Region,
-			TotalCarbonSaved = user.TotalCarbonSaved,
-			CurrentPoints = user.CurrentPoints,
-			Rank = rank,
-			Role = user.Role
+			Location = user.Region,
+			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
+			Avatar = user.AvatarUrl,
+			JoinDays = joinDays,
+			PointsTotal = user.CurrentPoints
 		};
 
 		return Ok(result);
