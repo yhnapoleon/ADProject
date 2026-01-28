@@ -199,23 +199,11 @@ const AdminDashboard: React.FC = () => {
             week: item.week || `Week ${index + 1}`,
             value: item.value || item.carbonReduced || 0,
           }));
-          setWeeklyData(formattedWeekly.length > 0 ? formattedWeekly : [
-            { week: 'Week 1', value: 0 },
-            { week: 'Week 2', value: 0 },
-            { week: 'Week 3', value: 0 },
-            { week: 'Week 4', value: 0 },
-            { week: 'Week 5', value: 0 },
-          ]);
+          setWeeklyData(formattedWeekly);
         } else {
           console.error('Failed to load weekly impact:', weeklyRes.reason);
-          // 使用默认数据
-          setWeeklyData([
-            { week: 'Week 1', value: 800 },
-            { week: 'Week 2', value: 1200 },
-            { week: 'Week 3', value: 1100 },
-            { week: 'Week 4', value: 1500 },
-            { week: 'Week 5', value: 1900 },
-          ]);
+          // API失败时使用空数组，不显示硬编码数据
+          setWeeklyData([]);
         }
 
         // 加载排放因子列表
