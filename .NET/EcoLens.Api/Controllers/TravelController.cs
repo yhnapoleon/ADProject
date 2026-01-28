@@ -99,6 +99,33 @@ public class TravelController : ControllerBase
 	}
 
 	/// <summary>
+	/// 路由别名：/api/records/travel（与前端文档对齐）。
+	/// </summary>
+	[HttpPost("/api/records/travel")]
+	public async Task<ActionResult<object>> CreateAlias([FromBody] CreateTravelLogDto dto, CancellationToken ct = default)
+	{
+		var userId = GetUserId();
+		if (userId is null)
+		{
+			return Unauthorized(new { error = "Unable to get user information, please login again" });
+		}
+		if (!ModelState.IsValid)
+		{
+			return BadRequest(new { error = "Request validation failed", errors = ModelState });
+		}
+		var result = await _travelService.CreateTravelLogAsync(userId.Value, dto, ct);
+		return Ok(new
+		{
+			id = result.Id.ToString(),
+			date = result.CreatedAt.ToString("yyyy-MM-dd"),
+			type = "Transport",
+			amount = result.CarbonEmission,
+			unit = "kg CO₂e",
+			description = result.TransportModeName
+		});
+	}
+
+	/// <summary>
 	/// 预览路线和碳排放（不保存到数据库）
 	/// </summary>
 	/// <remarks>

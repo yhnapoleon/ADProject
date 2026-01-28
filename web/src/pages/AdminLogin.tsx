@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AdminLogin.css';
+import request from '../utils/request';
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -8,18 +9,43 @@ const AdminLogin: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Simple validation - in production, this would call an API
-    if (username && password) {
-      // Store auth state (in production, use proper token management)
-      localStorage.setItem('adminAuthenticated', 'true');
-      localStorage.setItem('adminUsername', username);
-      navigate('/admin');
-    } else {
+    if (!username || !password) {
       setError('Please enter both username and password');
+      return;
+    }
+
+    try {
+      // 调用管理员登录API
+      const response = await request.post('/admin/auth/login', {
+        username,
+        password,
+      });
+
+      // 保存token和用户信息
+      if (response.accessToken || response.token) {
+        const token = response.accessToken || response.token;
+        localStorage.setItem('adminToken', token);
+        localStorage.setItem('token', token); // 同时保存为通用token
+        localStorage.setItem('adminAuthenticated', 'true');
+        localStorage.setItem('adminUsername', response.admin?.username || username);
+        
+        // 跳转到管理面板
+        navigate('/admin');
+      } else {
+        setError('Login failed: No token received');
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(
+        error.response?.data?.error || 
+        error.response?.data?.message || 
+        error.message || 
+        'Login failed. Please check your credentials.'
+      );
     }
   };
 

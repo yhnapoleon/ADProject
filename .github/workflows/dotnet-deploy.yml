@@ -1,0 +1,46 @@
+name: Deploy .NET Backend to Azure
+
+on:
+  push:
+    branches:
+      - main # 如果默认分支不是 main，请改成你的默认分支名
+    paths:
+      - '.NET/**' # 后端位于 .NET 目录；若目录不同请修改
+      - '.github/workflows/dotnet-deploy.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取代码
+      - uses: actions/checkout@v4
+
+      # 2. 设置 .NET 环境
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x' # 与项目 TargetFramework 对齐，例如 net8.0；若不同请修改
+
+      # 3. 还原并编译 (Build)
+      # 如果仓库没有 .sln，可直接对 .csproj 构建（当前按 .NET/EcoLens.Api/EcoLens.Api.csproj）
+      - name: Restore
+        run: dotnet restore ".NET/EcoLens.Api/EcoLens.Api.csproj"
+      - name: Build
+        run: dotnet build ".NET/EcoLens.Api/EcoLens.Api.csproj" --configuration Release --no-restore
+        # 若你有解决方案文件 .sln，请将上面路径替换为你的 .sln，相对仓库根路径
+
+      # 4. 发布 (Publish)
+      - name: Publish
+        run: dotnet publish ".NET/EcoLens.Api/EcoLens.Api.csproj" -c Release -o ${{ env.DOTNET_ROOT }}/myapp
+        # 若 API 项目路径不同，请替换为实际的 .csproj 相对路径
+
+      # 5. 部署到 Azure Web App
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'ecolens-api' # 替换为你在 Azure 创建的 Web App 名称
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }} # 在仓库 Secrets 中配置
+          package: ${{ env.DOTNET_ROOT }}/myapp
+

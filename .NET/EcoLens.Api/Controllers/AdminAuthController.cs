@@ -29,6 +29,12 @@ public class AdminAuthController : ControllerBase
 	public class AdminLoginResponse
 	{
 		public string AccessToken { get; set; } = string.Empty;
+		// 兼容前端期望的字段名
+		public string Token
+		{
+			get => AccessToken;
+			set => AccessToken = value;
+		}
 		public int ExpiresIn { get; set; } = 3600;
 		public object Admin { get; set; } = new();
 	}

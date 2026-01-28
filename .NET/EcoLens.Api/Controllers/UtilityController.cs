@@ -239,9 +239,9 @@ public class UtilityController : ControllerBase
 			await _db.ActivityLogs.AddAsync(log, ct);
 		}
 
-		await AddLogAsync("Electricity", bill.ElectricityUsage);
-		await AddLogAsync("Water", bill.WaterUsage);
-		await AddLogAsync("Gas", bill.GasUsage);
+		await AddLogAsync("Electricity", bill.ElectricityUsage ?? 0m);
+		await AddLogAsync("Water", bill.WaterUsage ?? 0m);
+		await AddLogAsync("Gas", bill.GasUsage ?? 0m);
 
 		await _db.SaveChangesAsync(ct);
 
@@ -249,11 +249,11 @@ public class UtilityController : ControllerBase
 		{
 			Id = bill.Id,
 			YearMonth = bill.YearMonth,
-			ElectricityUsage = bill.ElectricityUsage,
+			ElectricityUsage = bill.ElectricityUsage ?? 0m,
 			ElectricityCost = bill.ElectricityCost,
-			WaterUsage = bill.WaterUsage,
+			WaterUsage = bill.WaterUsage ?? 0m,
 			WaterCost = bill.WaterCost,
-			GasUsage = bill.GasUsage,
+			GasUsage = bill.GasUsage ?? 0m,
 			GasCost = bill.GasCost,
 			EstimatedEmission = totalEmission
 		};
@@ -301,16 +301,16 @@ public class UtilityController : ControllerBase
 			{
 				Id = b.Id,
 				YearMonth = b.YearMonth,
-				ElectricityUsage = b.ElectricityUsage,
+					ElectricityUsage = b.ElectricityUsage ?? 0m,
 				ElectricityCost = b.ElectricityCost,
-				WaterUsage = b.WaterUsage,
+					WaterUsage = b.WaterUsage ?? 0m,
 				WaterCost = b.WaterCost,
-				GasUsage = b.GasUsage,
+					GasUsage = b.GasUsage ?? 0m,
 				GasCost = b.GasCost,
 				EstimatedEmission =
-					(b.ElectricityUsage * (electricity != null ? electricity.Co2Factor : 0m)) +
-					(b.WaterUsage * (water != null ? water.Co2Factor : 0m)) +
-					(b.GasUsage * (gas != null ? gas.Co2Factor : 0m))
+					((b.ElectricityUsage ?? 0m) * (electricity != null ? electricity.Co2Factor : 0m)) +
+					((b.WaterUsage ?? 0m) * (water != null ? water.Co2Factor : 0m)) +
+					((b.GasUsage ?? 0m) * (gas != null ? gas.Co2Factor : 0m))
 			})
 			.ToListAsync(ct);
 

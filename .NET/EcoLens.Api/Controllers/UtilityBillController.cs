@@ -122,6 +122,14 @@ public class UtilityBillController : ControllerBase
 	}
 
 	/// <summary>
+	/// 路由别名：/api/vision/utility-bill（与前端文档对齐，转到上传并处理）。
+	/// </summary>
+	[HttpPost("/api/vision/utility-bill")]
+	[Consumes("multipart/form-data")]
+	public Task<ActionResult<UtilityBillResponseDto>> UploadAlias([FromForm] UploadUtilityBillDto dto, CancellationToken ct = default)
+		=> Upload(dto, ct);
+
+	/// <summary>
 	/// 手动创建账单（碳排放计算 → 保存）
 	/// </summary>
 	/// <remarks>
@@ -198,6 +206,8 @@ public class UtilityBillController : ControllerBase
 			return StatusCode(500, new { error = "Internal server error, please try again later" });
 		}
 	}
+
+	// 注意：/api/records/utilities 已由 UtilityController 暴露，避免路由冲突，这里不再重复定义。
 
 	/// <summary>
 	/// 获取当前用户的账单列表（支持筛选和分页）

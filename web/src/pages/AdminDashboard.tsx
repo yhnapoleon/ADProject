@@ -3,14 +3,42 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaCh
 // @ts-ignore - GeoJSON 文件导入
 import singaporeGeoJsonUrl from '../assets/Singapore.geojson?url';
 import './AdminDashboard.css';
+import request from '../utils/request';
 
-// 区域数据接口 - 用于后续后端数据集成
+// 区域数据接口 - 与API返回的RegionStatItem对应
 interface RegionData {
   regionCode: string;
   regionName: string;
   carbonReduced: number; // kg CO2
   userCount: number;
   reductionRate: number; // percentage
+}
+
+// 周报数据接口
+interface WeeklyImpactData {
+  week: string;
+  value: number;
+}
+
+// 排放因子接口
+interface EmissionFactor {
+  id: string;
+  category: string;
+  itemName: string;
+  factor: number;
+  unit: string;
+  source?: string;
+  status: string;
+  lastUpdated: string;
+}
+
+// 总体统计数据
+interface DashboardStats {
+  totalUsers: number;
+  totalCarbonReduced: number;
+  activeFactors: number;
+  userGrowth: number;
+  carbonGrowth: number;
 }
 
 
@@ -54,6 +82,16 @@ const AdminDashboard: React.FC = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<{ regionCode: string; regionName: string; data: RegionData | null; x: number; y: number } | null>(null);
   const tooltipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [weeklyData, setWeeklyData] = useState<WeeklyImpactData[]>([]);
+  const [emissionFactors, setEmissionFactors] = useState<EmissionFactor[]>([]);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalUsers: 0,
+    totalCarbonReduced: 0,
+    activeFactors: 0,
+    userGrowth: 0,
+    carbonGrowth: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   // 计算边界框和投影配置，确保地图完整显示
   const calculateBounds = (data: any) => {
@@ -109,65 +147,102 @@ const AdminDashboard: React.FC = () => {
     };
   };
 
-  // 加载 GeoJSON 数据
+  // 加载所有数据
   useEffect(() => {
-    fetch(singaporeGeoJsonUrl)
-      .then((res) => res.json())
-      .then((data) => {
-        setGeoData(data);
-        const calculatedBounds = calculateBounds(data);
-        setBounds(calculatedBounds);
-        // TODO: 后续集成后端API
-        // 替换下面的模拟数据为实际API调用
-        // 示例: const response = await fetch('/api/regions/stats');
-        // const apiData = await response.json();
-        loadRegionData(data);
-      })
-      .catch((err) => {
-        console.error('Failed to load GeoJSON:', err);
-      });
-  }, []);
+    const loadAllData = async () => {
+      setLoading(true);
+      try {
+        // 并行加载所有数据
+        const [geoJsonRes, regionsRes, weeklyRes, factorsRes] = await Promise.allSettled([
+          fetch(singaporeGeoJsonUrl).then(res => res.json()),
+          request.get('/admin/regions/stats'),
+          request.get('/admin/impact/weekly'),
+          request.get('/admin/emission-factors', { params: { page: 1, pageSize: 10 } }),
+        ]);
 
-  // 加载区域数据 - 目前使用模拟数据，后续替换为后端API调用
-  const loadRegionData = (geoData: any) => {
-    const mockData: Record<string, RegionData> = {};
-    if (geoData.features) {
-      geoData.features.forEach((feature: any) => {
-        const regionCode = feature.properties?.REGION_C || '';
-        const regionName = feature.properties?.REGION_N || '';
-        if (regionCode) {
-          // 生成更分散的模拟数据，确保有不同颜色
-          const randomValue = Math.random();
-          let carbonReduced: number;
-          
-          // 确保数据分布在不同范围，以便显示不同颜色
-          if (randomValue < 0.25) {
-            // 25% 的区域为 Very Low (<500)
-            carbonReduced = Math.random() * 300 + 200;
-          } else if (randomValue < 0.5) {
-            // 25% 的区域为 Low (500-1000)
-            carbonReduced = Math.random() * 500 + 500;
-          } else if (randomValue < 0.75) {
-            // 25% 的区域为 Medium (1000-1750)
-            carbonReduced = Math.random() * 750 + 1000;
-          } else {
-            // 25% 的区域为 High (>1750)
-            carbonReduced = Math.random() * 750 + 1750;
-          }
-          
-          mockData[regionCode] = {
-            regionCode,
-            regionName,
-            carbonReduced,
-            userCount: Math.floor(Math.random() * 5000 + 1000),
-            reductionRate: Math.random() * 20 + 5,
-          };
+        // 加载GeoJSON数据
+        if (geoJsonRes.status === 'fulfilled') {
+          const geoData = geoJsonRes.value;
+          setGeoData(geoData);
+          const calculatedBounds = calculateBounds(geoData);
+          setBounds(calculatedBounds);
         }
-      });
-    }
-    console.log('Loaded region data:', mockData); // 调试信息
-    setRegionData(mockData);
-  };
+
+        // 加载区域统计数据
+        if (regionsRes.status === 'fulfilled') {
+          const regions: RegionData[] = regionsRes.value || [];
+          const regionDataMap: Record<string, RegionData> = {};
+          regions.forEach((region: RegionData) => {
+            if (region.regionCode) {
+              regionDataMap[region.regionCode] = region;
+            }
+          });
+          setRegionData(regionDataMap);
+
+          // 计算总体统计数据
+          const totalUsers = regions.reduce((sum, r) => sum + (r.userCount || 0), 0);
+          const totalCarbonReduced = regions.reduce((sum, r) => sum + (r.carbonReduced || 0), 0);
+          setStats(prev => ({
+            ...prev,
+            totalUsers,
+            totalCarbonReduced: Math.round(totalCarbonReduced),
+          }));
+        } else {
+          console.error('Failed to load regions stats:', regionsRes.reason);
+        }
+
+        // 加载周报数据
+        if (weeklyRes.status === 'fulfilled') {
+          const weekly: any[] = weeklyRes.value || [];
+          // 转换API返回的数据格式为图表所需格式
+          const formattedWeekly = weekly.map((item: any, index: number) => ({
+            week: item.week || `Week ${index + 1}`,
+            value: item.value || item.carbonReduced || 0,
+          }));
+          setWeeklyData(formattedWeekly.length > 0 ? formattedWeekly : [
+            { week: 'Week 1', value: 0 },
+            { week: 'Week 2', value: 0 },
+            { week: 'Week 3', value: 0 },
+            { week: 'Week 4', value: 0 },
+            { week: 'Week 5', value: 0 },
+          ]);
+        } else {
+          console.error('Failed to load weekly impact:', weeklyRes.reason);
+          // 使用默认数据
+          setWeeklyData([
+            { week: 'Week 1', value: 800 },
+            { week: 'Week 2', value: 1200 },
+            { week: 'Week 3', value: 1100 },
+            { week: 'Week 4', value: 1500 },
+            { week: 'Week 5', value: 1900 },
+          ]);
+        }
+
+        // 加载排放因子列表
+        if (factorsRes.status === 'fulfilled') {
+          const factorsData = factorsRes.value;
+          // 处理分页响应或直接数组
+          const factors: EmissionFactor[] = Array.isArray(factorsData) 
+            ? factorsData 
+            : (factorsData?.data || factorsData?.items || []);
+          
+          setEmissionFactors(factors.slice(0, 10)); // 只显示最近10条
+          setStats(prev => ({
+            ...prev,
+            activeFactors: factorsData?.total || factors.length || 0,
+          }));
+        } else {
+          console.error('Failed to load emission factors:', factorsRes.reason);
+        }
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllData();
+  }, []);
 
   // 根据区域数据获取颜色
   const getRegionColor = (regionCode: string): string => {
@@ -193,19 +268,6 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const weeklyData = [
-    { week: 'Week 1', value: 800 },
-    { week: 'Week 2', value: 1200 },
-    { week: 'Week 3', value: 1100 },
-    { week: 'Week 4', value: 1500 },
-    { week: 'Week 5', value: 1900 },
-  ];
-
-  const emissionFactors = [
-    { id: 'EF-001', category: 'Food', itemName: 'Beef Steak (100g)', factor: 2.5, lastUpdated: '2024-05-20', status: 'Active' },
-    { id: 'EF-002', category: 'Transport', itemName: 'Bus Ride (1km)', factor: 0.1, lastUpdated: '2024-05-19', status: 'Active' },
-    { id: 'EF-003', category: 'Energy', itemName: 'Electricity (1kWh)', factor: 0.5, lastUpdated: '2024-05-18', status: 'Review' },
-  ];
 
   return (
     <div className="dashboard">
@@ -214,17 +276,27 @@ const AdminDashboard: React.FC = () => {
       <div className="stats-cards">
         <div className="stat-card">
           <h3>Total Eco-Users</h3>
-          <div className="stat-value">12,450</div>
-          <div className="stat-change positive">+5% this week</div>
+          <div className="stat-value">
+            {loading ? 'Loading...' : stats.totalUsers.toLocaleString()}
+          </div>
+          <div className="stat-change positive">
+            {stats.userGrowth > 0 ? `+${stats.userGrowth}% this week` : 'Database Updated'}
+          </div>
         </div>
         <div className="stat-card">
           <h3>Carbon Reduced</h3>
-          <div className="stat-value">8,320 kg</div>
-          <div className="stat-change positive">+12% this week</div>
+          <div className="stat-value">
+            {loading ? 'Loading...' : `${stats.totalCarbonReduced.toLocaleString()} kg`}
+          </div>
+          <div className="stat-change positive">
+            {stats.carbonGrowth > 0 ? `+${stats.carbonGrowth}% this week` : 'Database Updated'}
+          </div>
         </div>
         <div className="stat-card">
           <h3>Active Factors</h3>
-          <div className="stat-value">1,240</div>
+          <div className="stat-value">
+            {loading ? 'Loading...' : stats.activeFactors.toLocaleString()}
+          </div>
           <div className="stat-change">Database Updated</div>
         </div>
       </div>
@@ -422,48 +494,66 @@ const AdminDashboard: React.FC = () => {
         </div>
         <div className="chart-card">
           <h3>Weekly Platform Impact (kg CO2)</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={weeklyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-              <XAxis dataKey="week" stroke="#666" />
-              <YAxis stroke="#666" domain={[0, 2000]} />
-              <Tooltip />
-              <Area type="monotone" dataKey="value" stroke="#4CAF50" fill="#4CAF50" fillOpacity={0.3} />
-            </AreaChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              Loading chart data...
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="week" stroke="#666" />
+                <YAxis stroke="#666" domain={[0, 'dataMax + 200']} />
+                <Tooltip />
+                <Area type="monotone" dataKey="value" stroke="#4CAF50" fill="#4CAF50" fillOpacity={0.3} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
       <div className="table-card">
         <h3>Emission Factor Database (Recent Updates)</h3>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Category</th>
-              <th>Item Name</th>
-              <th>Emission Factor (kg CO2/unit)</th>
-              <th>Last Updated</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {emissionFactors.map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.category}</td>
-                <td>{item.itemName}</td>
-                <td>{item.factor}</td>
-                <td>{item.lastUpdated}</td>
-                <td>
-                  <span className={`status-badge ${item.status.toLowerCase()}`}>
-                    {item.status}
-                  </span>
-                </td>
+        {loading ? (
+          <div style={{ padding: '20px', textAlign: 'center' }}>Loading emission factors...</div>
+        ) : (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Category</th>
+                <th>Item Name</th>
+                <th>Emission Factor ({emissionFactors[0]?.unit || 'kg CO2/unit'})</th>
+                <th>Last Updated</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {emissionFactors.length > 0 ? (
+                emissionFactors.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.id}</td>
+                    <td>{item.category}</td>
+                    <td>{item.itemName}</td>
+                    <td>{item.factor}</td>
+                    <td>{item.lastUpdated}</td>
+                    <td>
+                      <span className={`status-badge ${item.status?.toLowerCase().replace(/\s+/g, '-') || 'active'}`}>
+                        {item.status || 'Active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
+                    No emission factors found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
