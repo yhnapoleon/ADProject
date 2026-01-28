@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Table, Select, Button, Modal, message, Row, Col, Tag } from 'antd';
 import { DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Record, EmissionType } from '../types/index';
@@ -6,206 +6,38 @@ import './Records.module.css';
 import mainEatIcon from '../assets/icons/main_eat.svg';
 import mainTravelIcon from '../assets/icons/main_travel.svg';
 import mainWaterIcon from '../assets/icons/main_water.svg';
+import request from '../utils/request';
 
 const Records = () => {
+  const [loading, setLoading] = useState(false);
+  const [records, setRecords] = useState<Record[]>([]);
   const [filterType, setFilterType] = useState<EmissionType | 'all' | undefined>('all');
   const [filterMonth, setFilterMonth] = useState<string | 'all'>('all');
 
-  // Mock data
-  const mockRecords: Record[] = [
-    {
-      id: '1',
-      date: '2026-01-23',
-      type: 'Food',
-      amount: 2.5,
-      unit: 'kg CO₂e',
-      description: 'Beef meal at restaurant',
-    },
-    {
-      id: '2',
-      date: '2026-01-22',
-      type: 'Transport',
-      amount: 1.8,
-      unit: 'kg CO₂e',
-      description: 'Drive car to office (25 km)',
-    },
-    {
-      id: '3',
-      date: '2026-01-21',
-      type: 'Utilities',
-      amount: 0.5,
-      unit: 'kg CO₂e',
-      description: 'Electricity usage',
-    },
-    {
-      id: '4',
-      date: '2026-01-20',
-      type: 'Food',
-      amount: 1.2,
-      unit: 'kg CO₂e',
-      description: 'Chicken pasta',
-    },
-    {
-      id: '5',
-      date: '2026-01-19',
-      type: 'Transport',
-      amount: 0.9,
-      unit: 'kg CO₂e',
-      description: 'Public bus ride',
-    },
-    {
-      id: '6',
-      date: '2026-01-18',
-      type: 'Utilities',
-      amount: 0.3,
-      unit: 'kg CO₂e',
-      description: 'Water usage',
-    },
-    {
-      id: '7',
-      date: '2026-01-17',
-      type: 'Food',
-      amount: 0.8,
-      unit: 'kg CO₂e',
-      description: 'Vegetable salad',
-    },
-    {
-      id: '8',
-      date: '2026-01-16',
-      type: 'Transport',
-      amount: 2.1,
-      unit: 'kg CO₂e',
-      description: 'Flight to Singapore',
-    },
-    {
-      id: '9',
-      date: '2026-01-15',
-      type: 'Utilities',
-      amount: 0.6,
-      unit: 'kg CO₂e',
-      description: 'Gas heating',
-    },
-    {
-      id: '10',
-      date: '2026-01-14',
-      type: 'Food',
-      amount: 3.1,
-      unit: 'kg CO₂e',
-      description: 'BBQ party',
-    },
-    {
-      id: '11',
-      date: '2025-12-28',
-      type: 'Food',
-      amount: 1.5,
-      unit: 'kg CO₂e',
-      description: 'Lunch at cafe',
-    },
-    {
-      id: '12',
-      date: '2025-12-27',
-      type: 'Transport',
-      amount: 1.2,
-      unit: 'kg CO₂e',
-      description: 'Taxi ride downtown',
-    },
-    {
-      id: '13',
-      date: '2025-12-26',
-      type: 'Utilities',
-      amount: 0.8,
-      unit: 'kg CO₂e',
-      description: 'Monthly electricity bill',
-    },
-    {
-      id: '14',
-      date: '2025-12-25',
-      type: 'Food',
-      amount: 4.2,
-      unit: 'kg CO₂e',
-      description: 'Christmas dinner',
-    },
-    {
-      id: '15',
-      date: '2025-12-24',
-      type: 'Transport',
-      amount: 3.5,
-      unit: 'kg CO₂e',
-      description: 'Airport transfer',
-    },
-    {
-      id: '16',
-      date: '2025-12-20',
-      type: 'Food',
-      amount: 2.0,
-      unit: 'kg CO₂e',
-      description: 'Restaurant dinner',
-    },
-    {
-      id: '17',
-      date: '2025-12-18',
-      type: 'Utilities',
-      amount: 0.4,
-      unit: 'kg CO₂e',
-      description: 'Water bill',
-    },
-    {
-      id: '18',
-      date: '2025-12-15',
-      type: 'Transport',
-      amount: 0.7,
-      unit: 'kg CO₂e',
-      description: 'MRT commute',
-    },
-    {
-      id: '19',
-      date: '2025-11-30',
-      type: 'Food',
-      amount: 1.8,
-      unit: 'kg CO₂e',
-      description: 'Weekend brunch',
-    },
-    {
-      id: '20',
-      date: '2025-11-28',
-      type: 'Transport',
-      amount: 2.3,
-      unit: 'kg CO₂e',
-      description: 'Long distance drive',
-    },
-    {
-      id: '21',
-      date: '2025-11-25',
-      type: 'Utilities',
-      amount: 0.9,
-      unit: 'kg CO₂e',
-      description: 'Electricity usage',
-    },
-    {
-      id: '22',
-      date: '2025-11-20',
-      type: 'Food',
-      amount: 1.1,
-      unit: 'kg CO₂e',
-      description: 'Vegetarian meal',
-    },
-    {
-      id: '23',
-      date: '2025-11-15',
-      type: 'Transport',
-      amount: 1.5,
-      unit: 'kg CO₂e',
-      description: 'Bus journey',
-    },
-  ];
+  const fetchRecords = async () => {
+    setLoading(true);
+    try {
+      // 这里的 params 需要根据后端实际支持的过滤字段调整
+      const res: any = await request.get('/api/records', {
+        params: {
+          type: filterType === 'all' ? undefined : filterType,
+          month: filterMonth === 'all' ? undefined : filterMonth,
+        }
+      });
+      // 兼容数组或带 total 的对象
+      const list = Array.isArray(res) ? res : res.items || [];
+      setRecords(list);
+    } catch (error: any) {
+      console.error('Failed to fetch records:', error);
+      message.error('Failed to load records');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Filter records
-  const filteredRecords = mockRecords.filter((record) => {
-    const matchType = !filterType || filterType === 'all' || record.type === filterType;
-    // Only filter by month if filterMonth has a specific value and is not 'all', '', null, or undefined
-    const matchMonth = !filterMonth || filterMonth === 'all' || filterMonth === '' || record.date.substring(0, 7) === filterMonth;
-    return matchType && matchMonth;
-  });
+  useEffect(() => {
+    fetchRecords();
+  }, [filterType, filterMonth]);
 
   const getTypeColor = (type: EmissionType) => {
     const colorMap: { [key in EmissionType]: string } = {
@@ -213,7 +45,7 @@ const Records = () => {
       'Transport': 'blue',
       'Utilities': 'orange',
     };
-    return colorMap[type];
+    return colorMap[type] || 'default';
   };
 
   const getTypeIcon = (type: EmissionType) => {
@@ -225,7 +57,7 @@ const Records = () => {
     return iconMap[type];
   };
 
-  const handleDelete = () => {
+  const handleDelete = (id: string) => {
     Modal.confirm({
       title: 'Delete Record',
       icon: <ExclamationCircleOutlined />,
@@ -233,8 +65,15 @@ const Records = () => {
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
-      onOk() {
-        message.success('Record deleted successfully');
+      async onOk() {
+        try {
+          await request.delete(`/api/records/${id}`);
+          message.success('Record deleted successfully');
+          fetchRecords(); // 刷新列表
+        } catch (error: any) {
+          console.error('Failed to delete record:', error);
+          message.error('Failed to delete record');
+        }
       },
     });
   };
@@ -258,7 +97,7 @@ const Records = () => {
       align: 'center' as const,
       render: (text: EmissionType) => (
         <Tag color={getTypeColor(text)} style={{ marginRight: 0, display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-          <img src={getTypeIcon(text)} alt={text} style={{ width: '16px', height: '16px', filter: 'brightness(0) saturate(100%) invert(40%)' }} />
+          {getTypeIcon(text) && <img src={getTypeIcon(text)} alt={text} style={{ width: '16px', height: '16px', filter: 'brightness(0) saturate(100%) invert(40%)' }} />}
           {text}
         </Tag>
       ),
@@ -268,7 +107,7 @@ const Records = () => {
       title: 'Amount',
       dataIndex: 'amount',
       key: 'amount',
-      render: (text: number, record: Record) => `${text} ${record.unit}`,
+      render: (text: number, record: Record) => `${text} ${record.unit || 'kg CO₂e'}`,
       width: '15%',
     },
     {
@@ -281,12 +120,12 @@ const Records = () => {
     {
       title: 'Action',
       key: 'action',
-      render: () => (
+      render: (_: any, record: Record) => (
         <Button
           type="text"
           danger
           icon={<DeleteOutlined />}
-          onClick={() => handleDelete()}
+          onClick={() => handleDelete(record.id)}
           size="small"
         >
           Delete
@@ -366,7 +205,8 @@ const Records = () => {
         <div style={{ margin: '24px 0' }}>
           <Table
             columns={columns}
-            dataSource={filteredRecords.map((record) => ({
+            loading={loading}
+            dataSource={records.map((record) => ({
               ...record,
               key: record.id,
             }))}
@@ -374,7 +214,6 @@ const Records = () => {
               position: ['bottomRight'],
               defaultPageSize: 10,
               showSizeChanger: true,
-              showQuickJumper: false,
               pageSizeOptions: ['5', '10', '20', '50'],
               showTotal: (total) => `Total ${total} records`,
             }}
@@ -383,17 +222,17 @@ const Records = () => {
         </div>
 
         {/* Summary */}
-        {filteredRecords.length > 0 && (
+        {!loading && records.length > 0 && (
           <div style={{ marginTop: '20px', padding: '16px', background: '#f8f5fb', borderRadius: '8px', borderLeft: '4px solid #674fa3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '14px', color: '#666' }}>
               Total Emissions: <span style={{ fontWeight: '700', color: '#674fa3', fontSize: '16px' }}>
-                {filteredRecords.reduce((sum, r) => sum + r.amount, 0).toFixed(2)} kg CO₂e
+                {records.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)} kg CO₂e
               </span>
             </div>
           </div>
         )}
 
-        {filteredRecords.length === 0 && (
+        {!loading && records.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#999' }}>
             <div style={{ fontSize: '16px' }}>
               No records found. Adjust your filters to see data.

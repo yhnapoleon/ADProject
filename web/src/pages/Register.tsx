@@ -1,7 +1,8 @@
 import { Button, Card, Form, Input, message, Typography, DatePicker, Select, Progress } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import splashIcon from '../assets/icons/splash.svg';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
@@ -17,6 +18,7 @@ type FormValues = {
 const Register = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm<FormValues>();
+  const [loading, setLoading] = useState(false);
   const watchedPassword: string = Form.useWatch('password', form) ?? '';
 
   const passwordStrength = useMemo(() => {
@@ -57,8 +59,67 @@ const Register = () => {
       message.error('Password must be at least medium strength (length >= 8, contains letters and digits)');
       return;
     }
-    message.success('Account created successfully!');
-    navigate('/login', { replace: true });
+
+    // 验证必填字段
+    if (!values.dateOfBirth) {
+      message.error('Please select your date of birth');
+      return;
+    }
+    if (!values.location) {
+      message.error('Please select your location');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 准备注册数据 - 使用 camelCase（ASP.NET Core 默认 JSON 序列化使用 camelCase）
+      // 后端 RegisterRequestDto 属性：Username, Email, Password, Region, BirthDate
+      // ASP.NET Core 会自动将 camelCase 映射到 PascalCase 属性
+      const registerData = {
+        username: values.username,
+        email: values.email,
+        password: values.password,
+        region: values.location, // 映射到后端的 Region 属性
+        birthDate: values.dateOfBirth.format('YYYY-MM-DD'), // 映射到后端的 BirthDate 属性
+      };
+      
+      console.log('Register data:', registerData); // 调试用
+
+      // 调用注册 API
+      await request.post('/api/Auth/register', registerData);
+
+      // 注册成功
+      message.success('Registration successful! Please log in.');
+      navigate('/login', { replace: true });
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      console.error('Error response:', error.response?.data);
+      
+      // 显示后端返回的错误信息
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.response?.data) {
+        // 尝试获取详细的验证错误信息
+        if (error.response.data.errors) {
+          // ASP.NET Core 模型验证错误
+          const validationErrors = Object.values(error.response.data.errors)
+            .flat()
+            .join(', ');
+          errorMessage = validationErrors || error.response.data.title || error.response.data.message || errorMessage;
+        } else {
+          errorMessage = error.response.data.error || 
+                        error.response.data.message || 
+                        error.response.data.title ||
+                        errorMessage;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -163,6 +224,7 @@ const Register = () => {
             type="primary"
             size="large"
             htmlType="submit"
+            loading={loading}
             style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 10, fontWeight: 700 }}
           >
             Sign Up

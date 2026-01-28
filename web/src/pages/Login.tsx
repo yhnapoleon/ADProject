@@ -28,25 +28,36 @@ const Login = () => {
   const onFinish = async (values: FormValues) => {
     setLoading(true);
     try {
+      // 调用登录 API
       const response: any = await request.post('/auth/login', {
         email: values.email,
         password: values.password,
       });
-      
-      // 保存 token 和登录状态（API 返回 Token 或 token）
+
+      // 保存 token 和用户信息（支持多种 token 字段名）
       const token = response.token || response.Token || response.accessToken || response.AccessToken;
-      if (!token) {
-        throw new Error('No token received from server');
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('isLoggedIn', 'true');
+        
+        // 如果响应中包含用户信息，也保存
+        if (response?.user || response?.User) {
+          localStorage.setItem('user', JSON.stringify(response.user || response.User));
+        }
+        
+        message.success('Welcome back!');
+        navigate('/dashboard', { replace: true });
+      } else {
+        message.error('Login failed: No token received');
       }
-      
-      localStorage.setItem('token', token);
-      localStorage.setItem('isLoggedIn', 'true');
-      
-      message.success('Welcome back!');
-      navigate('/dashboard', { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed. Please check your credentials.';
+      // 显示错误提示
+      const errorMessage = 
+        error.response?.data?.error || 
+        error.response?.data?.message || 
+        error.message || 
+        'Login failed. Please check your credentials.';
       message.error(errorMessage);
     } finally {
       setLoading(false);

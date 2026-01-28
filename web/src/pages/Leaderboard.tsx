@@ -1,17 +1,18 @@
-import { Avatar, Card, Segmented, Space, Table } from 'antd';
+import { Avatar, Card, Segmented, Space, Table, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useMemo, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { mockLeaderboardData } from '../mock/data';
 import type { LeaderboardEntry } from '../types';
 import { getPoints, type PointsPeriod } from '../utils/points';
 import { TrophyFilled } from '@ant-design/icons';
 import './Leaderboard.module.css';
+import request from '../utils/request';
 
 const Leaderboard = () => {
   const location = useLocation();
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<LeaderboardEntry[]>([]);
   const [period, setPeriod] = useState<PointsPeriod>(() => {
-    // Check if defaultTab is passed from navigation state
     const defaultTab = (location.state as any)?.defaultTab;
     if (defaultTab && ['today', 'week', 'month', 'all'].includes(defaultTab)) {
       return defaultTab as PointsPeriod;
@@ -19,19 +20,31 @@ const Leaderboard = () => {
     return 'month';
   });
 
-  // Update period when location state changes
-  useEffect(() => {
-    const defaultTab = (location.state as any)?.defaultTab;
-    if (defaultTab && ['today', 'week', 'month', 'all'].includes(defaultTab)) {
-      setPeriod(defaultTab as PointsPeriod);
+  const fetchLeaderboard = async (currentPeriod: string) => {
+    setLoading(true);
+    try {
+      // 后端 API: /api/Leaderboard?period=...
+      const res: any = await request.get(`/api/Leaderboard`, {
+        params: { period: currentPeriod }
+      });
+      // 假设返回的是数组，或者在 res.items 中
+      const list = Array.isArray(res) ? res : res.items || [];
+      setData(list);
+    } catch (error: any) {
+      console.error('Failed to fetch leaderboard:', error);
+      message.error('Failed to load leaderboard data');
+    } finally {
+      setLoading(false);
     }
-  }, [location.state]);
+  };
+
+  useEffect(() => {
+    fetchLeaderboard(period);
+  }, [period]);
 
   const dataSource = useMemo(() => {
-    const sorted = [...mockLeaderboardData]
-      .sort((a, b) => getPoints(b, period) - getPoints(a, period));
-    return sorted.map((row, idx) => ({ ...row, rank: idx + 1 }));
-  }, [period]);
+    return data.map((row, idx) => ({ ...row, rank: idx + 1 }));
+  }, [data]);
 
   const columns: ColumnsType<LeaderboardEntry> = [
     {
@@ -69,12 +82,18 @@ const Leaderboard = () => {
       title: 'User',
       dataIndex: 'username',
       key: 'username',
-      render: (_: string, row) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Avatar src={row.avatarUrl} />
-          <span>{row.nickname}</span>
-        </div>
-      ),
+      render: (_: string, row) => {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const avatarSrc = row.avatarUrl 
+          ? (row.avatarUrl.startsWith('http') ? row.avatarUrl : `${baseUrl}${row.avatarUrl}`)
+          : undefined;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Avatar src={avatarSrc} />
+            <span>{row.nickname || row.username}</span>
+          </div>
+        );
+      },
     },
     {
       title: 'Points',
@@ -83,7 +102,7 @@ const Leaderboard = () => {
       render: (_, row) => (
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
           <span style={{ fontWeight: 700 }}>{getPoints(row, period)}</span>
-          <span style={{ fontSize: 12, color: '#999' }}>{row.emissions.toFixed(2)} kg CO₂e</span>
+          <span style={{ fontSize: 12, color: '#999' }}>{(row.emissions || 0).toFixed(2)} kg CO₂e</span>
         </div>
       ),
     },
@@ -111,7 +130,8 @@ const Leaderboard = () => {
           rowKey={(row) => row.username}
           columns={columns}
           dataSource={dataSource}
-          pagination={false}
+          loading={loading}
+          pagination={{ pageSize: 20 }}
         />
       </Card>
     </div>
