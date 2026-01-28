@@ -13,6 +13,7 @@ import Onboarding from './pages/Onboarding';
 import LogMeal from './pages/LogMeal';
 import LogTravel from './pages/LogTravel';
 import LogUtility from './pages/LogUtility';
+import TreePlanting from './pages/TreePlanting';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminLogin from './pages/AdminLogin';
@@ -110,6 +111,7 @@ const App: React.FC = () => {
               <Route path="/log-meal" element={<LogMeal />} />
               <Route path="/log-travel" element={<LogTravel />} />
               <Route path="/log-utility" element={<LogUtility />} />
+              <Route path="/tree-planting" element={<TreePlanting />} />
             </Route>
           </Route>
         </Routes>
