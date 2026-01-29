@@ -50,4 +50,15 @@ dependencies {
     implementation("com.google.android.libraries.places:places:3.3.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+    // Retrofit 核心库
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    // 添加 Gson 转换器（用于自动解析后端返回的 JSON）
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // (可选) 添加 OkHttp 日志拦截器，方便你在控制台看请求细节
+    implementation("com.squareup.okhttp3:logging-interceptor:4.10.0")
+    // 使用 lifecycleScope
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    // 在 ViewModel 里用协程
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 }

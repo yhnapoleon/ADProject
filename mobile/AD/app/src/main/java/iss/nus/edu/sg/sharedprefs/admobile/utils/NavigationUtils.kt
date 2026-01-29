@@ -1,10 +1,15 @@
-package iss.nus.edu.sg.sharedprefs.admobile
+package iss.nus.edu.sg.sharedprefs.admobile.utils
 
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.view.View
 import android.widget.ImageView
+import iss.nus.edu.sg.sharedprefs.admobile.R
+import iss.nus.edu.sg.sharedprefs.admobile.ui.activity.AiAssistantActivity
+import iss.nus.edu.sg.sharedprefs.admobile.ui.activity.LeaderboardActivity
+import iss.nus.edu.sg.sharedprefs.admobile.ui.activity.MainActivity
+import iss.nus.edu.sg.sharedprefs.admobile.ui.activity.ProfileActivity
 
 object NavigationUtils {
     fun setupBottomNavigation(activity: Activity, currentItemId: Int) {
