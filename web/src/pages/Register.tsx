@@ -86,7 +86,7 @@ const Register = () => {
       console.log('Register data:', registerData); // 调试用
 
       // 调用注册 API
-      await request.post('/api/Auth/register', registerData);
+      await request.post('/Auth/register', registerData);
 
       // 注册成功
       message.success('Registration successful! Please log in.');
