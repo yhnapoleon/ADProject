@@ -2,8 +2,12 @@ import { Button, Card, Form, Input, InputNumber, message, Space, Typography, Upl
 import type { UploadProps } from 'antd';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BrowserMultiFormatReader } from '@zxing/library';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat, NotFoundException, ChecksumException, FormatException } from '@zxing/library';
 import request from '../utils/request';
+
+type BarcodeScanResult = { barcode: string | null; failureReason?: 'not_found' | 'decode_failed' };
+
+const BARCODE_MAX_IMAGE_DIM = 1600;
 
 const { Title, Text } = Typography;
 
@@ -41,6 +45,8 @@ const LogMeal = () => {
   const [loading, setLoading] = useState(false);
   const [detectionType, setDetectionType] = useState<'barcode' | 'food' | null>(null);
   const [detectedInfo, setDetectedInfo] = useState<{ type: 'barcode' | 'food'; data: BarcodeResponse | VisionResponse } | null>(null);
+  const [manualBarcode, setManualBarcode] = useState('');
+  const [manualBarcodeLoading, setManualBarcodeLoading] = useState(false);
 
   // 注意：路由保护已经在 App.tsx 中通过 RequireUserAuth 处理
   // 这里不需要再次检查，避免与路由保护冲突导致循环跳转
@@ -73,30 +79,217 @@ const LogMeal = () => {
       img.src = URL.createObjectURL(file);
     });
 
-  // 尝试从图片中识别条形码
-  const scanBarcode = async (file: File): Promise<string | null> => {
-    let imageUrl: string | null = null;
+  /** 将图片按最长边缩放到 maxDim，大图更容易被 zxing 识别 */
+  const resizeImageToMaxDim = (img: HTMLImageElement, maxDim: number): Promise<HTMLImageElement> => {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (w <= maxDim && h <= maxDim) return Promise.resolve(img);
+    const scale = maxDim / Math.max(w, h);
+    const cw = Math.max(1, Math.round(w * scale));
+    const ch = Math.max(1, Math.round(h * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.resolve(img);
+    ctx.drawImage(img, 0, 0, cw, ch);
+    const dataUrl = canvas.toDataURL('image/png');
+    return new Promise((resolve, reject) => {
+      const scaled = new Image();
+      scaled.onload = () => resolve(scaled);
+      scaled.onerror = reject;
+      scaled.src = dataUrl;
+    });
+  };
+
+  /** 中心裁剪为原图的 factor 比例（如 0.85 即裁掉边缘约 7.5%），减少反光/杂物干扰 */
+  const centerCropImage = (img: HTMLImageElement, factor: number): Promise<HTMLImageElement> => {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const cw = Math.max(1, Math.round(w * factor));
+    const ch = Math.max(1, Math.round(h * factor));
+    const sx = (w - cw) / 2;
+    const sy = (h - ch) / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.resolve(img);
+    ctx.drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
+    const dataUrl = canvas.toDataURL('image/png');
+    return new Promise((resolve, reject) => {
+      const cropped = new Image();
+      cropped.onload = () => resolve(cropped);
+      cropped.onerror = reject;
+      cropped.src = dataUrl;
+    });
+  };
+
+  /** 灰度 + 对比度增强，缓解罐身曲面、反光导致 zxing 无法定位条形码 */
+  const preprocessForBarcode = (img: HTMLImageElement): Promise<HTMLImageElement> => {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.resolve(img);
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h);
+    const d = data.data;
+    let min = 255;
+    let max = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      d[i] = d[i + 1] = d[i + 2] = g;
+      if (g < min) min = g;
+      if (g > max) max = g;
+    }
+    const span = Math.max(1, max - min);
+    const contrast = 1.4;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = ((d[i] - min) / span) * 255;
+      const out = Math.round(128 + (v - 128) * contrast);
+      const c = Math.max(0, Math.min(255, out));
+      d[i] = d[i + 1] = d[i + 2] = c;
+    }
+    ctx.putImageData(data, 0, 0);
+    const dataUrl = canvas.toDataURL('image/png');
+    return new Promise((resolve, reject) => {
+      const out = new Image();
+      out.onload = () => resolve(out);
+      out.onerror = reject;
+      out.src = dataUrl;
+    });
+  };
+
+  /** 将图片旋转指定角度（90/180/270），返回新 Image。竖向条形码需旋转后才能被 zxing 识别 */
+  const rotateImage = (img: HTMLImageElement, degrees: 90 | 180 | 270): Promise<HTMLImageElement> => {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const canvas = document.createElement('canvas');
+    if (degrees === 180) {
+      canvas.width = w;
+      canvas.height = h;
+    } else {
+      canvas.width = h;
+      canvas.height = w;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return Promise.resolve(img);
+    const rad = (degrees * Math.PI) / 180;
+    const cw = canvas.width;
+    const ch = canvas.height;
+    ctx.save();
+    ctx.translate(cw / 2, ch / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    const dataUrl = canvas.toDataURL('image/png');
+    return new Promise((resolve, reject) => {
+      const rotated = new Image();
+      rotated.onload = () => resolve(rotated);
+      rotated.onerror = reject;
+      rotated.src = dataUrl;
+    });
+  };
+
+  /** 根据 zxing 异常区分：未找到条形码 vs 找到但无法解析数字 */
+  const getBarcodeFailureReason = (e: unknown): 'not_found' | 'decode_failed' | undefined => {
+    if (e instanceof NotFoundException) return 'not_found';
+    if (e instanceof ChecksumException || e instanceof FormatException) return 'decode_failed';
+    return undefined;
+  };
+
+  // 尝试从图片中识别条形码（多策略：EAN/UPC 优先 → 原图 → 缩放 → 旋转 → 预处理/中心裁剪 → dataURL）
+  const scanBarcode = async (file: File): Promise<BarcodeScanResult> => {
+    let objectUrl: string | null = null;
+    let lastReason: 'not_found' | 'decode_failed' | undefined;
     try {
-      const codeReader = new BrowserMultiFormatReader();
+      const hints = new Map<DecodeHintType, unknown>([
+        [DecodeHintType.TRY_HARDER, true],
+        [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E]],
+      ]);
+      const codeReader = new BrowserMultiFormatReader(hints);
       const img = await fileToImage(file);
-      imageUrl = img.src;
-      
-      // 使用图片元素直接识别条形码
-      const result = await codeReader.decodeFromImageElement(img);
-      
-      if (result && result.getText()) {
-        return result.getText();
+      objectUrl = img.src;
+
+      const tryDecodeFromElement = async (el: HTMLImageElement): Promise<string | null> => {
+        try {
+          const result = await codeReader.decodeFromImageElement(el);
+          return result?.getText() ?? null;
+        } catch (e) {
+          const r = getBarcodeFailureReason(e);
+          if (r) lastReason = r;
+          return null;
+        }
+      };
+
+      const tryDecodeFromUrl = async (url: string): Promise<string | null> => {
+        try {
+          const result = await codeReader.decodeFromImageUrl(url);
+          return result?.getText() ?? null;
+        } catch (e) {
+          const r = getBarcodeFailureReason(e);
+          if (r) lastReason = r;
+          return null;
+        }
+      };
+
+      // 1. 原图
+      let text = await tryDecodeFromElement(img);
+      if (text) return { barcode: text };
+
+      // 2. 大图缩放
+      let workImg: HTMLImageElement = img;
+      if (img.naturalWidth > BARCODE_MAX_IMAGE_DIM || img.naturalHeight > BARCODE_MAX_IMAGE_DIM) {
+        workImg = await resizeImageToMaxDim(img, BARCODE_MAX_IMAGE_DIM);
+        text = await tryDecodeFromElement(workImg);
+        if (text) return { barcode: text };
       }
-      return null;
+
+      // 3. 旋转 90°、180°、270°（竖向/倾斜条形码）
+      for (const deg of [90, 180, 270] as const) {
+        const rotated = await rotateImage(workImg, deg);
+        text = await tryDecodeFromElement(rotated);
+        if (text) return { barcode: text };
+      }
+
+      // 4. 灰度+对比度增强（罐身曲面、反光时 zxing 常无法定位条码，预处理可改善）
+      const preprocessed = await preprocessForBarcode(workImg);
+      text = await tryDecodeFromElement(preprocessed);
+      if (text) return { barcode: text };
+
+      // 5. 中心裁剪后再试（减少边缘反光、杂物干扰）
+      const cropped = await centerCropImage(workImg, 0.85);
+      text = await tryDecodeFromElement(cropped);
+      if (text) return { barcode: text };
+
+      // 6. 预处理 + 中心裁剪
+      const preprocessedCropped = await centerCropImage(preprocessed, 0.9);
+      text = await tryDecodeFromElement(preprocessedCropped);
+      if (text) return { barcode: text };
+
+      // 7. 预处理后的旋转
+      for (const deg of [90, 180, 270] as const) {
+        const rot = await rotateImage(preprocessed, deg);
+        text = await tryDecodeFromElement(rot);
+        if (text) return { barcode: text };
+      }
+
+      // 8. data URL
+      const dataUrl = await fileToBase64(file);
+      text = await tryDecodeFromUrl(dataUrl);
+      if (text) return { barcode: text };
+
+      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? '未检测到条形码' : '检测到条形码但无法解析数字');
+      return { barcode: null, failureReason: lastReason };
     } catch (error) {
-      // 条形码识别失败，返回null
       console.log('Barcode scan failed:', error);
-      return null;
+      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? '未检测到条形码' : '检测到条形码但无法解析数字');
+      return { barcode: null, failureReason: lastReason };
     } finally {
-      // 确保清理URL对象
-      if (imageUrl) {
-        URL.revokeObjectURL(imageUrl);
-      }
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     }
   };
 
@@ -118,6 +311,39 @@ const LogMeal = () => {
         message.error('条形码查询失败');
       }
       return null;
+    }
+  };
+
+  /** 罐装/曲面条形码识别不到时，可手动输入数字后查询 */
+  const handleManualBarcodeQuery = async () => {
+    const raw = manualBarcode.replace(/\s+/g, '').replace(/-/g, '');
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 14) {
+      message.warning('请输入 8～14 位条形码数字（如 EAN-13 为 13 位）');
+      return;
+    }
+    setManualBarcodeLoading(true);
+    try {
+      const info = await fetchBarcodeInfo(digits);
+      if (info) {
+        setDetectionType('barcode');
+        setDetectedInfo({ type: 'barcode', data: info });
+        form.setFieldsValue({
+          foodName: info.productName || info.carbonReferenceLabel || '',
+          co2Factor: info.co2Factor ?? undefined,
+        });
+        message.success(`已查询：${info.productName || info.carbonReferenceLabel || '未知产品'}`);
+      } else {
+        const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+        if (!token) {
+          message.error('登录已过期，请重新登录');
+          navigate('/login');
+        } else {
+          message.warning('未找到该条形码对应的产品信息');
+        }
+      }
+    } finally {
+      setManualBarcodeLoading(false);
     }
   };
 
@@ -166,7 +392,9 @@ const LogMeal = () => {
     
     try {
       // 先尝试识别条形码
-      const barcode = await scanBarcode(file as unknown as File);
+      const scanResult = await scanBarcode(file as unknown as File);
+      const barcode = scanResult.barcode;
+      const barcodeFailureReason = scanResult.failureReason;
       
       if (barcode) {
         setDetectionType('barcode');
@@ -216,14 +444,18 @@ const LogMeal = () => {
               }, 2000);
               return false;
             }
-            // 食物识别也失败，显示提示
             message.warning({ content: '未能识别图片内容，请手动输入', key: 'detecting' });
           }
         }
       } else {
         // 没有识别到条形码，尝试食物识别
         setDetectionType('food');
-        message.loading({ content: '未识别到条形码，正在识别食物...', key: 'detecting' });
+        const reasonHint = barcodeFailureReason === 'decode_failed'
+          ? '检测到条形码但无法解析数字，'
+          : barcodeFailureReason === 'not_found'
+            ? '未检测到条形码，'
+            : '';
+        message.loading({ content: `${reasonHint}正在识别食物...`, key: 'detecting', duration: 0 });
         
         const foodInfo = await recognizeFood(file as unknown as File);
         if (foodInfo) {
@@ -244,7 +476,12 @@ const LogMeal = () => {
             }, 2000);
             return false;
           }
-          message.warning({ content: '未能识别图片内容，请手动输入', key: 'detecting' });
+          const manualHint = barcodeFailureReason === 'decode_failed'
+            ? '检测到条形码但无法解析数字，请确保条形码清晰、完整、少反光，或只拍条形码区域重试。可手动输入条形码数字查询。'
+            : barcodeFailureReason === 'not_found'
+              ? '未检测到条形码；食物识别也未成功。罐装/曲面条码可手动输入条形码数字查询，或直接填写食物信息。'
+              : '未能识别图片内容，请手动输入。';
+          message.warning({ content: manualHint, key: 'detecting', duration: 6 });
         }
       }
     } catch (error: any) {
@@ -346,6 +583,40 @@ const LogMeal = () => {
             )}
           </div>
         </Upload>
+
+        {/* 罐装/曲面条形码识别不到时，可手动输入数字 */}
+        <div
+          style={{
+            marginTop: 12,
+            padding: '12px 14px',
+            background: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: 10,
+            fontSize: 13,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6, color: '#ad8b00' }}>
+            罐装 / 曲面条形码识别不到？手动输入条形码数字
+          </div>
+          <Space.Compact style={{ width: '100%' }}>
+            <Input
+              value={manualBarcode}
+              onChange={(e) => setManualBarcode(e.target.value)}
+              placeholder="如 8888200708696（可含空格）"
+              maxLength={20}
+              style={{ flex: 1 }}
+              onPressEnter={handleManualBarcodeQuery}
+            />
+            <Button
+              type="primary"
+              loading={manualBarcodeLoading}
+              onClick={handleManualBarcodeQuery}
+              style={{ background: '#faad14', borderColor: '#faad14' }}
+            >
+              查询
+            </Button>
+          </Space.Compact>
+        </div>
 
         {/* Detection result info */}
         {detectedInfo && detectedInfo.type === 'barcode' && (
