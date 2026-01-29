@@ -28,6 +28,7 @@ public class ApplicationDbContext : DbContext
 	public DbSet<BarcodeReference> BarcodeReferences => Set<BarcodeReference>(); // 新增
 	public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
 	public DbSet<FoodRecord> FoodRecords => Set<FoodRecord>();
+	public DbSet<DietRecord> DietRecords => Set<DietRecord>();
 
 	public override int SaveChanges()
 	{
@@ -95,6 +96,20 @@ public class ApplicationDbContext : DbContext
 			.HasForeignKey(a => a.CarbonReferenceId)
 			.OnDelete(DeleteBehavior.Restrict);
 
+		// FoodRecord -> ApplicationUser
+		modelBuilder.Entity<FoodRecord>()
+			.HasOne<ApplicationUser>()
+			.WithMany()
+			.HasForeignKey(f => f.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
+		// DietRecord -> ApplicationUser
+		modelBuilder.Entity<DietRecord>()
+			.HasOne<ApplicationUser>()
+			.WithMany()
+			.HasForeignKey(d => d.UserId)
+			.OnDelete(DeleteBehavior.Cascade);
+
 		// BarcodeReference -> CarbonReference
 		modelBuilder.Entity<BarcodeReference>()
 			.HasOne(b => b.CarbonReference!)
@@ -128,6 +143,14 @@ public class ApplicationDbContext : DbContext
 			.Property(p => p.EmissionFactor)
 			.HasColumnType("decimal(18,4)");
 		modelBuilder.Entity<FoodRecord>()
+			.Property(p => p.Emission)
+			.HasColumnType("decimal(18,4)");
+
+		// DietRecord precisions
+		modelBuilder.Entity<DietRecord>()
+			.Property(p => p.EmissionFactor)
+			.HasColumnType("decimal(18,4)");
+		modelBuilder.Entity<DietRecord>()
 			.Property(p => p.Emission)
 			.HasColumnType("decimal(18,4)");
 

@@ -3,6 +3,7 @@ using EcoLens.Api.DTOs.Food;
 using EcoLens.Api.Models;
 using EcoLens.Api.Models.Enums;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +19,12 @@ public class SimpleFoodController : ControllerBase
 	public SimpleFoodController(ApplicationDbContext db)
 	{
 		_db = db;
+	}
+
+	private int? GetUserId()
+	{
+		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
 	/// <summary>
@@ -68,6 +75,12 @@ public class SimpleFoodController : ControllerBase
 	{
 		if (!ModelState.IsValid) return ValidationProblem(ModelState);
 
+		var userId = GetUserId();
+		if (userId is null)
+		{
+			return Unauthorized();
+		}
+
 		// 可选校验：校验 name 是否在 CarbonReferences 中存在
 		var exists = await _db.CarbonReferences.AsNoTracking()
 			.AnyAsync(c => c.Category == CarbonCategory.Food && c.LabelName == req.Name, ct);
@@ -75,6 +88,7 @@ public class SimpleFoodController : ControllerBase
 		// 允许前端传自定义项；若不存在，依然保存
 		var record = new FoodRecord
 		{
+			UserId = userId.Value,
 			Name = req.Name,
 			Amount = req.Amount,
 			EmissionFactor = req.EmissionFactor,
