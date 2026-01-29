@@ -5,7 +5,10 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> <application
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <application
     android:allowBackup="true"
     android:dataExtractionRules="@xml/data_extraction_rules"
     android:fullBackupContent="@xml/backup_rules"
@@ -20,7 +23,7 @@
         android:value="AIzaSyCM7mWNDAl1ZzJ5Kw2eCdSpBwq_gqyNPr0" />
 
     <activity
-        android:name=".SplashActivity"
+        android:name=".ui.activity.SplashActivity"
         android:exported="true"
         android:theme="@style/Theme.ADMobile.NoActionBar">
         <intent-filter>
@@ -30,65 +33,73 @@
     </activity>
 
     <activity
-        android:name=".IntroActivity"
+        android:name=".ui.activity.IntroActivity"
         android:exported="false"
         android:theme="@style/Theme.ADMobile.NoActionBar" />
 
     <activity
-        android:name=".LoginActivity"
+        android:name=".ui.activity.LoginActivity"
         android:exported="false"
         android:theme="@style/Theme.ADMobile.NoActionBar" />
 
     <activity
-        android:name=".RegisterActivity"
+        android:name=".ui.activity.RegisterActivity"
         android:exported="false"
         android:theme="@style/Theme.ADMobile.NoActionBar" />
 
     <activity
-        android:name=".AddFoodActivity"
+        android:name=".ui.activity.AddFoodActivity"
         android:exported="false"
         android:theme="@style/Theme.ADMobile.NoActionBar" />
 
     <activity
-        android:name=".AddTravelActivity"
+        android:name=".ui.activity.AddTravelActivity"
         android:exported="false"
         android:theme="@style/Theme.ADMobile.NoActionBar" />
 
     <activity
-        android:name=".AddUtilityActivity"
+        android:name=".ui.activity.AddUtilityActivity"
         android:exported="false"
         android:theme="@style/Theme.ADMobile.NoActionBar" />
 
     <activity
-        android:name=".MainActivity"
+        android:name=".ui.activity.MainActivity"
         android:exported="true"
         android:windowSoftInputMode="adjustResize"/>
 
     <activity
-        android:name=".AiAssistantActivity"
+        android:name=".ui.activity.AiAssistantActivity"
         android:exported="false" />
 
     <activity
-        android:name=".LeaderboardActivity"
+        android:name=".ui.activity.LeaderboardActivity"
         android:exported="false" />
 
     <activity
-        android:name=".ProfileActivity"
+        android:name=".ui.activity.ProfileActivity"
         android:exported="false" />
 
     <activity
-        android:name=".TreePlantingActivity"
+        android:name=".ui.activity.TreePlantingActivity"
         android:exported="false"/>
 
     <activity
-        android:name=".ProfileStatsActivity"
+        android:name=".ui.activity.ProfileStatsActivity"
         android:exported="false"/>
 
     <activity
-        android:name=".EmissionRecordsActivity"
+        android:name=".ui.activity.EmissionRecordsActivity"
         android:exported="false"/>
 
-
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/file_paths" />
+    </provider>
 
 
 </application>

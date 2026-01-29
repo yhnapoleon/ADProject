@@ -154,8 +154,9 @@
         android:layout_margin="20dp"
         app:cardCornerRadius="20dp"
         app:cardElevation="2dp"
-        app:layout_constraintBottom_toTopOf="@+id/btn_edit_profile"
-        app:layout_constraintTop_toBottomOf="@id/card_history">
+        app:layout_constraintTop_toBottomOf="@id/card_history"
+        app:layout_constraintBottom_toTopOf="@+id/button_group">
+
 
         <ScrollView
             android:layout_width="match_parent"
@@ -179,20 +180,36 @@
         </ScrollView>
     </com.google.android.material.card.MaterialCardView>
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_edit_profile"
-        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+    <LinearLayout
+        android:id="@+id/button_group"
         android:layout_width="wrap_content"
-        android:layout_height="50dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
         android:layout_marginBottom="12dp"
-        android:paddingHorizontal="40dp"
-        android:text="Edit Profile"
-        android:textAllCaps="false"
-        app:backgroundTint="#674fa3"
-        app:cornerRadius="25dp"
         app:layout_constraintBottom_toTopOf="@id/bottom_navigation_container"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintStart_toStartOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_edit_profile"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="50dp"
+            android:paddingHorizontal="40dp"
+            android:text="Edit Profile"
+            android:textAllCaps="false"
+            app:backgroundTint="#674fa3"
+            app:cornerRadius="25dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_logout"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Logout"
+            android:textColor="#FF5252" />
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/bottom_navigation_container"

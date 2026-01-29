@@ -1,24 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#F4F4F6"
-    tools:context=".AddUtilityActivity">
+    android:background="#F4F4F6">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
         app:elevation="0dp">
-
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@android:drawable/ic_menu_revert"
             app:title="Add Utility Usage"
             app:titleCentered="true"/>
     </com.google.android.material.appbar.AppBarLayout>
@@ -36,96 +32,87 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/card_scan_bill"
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
-                app:cardBackgroundColor="@android:color/white"
+                android:layout_height="220dp"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="2dp"
                 android:clickable="true"
                 android:focusable="true">
 
-                <LinearLayout
+                <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:layout_height="match_parent">
 
                     <ImageView
                         android:id="@+id/iv_bill_preview"
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
-                        android:src="@android:drawable/ic_menu_camera"
-                        app:tint="#674fa3" />
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Scan Utility Bill"
-                        android:textColor="#674fa3"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                    <LinearLayout
+                        android:id="@+id/ll_scan_placeholder"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+                        <ImageView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@android:drawable/ic_menu_camera"
+                            app:tint="#674fa3" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Scan or Upload Utility Bill"
+                            android:textColor="#674fa3"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="Usage Details"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="#333333"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="Usage Details" android:textSize="18sp" android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="wrap_content"
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Billing Month" android:textStyle="bold"/>
+            <EditText
+                android:id="@+id/et_month"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Electricity (kWh)"
-                android:textStyle="bold"/>
+                android:layout_marginTop="8dp"
+                android:background="@android:drawable/editbox_background"
+                android:drawableEnd="@android:drawable/ic_menu_my_calendar"
+                android:focusable="false"
+                android:padding="12dp" />
 
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Electricity (kWh)" android:textStyle="bold"/>
             <EditText
                 android:id="@+id/et_electricity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:background="@android:drawable/editbox_background"
-                android:hint="Enter kWh or scan bill"
                 android:inputType="numberDecimal"
                 android:padding="12dp" />
+            <TextView android:id="@+id/tv_electricity_carbon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Carbon: 0.00 kg CO2e" android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/tv_electricity_carbon"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Carbon: 0.00 kg CO2e"
-                android:textColor="#757575"
-                android:textSize="13sp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Water (m³)"
-                android:textStyle="bold"/>
-
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Water (m³)" android:textStyle="bold"/>
             <EditText
                 android:id="@+id/et_water"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:background="@android:drawable/editbox_background"
-                android:hint="Enter m³ or scan bill"
                 android:inputType="numberDecimal"
                 android:padding="12dp" />
+            <TextView android:id="@+id/tv_water_carbon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Carbon: 0.00 kg CO2e" android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/tv_water_carbon"
-                android:layout_width="wrap_content"
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Notes (Optional)" android:textStyle="bold"/>
+            <EditText
+                android:id="@+id/et_notes"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Carbon: 0.00 kg CO2e"
-                android:textColor="#757575"
-                android:textSize="13sp" />
+                android:layout_marginTop="8dp"
+                android:background="@android:drawable/editbox_background"
+                android:hint="Extra details..."
+                android:padding="12dp" />
 
             <Button
                 android:id="@+id/save_button"
@@ -134,7 +121,6 @@
                 android:layout_marginTop="32dp"
                 android:text="Save Record"
                 android:backgroundTint="#674fa3"/>
-
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

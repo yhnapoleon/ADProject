@@ -1,4 +1,4 @@
-package iss.nus.edu.sg.sharedprefs.admobile
+package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,6 +11,8 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import iss.nus.edu.sg.sharedprefs.admobile.ui.activity.LoginActivity
+import iss.nus.edu.sg.sharedprefs.admobile.R
 
 data class IntroItem(val title: String, val description: String, val imageResId: Int)
 

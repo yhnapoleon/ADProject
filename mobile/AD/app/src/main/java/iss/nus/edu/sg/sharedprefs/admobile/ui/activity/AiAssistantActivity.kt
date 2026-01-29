@@ -1,4 +1,4 @@
-package iss.nus.edu.sg.sharedprefs.admobile
+package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.os.Bundle
 import android.os.Handler
@@ -6,10 +6,14 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.*
+import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import iss.nus.edu.sg.sharedprefs.admobile.utils.NavigationUtils
+import iss.nus.edu.sg.sharedprefs.admobile.R
 
 // 数据模型
 data class ChatMessage(val content: String, val isBot: Boolean)

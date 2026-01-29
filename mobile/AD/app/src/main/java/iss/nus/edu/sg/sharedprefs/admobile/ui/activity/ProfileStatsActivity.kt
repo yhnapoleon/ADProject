@@ -1,17 +1,28 @@
-package iss.nus.edu.sg.sharedprefs.admobile
+package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.PieChart
+import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.*
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.data.PieData
+import com.github.mikephil.charting.data.PieDataSet
+import com.github.mikephil.charting.data.PieEntry
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import iss.nus.edu.sg.sharedprefs.admobile.R
 
 class ProfileStatsActivity : AppCompatActivity() {
 
@@ -26,7 +37,7 @@ class ProfileStatsActivity : AppCompatActivity() {
         window.statusBarColor = Color.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
-        val toolbar = findViewById<com.google.android.material.appbar.MaterialToolbar>(R.id.toolbar)
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
         toolbar.setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()
         }
@@ -34,6 +45,7 @@ class ProfileStatsActivity : AppCompatActivity() {
         setupLineChart()
         setupPieChart()
         setupTimeRangeSpinner() // 🌟 初始化选择器
+
     }
 
     private fun setupTimeRangeSpinner() {
@@ -110,7 +122,8 @@ class ProfileStatsActivity : AppCompatActivity() {
 
         lineChart.xAxis.apply {
             position = XAxis.XAxisPosition.BOTTOM
-            valueFormatter = IndexAxisValueFormatter(arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"))
+            valueFormatter =
+                IndexAxisValueFormatter(arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"))
             setDrawGridLines(false)
             granularity = 1f
         }
@@ -129,11 +142,30 @@ class ProfileStatsActivity : AppCompatActivity() {
             isDrawHoleEnabled = false
             description.isEnabled = false
             legend.isEnabled = true
-            legend.verticalAlignment = com.github.mikephil.charting.components.Legend.LegendVerticalAlignment.BOTTOM
-            legend.horizontalAlignment = com.github.mikephil.charting.components.Legend.LegendHorizontalAlignment.CENTER
+            legend.verticalAlignment = Legend.LegendVerticalAlignment.BOTTOM
+            legend.horizontalAlignment = Legend.LegendHorizontalAlignment.CENTER
         }
 
         // 初始填充一次 All Time 数据
         updatePieChartData("All Time")
+    }
+
+    private fun performLogout() {
+        // 1. 清除 SharedPreferences 中的登录状态
+        val prefs = getSharedPreferences("EcoLensPrefs", MODE_PRIVATE)
+        prefs.edit().clear().apply() // 🌟 清空所有数据，包括 Token 和用户名
+
+        // 2. 提示用户
+        Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show()
+
+        // 3. 跳转回登录页面
+        val intent = Intent(this, LoginActivity::class.java)
+
+        // 🌟 关键：清空 Activity 栈，防止用户按返回键又回到 Profile 页面
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+
+        // 4. 销毁当前页面
+        finish()
     }
 }

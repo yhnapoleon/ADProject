@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#F4F4F6"
-    tools:context=".MainActivity">
+    tools:context=".ui.activity.MainActivity">
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/main_content"
@@ -126,17 +126,12 @@
                             app:layout_constraintTop_toTopOf="parent">
 
                             <TextView
+                                android:id="@+id/tv_total_emissions"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="0.00 kg"
                                 android:textSize="32sp"
                                 android:textStyle="bold"
-                                android:textColor="@android:color/white"/>
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="This month: 0.00 kg"
                                 android:textColor="@android:color/white"/>
 
                         </LinearLayout>
@@ -191,6 +186,7 @@
                                         android:textColor="@android:color/white" />
                                 </LinearLayout>
                                 <TextView
+                                    android:id="@+id/tv_food_value"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="8dp"
@@ -233,6 +229,7 @@
                                         android:textColor="@android:color/white" />
                                 </LinearLayout>
                                 <TextView
+                                    android:id="@+id/tv_travel_value"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="8dp"
@@ -274,6 +271,7 @@
                                         android:textColor="@android:color/white" />
                                 </LinearLayout>
                                 <TextView
+                                    android:id="@+id/tv_utility_value"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="8dp"

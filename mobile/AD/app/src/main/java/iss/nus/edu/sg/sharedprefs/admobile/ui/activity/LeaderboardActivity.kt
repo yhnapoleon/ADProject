@@ -1,15 +1,16 @@
-package iss.nus.edu.sg.sharedprefs.admobile
+package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.appbar.MaterialToolbar
+import iss.nus.edu.sg.sharedprefs.admobile.utils.NavigationUtils
+import iss.nus.edu.sg.sharedprefs.admobile.R
 
 class LeaderboardActivity : AppCompatActivity() {
 
@@ -55,22 +56,22 @@ class LeaderboardActivity : AppCompatActivity() {
             // 选中 Daily
             tvDaily.setBackgroundResource(R.drawable.shape_tab_selected)
             tvDaily.setTextColor(Color.parseColor("#674fa3"))
-            tvDaily.setTypeface(null, android.graphics.Typeface.BOLD)
+            tvDaily.setTypeface(null, Typeface.BOLD)
 
             // 取消选中 Monthly
             tvMonthly.setBackground(null)
             tvMonthly.setTextColor(Color.WHITE)
-            tvMonthly.setTypeface(null, android.graphics.Typeface.NORMAL)
+            tvMonthly.setTypeface(null, Typeface.NORMAL)
         } else {
             // 选中 Monthly
             tvMonthly.setBackgroundResource(R.drawable.shape_tab_selected)
             tvMonthly.setTextColor(Color.parseColor("#674fa3"))
-            tvMonthly.setTypeface(null, android.graphics.Typeface.BOLD)
+            tvMonthly.setTypeface(null, Typeface.BOLD)
 
             // 取消选中 Daily
             tvDaily.setBackground(null)
             tvDaily.setTextColor(Color.WHITE)
-            tvDaily.setTypeface(null, android.graphics.Typeface.NORMAL)
+            tvDaily.setTypeface(null, Typeface.NORMAL)
         }
     }
 
