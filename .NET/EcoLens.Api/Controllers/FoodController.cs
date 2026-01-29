@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Claims;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs;
 using EcoLens.Api.DTOs.Food;
@@ -19,11 +20,19 @@ public class FoodController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
 	private readonly IVisionService _visionService;
+	private readonly ILogger<FoodController> _logger;
 
-	public FoodController(ApplicationDbContext db, IVisionService visionService)
+	public FoodController(ApplicationDbContext db, IVisionService visionService, ILogger<FoodController> logger)
 	{
 		_db = db;
 		_visionService = visionService;
+		_logger = logger;
+	}
+
+	private int? GetUserId()
+	{
+		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
 	/// <summary>
@@ -74,6 +83,129 @@ public class FoodController : ControllerBase
 		};
 
 		return Ok(result);
+	}
+
+	/// <summary>
+	/// 集成式流程：上传图片 + 分量，后端识别名称、计算总排放并入库，返回最终结果。
+	/// - multipart/form-data: image, quantity, unit, note?
+	/// - 返回：name, amount(kg), emissionFactor, emission, createdAt
+	/// </summary>
+	[HttpPost("ingest-from-image")]
+	[Consumes("multipart/form-data")]
+	public async Task<ActionResult<FoodSimpleCalcResponse>> IngestFromImage([FromForm] IFormFile image, [FromForm] double quantity, [FromForm] string unit, [FromForm] string? note, CancellationToken ct)
+	{
+		if (image == null || image.Length == 0) return BadRequest("未上传图片。");
+		if (quantity < 0) return BadRequest("Quantity 必须为非负数。");
+
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		var vision = await _visionService.PredictAsync(image, ct);
+		var food = await FindFoodCarbonReferenceAsync(vision.Label, ct);
+		if (food is null) return NotFound($"未找到食物：{vision.Label} 的碳因子。");
+
+		// 计算总排放
+		var inputUnit = NormalizeUnit(unit);
+		var factorUnit = NormalizeUnit(food.Unit);
+		var normalizedQuantity = ConvertToFactorUnit(vision.Label, quantity, inputUnit, factorUnit);
+		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
+		var total = (decimal)normalizedQuantity * food.Co2Factor;
+
+		// 入库（amount 统一保存为 kg）
+		var amountKg = ToKilograms(vision.Label, quantity, inputUnit);
+		if (amountKg < 0) return BadRequest("份量换算失败（kg）。");
+
+		var record = new FoodRecord
+		{
+			UserId = userId.Value,
+			Name = food.LabelName,
+			Amount = amountKg,
+			EmissionFactor = food.Co2Factor,
+			Emission = Math.Round(total, 6),
+			Note = note
+		};
+		await _db.FoodRecords.AddAsync(record, ct);
+		await _db.SaveChangesAsync(ct);
+
+		return Ok(new FoodSimpleCalcResponse
+		{
+			Name = record.Name,
+			Quantity = quantity,
+			EmissionFactor = record.EmissionFactor,
+			Emission = record.Emission
+		});
+	}
+
+	/// <summary>
+	/// 集成式流程：前端直接传名称 + 分量，后端计算并入库后仅返回最终结果。
+	/// - JSON: { name, quantity, unit, note? }
+	/// </summary>
+	[HttpPost("ingest-by-name")]
+	public async Task<ActionResult<FoodSimpleCalcResponse>> IngestByName([FromBody] FoodIngestByNameRequest req, CancellationToken ct)
+	{
+		if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		var food = await FindFoodCarbonReferenceAsync(req.Name, ct);
+		if (food is null) return NotFound($"未找到食物：{req.Name} 的碳因子。");
+
+		var inputUnit = NormalizeUnit(req.Unit);
+		var factorUnit = NormalizeUnit(food.Unit);
+		var normalizedQuantity = ConvertToFactorUnit(req.Name, req.Quantity, inputUnit, factorUnit);
+		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
+		var total = (decimal)normalizedQuantity * food.Co2Factor;
+
+		var amountKg = ToKilograms(req.Name, req.Quantity, inputUnit);
+		if (amountKg < 0) return BadRequest("份量换算失败（kg）。");
+
+		var record = new FoodRecord
+		{
+			UserId = userId.Value,
+			Name = food.LabelName,
+			Amount = amountKg,
+			EmissionFactor = food.Co2Factor,
+			Emission = Math.Round(total, 6),
+			Note = req.Note
+		};
+		await _db.FoodRecords.AddAsync(record, ct);
+		await _db.SaveChangesAsync(ct);
+
+		return Ok(new FoodSimpleCalcResponse
+		{
+			Name = record.Name,
+			Quantity = req.Quantity,
+			EmissionFactor = record.EmissionFactor,
+			Emission = record.Emission
+		});
+	}
+
+	/// <summary>
+	/// 前端传名称+分量，后端只计算（不入库），返回最小结果：name, quantity, emissionFactor, emission。
+	/// </summary>
+	[HttpPost("calculate-simple")]
+	public async Task<ActionResult<FoodSimpleCalcResponse>> CalculateSimple([FromBody] FoodCalculateSimpleRequest req, CancellationToken ct)
+	{
+		if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+		var food = await FindFoodCarbonReferenceAsync(req.Name, ct);
+		if (food is null) return NotFound($"未找到食物：{req.Name} 的碳因子。");
+
+		var inputUnit = NormalizeUnit(req.Unit);
+		var factorUnit = NormalizeUnit(food.Unit);
+		var normalizedQuantity = ConvertToFactorUnit(req.Name, req.Quantity, inputUnit, factorUnit);
+		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
+
+		var total = (decimal)normalizedQuantity * food.Co2Factor;
+
+		return Ok(new FoodSimpleCalcResponse
+		{
+			Name = food.LabelName,
+			Quantity = req.Quantity,
+			EmissionFactor = food.Co2Factor,
+			Emission = Math.Round(total, 6)
+		});
 	}
 
 	/// <summary>
@@ -201,6 +333,22 @@ public class FoodController : ControllerBase
 			"kg" => grams / 1000.0,
 			_ => -1
 		};
+	}
+
+	/// <summary>
+	/// 将输入数量转换为 kg（入库统一单位）。
+	/// </summary>
+	private static double ToKilograms(string foodName, double quantity, string inputUnit)
+	{
+		double grams = inputUnit switch
+		{
+			"g" => quantity,
+			"kg" => quantity * 1000.0,
+			"portion" => MapPortionToGrams(foodName, quantity),
+			_ => -1
+		};
+		if (grams < 0) return -1;
+		return grams / 1000.0;
 	}
 
 	/// <summary>
