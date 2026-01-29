@@ -10,12 +10,12 @@ namespace EcoLens.Api.Services;
 public interface IUtilityBillService
 {
 	/// <summary>
-	/// 上传账单文件并自动处理（OCR识别 → 数据提取 → 碳排放计算 → 保存）
+	/// 上传账单文件并识别（OCR识别 → 数据提取 → 碳排放计算，不保存到数据库）
 	/// </summary>
 	/// <param name="userId">用户ID</param>
 	/// <param name="file">账单文件（图片或PDF）</param>
 	/// <param name="ct">取消令牌</param>
-	/// <returns>处理后的账单响应DTO</returns>
+	/// <returns>识别后的账单响应DTO（Id = 0 表示还未保存，用户确认后需调用 manual 接口保存）</returns>
 	Task<UtilityBillResponseDto> UploadAndProcessBillAsync(int userId, IFormFile file, CancellationToken ct = default);
 
 	/// <summary>

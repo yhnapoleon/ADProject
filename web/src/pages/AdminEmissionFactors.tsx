@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import request from '../utils/request';
 import './AdminEmissionFactors.css';
 
@@ -39,6 +39,8 @@ const AdminEmissionFactors: React.FC = () => {
   const [editingStatuses, setEditingStatuses] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** 全量因子列表缓存，用于 Add/Import 时的重复校验（避免分页漏检） */
+  const allFactorsRef = useRef<EmissionFactor[] | null>(null);
 
   // 从排放因子数据中提取唯一的分类
   const extractCategories = (factors: EmissionFactor[]): string[] => {
@@ -131,6 +133,46 @@ const AdminEmissionFactors: React.FC = () => {
     if (status === 'Review Pending') return 'review-pending';
     if (status === 'Draft') return 'draft';
     return '';
+  };
+
+  /** 拉取全量因子列表（分页请求直到取完），用于重复校验；结果缓存在 allFactorsRef */
+  const ensureAllFactorsLoaded = async (): Promise<EmissionFactor[]> => {
+    if (allFactorsRef.current) return allFactorsRef.current;
+    const pageSize = 100;
+    let page = 1;
+    const all: EmissionFactor[] = [];
+    let total = 0;
+    do {
+      const res: any = await request.get('/admin/emission-factors', {
+        params: { page, pageSize },
+      });
+      const raw = res as any;
+      const items: EmissionFactor[] = raw?.items ?? raw?.data ?? (Array.isArray(raw) ? raw : []);
+      total = typeof raw === 'object' && !Array.isArray(raw) ? raw?.total ?? items.length : items.length;
+      all.push(...items);
+      if (items.length < pageSize || all.length >= total) break;
+      page += 1;
+    } while (true);
+    allFactorsRef.current = all;
+    return all;
+  };
+
+  /** 检查 (itemName, category) 是否在列表中已存在；list 不传则用当前页 factors */
+  const isDuplicateItemNameCategory = (
+    itemName: string,
+    category: string,
+    excludeId?: string,
+    list?: EmissionFactor[]
+  ): boolean => {
+    const n = (itemName || '').trim().toLowerCase();
+    const c = (category || '').trim();
+    const target = list ?? factors;
+    return target.some(
+      (f) =>
+        f.id !== excludeId &&
+        (f.itemName || '').trim().toLowerCase() === n &&
+        (f.category || '').trim() === c
+    );
   };
 
   const handleAddNew = () => {
@@ -242,6 +284,7 @@ const AdminEmissionFactors: React.FC = () => {
     setError(null);
     try {
       await request.delete(`/admin/emission-factors/${factor.id}`);
+      allFactorsRef.current = null;
       setFactors(factors.filter((f) => f.id !== factor.id));
       setTotalFactors((prev) => Math.max(0, prev - 1));
     } catch (e: any) {
@@ -258,12 +301,24 @@ const AdminEmissionFactors: React.FC = () => {
   };
 
   const handleSaveNew = async () => {
-    if (newFactor.id && newFactor.itemName && newFactor.factor !== undefined) {
+    if (newFactor.itemName && newFactor.factor !== undefined) {
+      const itemName = (newFactor.itemName || '').trim();
+      const category = newFactor.category || 'Food';
       try {
-        const payload: EmissionFactor = {
-          id: newFactor.id,
-          category: newFactor.category || 'Food',
-          itemName: newFactor.itemName,
+        const fullList = await ensureAllFactorsLoaded();
+        if (isDuplicateItemNameCategory(itemName, category, undefined, fullList)) {
+          alert('Item Name and Category cannot duplicate an existing emission factor. Please use a different name or category.');
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load full list for duplicate check:', e);
+        alert('Could not validate duplicates. Please try again.');
+        return;
+      }
+      try {
+        const payload = {
+          category,
+          itemName,
           factor: newFactor.factor,
           unit: newFactor.unit || 'kg CO2/kg',
           source: newFactor.source || '',
@@ -274,6 +329,7 @@ const AdminEmissionFactors: React.FC = () => {
         const created: any = await request.post('/admin/emission-factors', payload);
         const createdFactor = (created as any) ?? payload;
         setFactors([...factors, createdFactor as EmissionFactor]);
+        allFactorsRef.current = null;
         setNewFactor({
           id: '',
           category: 'Food',
@@ -297,31 +353,66 @@ const AdminEmissionFactors: React.FC = () => {
     }
   };
 
-  const handleBulkImportSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleBulkImportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput && fileInput.files && fileInput.files[0]) {
-      const file = fileInput.files[0];
-      const formData = new FormData();
-      formData.append('file', file);
-
-      request
-        .post('/admin/emission-factors/import', formData)
-        .then((res: any) => {
-          const importedCount = res?.importedCount ?? res?.imported ?? 0;
-          alert(`Imported ${importedCount} factors successfully.`);
-          setShowBulkImportModal(false);
-          fetchFactors();
-        })
-        .catch((err: any) => {
-          console.error('Failed to import emission factors:', err);
-          alert(
-            err?.response?.data?.error ||
-              err?.response?.data?.message ||
-              err?.message ||
-              'Error importing file. Please check the file format.'
-          );
-        });
+    if (!fileInput?.files?.[0]) return;
+    const file = fileInput.files[0];
+    try {
+      const text = await file.text();
+      const items: Array<{ itemName?: string; category?: string }> = JSON.parse(text);
+      if (!Array.isArray(items)) {
+        alert('File must be a JSON array.');
+        return;
+      }
+      const seen = new Set<string>();
+      let fullList: EmissionFactor[];
+      try {
+        fullList = await ensureAllFactorsLoaded();
+      } catch (err) {
+        console.error('Failed to load full list for duplicate check:', err);
+        alert('Could not validate duplicates. Please try again.');
+        return;
+      }
+      for (let i = 0; i < items.length; i++) {
+        const itemName = (items[i].itemName ?? '').trim().toLowerCase();
+        const category = (items[i].category ?? '').trim();
+        if (!itemName || !category) continue;
+        const key = `${itemName}|${category}`;
+        if (seen.has(key)) {
+          alert(`Duplicate (Item Name + Category) in file: "${items[i].itemName}" / ${category} (row ${i + 1}).`);
+          return;
+        }
+        seen.add(key);
+        if (isDuplicateItemNameCategory(items[i].itemName ?? '', category, undefined, fullList)) {
+          alert(`Row ${i + 1} duplicates an existing factor: "${items[i].itemName}" / ${category}.`);
+          return;
+        }
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('JSON')) {
+        alert('Invalid JSON file.');
+        return;
+      }
+      throw err;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res: any = await request.post('/admin/emission-factors/import', formData);
+      const importedCount = res?.importedCount ?? res?.imported ?? 0;
+      allFactorsRef.current = null;
+      alert(`Imported ${importedCount} factors successfully.`);
+      setShowBulkImportModal(false);
+      fetchFactors();
+    } catch (err: any) {
+      console.error('Failed to import emission factors:', err);
+      alert(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Error importing file. Please check the file format.'
+      );
     }
   };
 
@@ -341,7 +432,7 @@ const AdminEmissionFactors: React.FC = () => {
             </>
           ) : (
             <>
-              <button className="btn-primary" onClick={handleEditModeToggle}>✏️ Edit</button>
+              <button className="btn-primary" onClick={handleEditModeToggle}>Edit</button>
               <button className="btn-primary" onClick={handleAddNew}>+ Add New</button>
               <button className="btn-secondary" onClick={handleBulkImport}>Bulk Import</button>
             </>
@@ -379,15 +470,6 @@ const AdminEmissionFactors: React.FC = () => {
               <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label>ID *</label>
-                <input
-                  type="text"
-                  value={newFactor.id}
-                  onChange={(e) => setNewFactor({ ...newFactor, id: e.target.value })}
-                  placeholder="e.g., EF-046"
-                />
-              </div>
               <div className="form-group">
                 <label>Category *</label>
                 <select
@@ -474,9 +556,9 @@ const AdminEmissionFactors: React.FC = () => {
             <div className="modal-body">
               <form onSubmit={handleBulkImportSubmit}>
                 <div className="form-group">
-                  <label>Select File (CSV or JSON)</label>
-                  <input type="file" accept=".csv,.json" required />
-                  <p className="form-hint">Upload a CSV or JSON file containing emission factor data.</p>
+                  <label>Select File (JSON)</label>
+                  <input type="file" accept=".json" required />
+                  <p className="form-hint">Upload a JSON file containing emission factor data.</p>
                 </div>
                 <div className="modal-footer">
                   <button type="button" className="btn-secondary" onClick={() => setShowBulkImportModal(false)}>Cancel</button>
@@ -492,6 +574,7 @@ const AdminEmissionFactors: React.FC = () => {
         {loading ? (
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading emission factors...</div>
         ) : (
+          <div className="table-scroll-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -600,6 +683,7 @@ const AdminEmissionFactors: React.FC = () => {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

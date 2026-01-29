@@ -166,7 +166,7 @@ const AdminUserList: React.FC = () => {
             </>
           ) : (
             <button onClick={handleEditModeToggle} className="action-btn edit-btn">
-              ✏️ Edit
+              Edit
             </button>
           )}
         </div>
@@ -198,6 +198,7 @@ const AdminUserList: React.FC = () => {
         {loading ? (
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading users...</div>
         ) : (
+          <div className="table-scroll-wrap">
           <table className="data-table">
             <thead>
               <tr>
@@ -259,6 +260,7 @@ const AdminUserList: React.FC = () => {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

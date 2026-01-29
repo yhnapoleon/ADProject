@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 // @ts-ignore - GeoJSON 文件导入
 import singaporeGeoJsonUrl from '../assets/Singapore.geojson?url';
@@ -76,6 +77,7 @@ const geoJsonToPath = (coordinates: any[], center: [number, number], scale: numb
 };
 
 const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [geoData, setGeoData] = useState<any>(null);
   const [regionData, setRegionData] = useState<Record<string, RegionData>>({});
   const [bounds, setBounds] = useState<{ minX: number; maxX: number; minY: number; maxY: number; center: [number, number]; scale: number } | null>(null);
@@ -262,7 +264,13 @@ const AdminDashboard: React.FC = () => {
       <h1 className="page-title">Community Macro-Monitoring</h1>
       
       <div className="stats-cards">
-        <div className="stat-card">
+        <div
+          className="stat-card stat-card-clickable"
+          onClick={() => navigate('/admin/users')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/users')}
+        >
           <h3>Total Eco-Users</h3>
           <div className="stat-value">
             {loading ? 'Loading...' : stats.totalUsers.toLocaleString()}
@@ -271,7 +279,13 @@ const AdminDashboard: React.FC = () => {
             {stats.userGrowth > 0 ? `+${stats.userGrowth}% this week` : 'Database Updated'}
           </div>
         </div>
-        <div className="stat-card">
+        <div
+          className="stat-card stat-card-clickable"
+          onClick={() => navigate('/admin/community-analytics')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/community-analytics')}
+        >
           <h3>Carbon Reduced</h3>
           <div className="stat-value">
             {loading ? 'Loading...' : `${stats.totalCarbonReduced.toLocaleString()} kg`}
@@ -280,7 +294,13 @@ const AdminDashboard: React.FC = () => {
             {stats.carbonGrowth > 0 ? `+${stats.carbonGrowth}% this week` : 'Database Updated'}
           </div>
         </div>
-        <div className="stat-card">
+        <div
+          className="stat-card stat-card-clickable"
+          onClick={() => navigate('/admin/emission-factors')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/emission-factors')}
+        >
           <h3>Active Factors</h3>
           <div className="stat-value">
             {loading ? 'Loading...' : stats.activeFactors.toLocaleString()}
@@ -315,16 +335,19 @@ const AdminDashboard: React.FC = () => {
                       clearTimeout(tooltipTimeoutRef.current);
                       tooltipTimeoutRef.current = null;
                     }
-                    
-                    if (tooltip) {
-                      const containerRect = e.currentTarget.closest('.singapore-map-container')?.getBoundingClientRect();
-                      if (containerRect) {
-                        setTooltip({
-                          ...tooltip,
-                          x: e.clientX - containerRect.left,
-                          y: e.clientY - containerRect.top,
-                        });
-                      }
+                    const containerRect = e.currentTarget.closest('.singapore-map-container')?.getBoundingClientRect();
+                    if (!containerRect) return;
+                    const x = e.clientX - containerRect.left;
+                    const y = e.clientY - containerRect.top;
+                    const target = e.target as SVGElement;
+                    const path = target.closest?.('path.region-path') as SVGPathElement | null;
+                    if (path) {
+                      const regionCode = path.getAttribute('data-region-code') ?? '';
+                      const regionName = path.getAttribute('data-region-name') ?? '';
+                      const data = regionData[regionCode] ?? null;
+                      setTooltip({ regionCode, regionName, data, x, y });
+                    } else {
+                      setTooltip(prev => prev ? { ...prev, x, y } : null);
                     }
                   }}
                 >
@@ -500,7 +523,13 @@ const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="table-card">
+      <div
+        className="table-card table-card-clickable"
+        onClick={() => navigate('/admin/emission-factors')}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/emission-factors')}
+      >
         <h3>Emission Factor Database (Recent Updates)</h3>
         {loading ? (
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading emission factors...</div>
