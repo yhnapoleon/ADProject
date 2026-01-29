@@ -35,7 +35,7 @@ const AdminUserList: React.FC = () => {
         },
       });
 
-      const items: User[] = Array.isArray(res) ? res : res?.items || res?.data || res || [];
+      const items: User[] = (Array.isArray(res) ? res : res?.items || res?.data || res || []) as User[];
       const total = typeof res === 'object' && !Array.isArray(res) ? (res?.total || items.length) : items.length;
       setUsers(items);
       setTotalUsers(total);
@@ -57,11 +57,13 @@ const AdminUserList: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter((user) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      user.username.toLowerCase().includes(term) ||
+      user.email.toLowerCase().includes(term)
+    );
+  });
 
   const handleEditModeToggle = () => {
     if (!isEditMode) {

@@ -34,6 +34,11 @@ const AdminEmissionFactors: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>(['All']);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingFactors, setEditingFactors] = useState<Record<string, number>>({});
+  const [editingStatuses, setEditingStatuses] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // 从排放因子数据中提取唯一的分类
   const extractCategories = (factors: EmissionFactor[]): string[] => {
@@ -50,7 +55,7 @@ const AdminEmissionFactors: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await request.get('/admin/emission-factors', {
+      const res: any = await request.get('/admin/emission-factors', {
         params: {
           q: searchTerm || undefined,
           category: selectedCategory === 'All' ? undefined : selectedCategory,
@@ -59,10 +64,11 @@ const AdminEmissionFactors: React.FC = () => {
         },
       });
 
-      const items: EmissionFactor[] = Array.isArray(res)
-        ? res
-        : res?.items || res?.data || [];
-      const total = typeof res === 'object' && !Array.isArray(res) ? (res?.total || items.length) : items.length;
+      const raw = res as any;
+      const items: EmissionFactor[] = Array.isArray(raw)
+        ? raw
+        : raw?.items || raw?.data || raw || [];
+      const total = typeof raw === 'object' && !Array.isArray(raw) ? (raw?.total || items.length) : items.length;
       setFactors(items);
       setTotalFactors(total);
       // 从数据中提取分类列表
@@ -85,15 +91,16 @@ const AdminEmissionFactors: React.FC = () => {
     const loadCategories = async () => {
       try {
         // 加载所有数据（不筛选）以获取所有分类
-        const res = await request.get('/admin/emission-factors', {
+        const res: any = await request.get('/admin/emission-factors', {
           params: {
             page: 1,
             pageSize: 1000, // 获取足够多的数据以提取所有分类
           },
         });
-        const items: EmissionFactor[] = Array.isArray(res)
-          ? res
-          : res?.items || res?.data || [];
+        const raw = res as any;
+        const items: EmissionFactor[] = Array.isArray(raw)
+          ? raw
+          : raw?.items || raw?.data || [];
         setCategories(extractCategories(items));
       } catch (e) {
         console.error('Failed to load categories:', e);
@@ -134,6 +141,122 @@ const AdminEmissionFactors: React.FC = () => {
     setShowBulkImportModal(true);
   };
 
+  const handleEditModeToggle = () => {
+    if (!isEditMode) {
+      // Enter edit mode, save current factors and statuses
+      const factorsMap: Record<string, number> = {};
+      const statusesMap: Record<string, string> = {};
+      filteredFactors.forEach(factor => {
+        factorsMap[factor.id] = factor.factor;
+        statusesMap[factor.id] = factor.status;
+      });
+      setEditingFactors(factorsMap);
+      setEditingStatuses(statusesMap);
+    }
+    setIsEditMode(!isEditMode);
+  };
+
+  const handleFactorChange = (factorId: string, value: number) => {
+    setEditingFactors({
+      ...editingFactors,
+      [factorId]: value
+    });
+  };
+
+  const handleStatusChange = (factorId: string, value: string) => {
+    setEditingStatuses({
+      ...editingStatuses,
+      [factorId]: value
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updatePromises = filteredFactors.map(async (factor) => {
+        const newFactor = editingFactors[factor.id];
+        const newStatus = editingStatuses[factor.id];
+        
+        // Only update if there are changes
+        if (newFactor === undefined && newStatus === undefined) {
+          return null;
+        }
+
+        const payload: Partial<EmissionFactor> = {};
+        if (newFactor !== undefined && newFactor !== factor.factor) {
+          payload.factor = newFactor;
+        }
+        if (newStatus !== undefined && newStatus !== factor.status) {
+          payload.status = newStatus;
+        }
+
+        if (Object.keys(payload).length === 0) {
+          return null;
+        }
+
+        try {
+          const updated = await request.put(`/admin/emission-factors/${factor.id}`, payload);
+          return { id: factor.id, updated };
+        } catch (e: any) {
+          console.error(`Failed to update factor ${factor.id}:`, e);
+          throw new Error(`Failed to update ${factor.itemName}: ${e?.response?.data?.message || e?.message || 'Unknown error'}`);
+        }
+      });
+
+      const results = await Promise.all(updatePromises);
+      const successCount = results.filter(r => r !== null).length;
+      
+      if (successCount > 0) {
+        // Refresh the list to get updated data
+        await fetchFactors();
+        setIsEditMode(false);
+        setEditingFactors({});
+        setEditingStatuses({});
+        alert(`Successfully updated ${successCount} emission factor(s).`);
+      }
+    } catch (e: any) {
+      console.error('Failed to save emission factors:', e);
+      setError(
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        e?.message ||
+        'Failed to save emission factor updates.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditMode(false);
+    setEditingFactors({});
+    setEditingStatuses({});
+  };
+
+  const handleDelete = async (factor: EmissionFactor) => {
+    if (!window.confirm(`Are you sure you want to delete "${factor.itemName}" (ID: ${factor.id})? This action cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(factor.id);
+    setError(null);
+    try {
+      await request.delete(`/admin/emission-factors/${factor.id}`);
+      setFactors(factors.filter((f) => f.id !== factor.id));
+      setTotalFactors((prev) => Math.max(0, prev - 1));
+    } catch (e: any) {
+      console.error('Failed to delete emission factor:', e);
+      setError(
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        e?.message ||
+        'Failed to delete emission factor.'
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleSaveNew = async () => {
     if (newFactor.id && newFactor.itemName && newFactor.factor !== undefined) {
       try {
@@ -148,8 +271,9 @@ const AdminEmissionFactors: React.FC = () => {
           lastUpdated: newFactor.lastUpdated || new Date().toISOString().split('T')[0],
         };
 
-        const created = await request.post('/admin/emission-factors', payload);
-        setFactors([...factors, (created as EmissionFactor) || payload]);
+        const created: any = await request.post('/admin/emission-factors', payload);
+        const createdFactor = (created as any) ?? payload;
+        setFactors([...factors, createdFactor as EmissionFactor]);
         setNewFactor({
           id: '',
           category: 'Food',
@@ -206,8 +330,22 @@ const AdminEmissionFactors: React.FC = () => {
       <div className="page-header">
         <h1 className="page-title">Emission Factor Database {totalFactors > 0 && `(${totalFactors} total)`}</h1>
         <div className="action-buttons">
-          <button className="btn-primary" onClick={handleAddNew}>+ Add New</button>
-          <button className="btn-secondary" onClick={handleBulkImport}>Bulk Import</button>
+          {isEditMode ? (
+            <>
+              <button className="btn-primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : '✓ Save'}
+              </button>
+              <button className="btn-secondary" onClick={handleCancel}>
+                ✕ Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn-primary" onClick={handleEditModeToggle}>✏️ Edit</button>
+              <button className="btn-primary" onClick={handleAddNew}>+ Add New</button>
+              <button className="btn-secondary" onClick={handleBulkImport}>Bulk Import</button>
+            </>
+          )}
         </div>
       </div>
 
@@ -394,6 +532,7 @@ const AdminEmissionFactors: React.FC = () => {
                 <th>Source/Ref</th>
                 <th>Status</th>
                 <th>Last Updated</th>
+                {isEditMode && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -403,20 +542,58 @@ const AdminEmissionFactors: React.FC = () => {
                     <td>{factor.id}</td>
                     <td>{factor.category}</td>
                     <td>{factor.itemName}</td>
-                    <td>{factor.factor}</td>
+                    <td className="factor-cell">
+                      {isEditMode ? (
+                        <input
+                          type="number"
+                          step="0.001"
+                          value={editingFactors[factor.id] !== undefined ? editingFactors[factor.id] : factor.factor}
+                          onChange={(e) => handleFactorChange(factor.id, Number(e.target.value))}
+                          className="factor-input"
+                          min="0"
+                        />
+                      ) : (
+                        <span className="factor-value">{factor.factor}</span>
+                      )}
+                    </td>
                     <td>{factor.unit}</td>
                     <td>{factor.source}</td>
-                    <td>
-                      <span className={`status-badge ${getStatusClass(factor.status)}`}>
-                        {factor.status}
-                      </span>
+                    <td className="status-cell">
+                      {isEditMode ? (
+                        <select
+                          value={editingStatuses[factor.id] !== undefined ? editingStatuses[factor.id] : factor.status}
+                          onChange={(e) => handleStatusChange(factor.id, e.target.value)}
+                          className="status-select"
+                        >
+                          <option value="Draft">Draft</option>
+                          <option value="Review Pending">Review Pending</option>
+                          <option value="Published">Published</option>
+                        </select>
+                      ) : (
+                        <span className={`status-badge ${getStatusClass(factor.status)}`}>
+                          {factor.status}
+                        </span>
+                      )}
                     </td>
                     <td>{factor.lastUpdated}</td>
+                    {isEditMode && (
+                      <td className="actions-cell">
+                        <button
+                          type="button"
+                          className="btn-delete"
+                          onClick={() => handleDelete(factor)}
+                          disabled={deletingId === factor.id}
+                          title="Delete this emission factor"
+                        >
+                          {deletingId === factor.id ? 'Deleting...' : '🗑 Delete'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '20px' }}>
+                  <td colSpan={isEditMode ? 9 : 8} style={{ textAlign: 'center', padding: '20px' }}>
                     No emission factors found.
                   </td>
                 </tr>
