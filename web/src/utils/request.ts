@@ -1,12 +1,20 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
+const rawBase = import.meta.env.VITE_API_URL;
+const baseURL = rawBase ? rawBase.replace(/\/$/, '') : '/api';
+
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL,
   timeout: 10000,
 });
 
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Normalize to avoid duplicated /api when baseURL already contains /api
+    if (config.url && baseURL && baseURL.endsWith('/api') && config.url.startsWith('/api')) {
+      config.url = config.url.replace(/^\/api/, '');
+    }
+
     // 从localStorage获取token并添加到请求头
     const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
     if (token) {
