@@ -196,7 +196,7 @@ const Profile = () => {
       const hasLetter = hasLower || hasUpper;
       const mediumOrAbove = pwd.length >= 9 && hasLetter && hasDigit;
       if (!mediumOrAbove) {
-        message.error('密码强度不足（至少 9 位，含字母与数字）');
+        message.error('Password is too weak (at least 9 characters, including letters and numbers).');
         return;
       }
     }
@@ -453,7 +453,7 @@ const Profile = () => {
                   <Input placeholder="Enter your email" />
                 </Form.Item>
                 <Form.Item label="Password" name="password">
-                  <Input.Password placeholder="Leave blank to keep current password" />
+                  <Input.Password placeholder="Enter new password if you want to change it" />
                 </Form.Item>
                 <div style={{ marginTop: -8, marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 6 }}>

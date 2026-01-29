@@ -49,12 +49,27 @@ const Login = () => {
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        'Login failed. Please check your credentials.';
-      message.error(errorMessage);
+
+      const resp = error.response;
+      const respData = resp?.data;
+      const serverMsg = (respData?.error || respData?.message || '') as string;
+
+      // 优先根据 HTTP 状态码判断，再回退到服务器返回的信息关键词
+      if (resp) {
+        if (resp.status === 404 || /not\s+found|no\s+account|user\s+not\s+found/i.test(serverMsg)) {
+          message.error('No account found with this email');
+        } else if (resp.status === 403 || /banned|disabled|forbidden/i.test(serverMsg)) {
+          message.error('Your account has been banned');
+        } else if (resp.status === 401 || /invalid|incorrect|password|credentials/i.test(serverMsg)) {
+          message.error('Incorrect email or password');
+        } else {
+          const fallback = serverMsg || error.message || 'Login failed. Please check your credentials.';
+          message.error(fallback);
+        }
+      } else {
+        // 非 HTTP 响应错误（网络等）
+        message.error(error.message || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
