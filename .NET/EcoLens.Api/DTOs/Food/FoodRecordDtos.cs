@@ -37,4 +37,4 @@ public class FoodRecordResponseDto
 	public decimal EmissionFactor { get; set; }
 	public decimal Emission { get; set; }
 }
-*** End Patch*** }|()
+

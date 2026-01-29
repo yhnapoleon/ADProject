@@ -132,4 +132,4 @@ public class FoodRecordsController : ControllerBase
 			Emission = r.Emission
 		};
 }
-*** End Patch ***!
+
