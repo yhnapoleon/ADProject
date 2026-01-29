@@ -93,7 +93,7 @@ const AdminLogin: React.FC = () => {
           </div>
 
           <button type="submit" className="login-button">
-            Sign In
+            Login In
           </button>
         </form>
       </div>

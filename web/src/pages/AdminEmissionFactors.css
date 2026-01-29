@@ -304,3 +304,66 @@
   font-size: 12px;
   color: #666;
 }
+
+.factor-cell,
+.status-cell {
+  position: relative;
+}
+
+.factor-input,
+.status-select {
+  width: 100%;
+  min-width: 80px;
+  padding: 6px 8px;
+  font-size: 14px;
+  border: 1px solid #4CAF50;
+  border-radius: 4px;
+  outline: none;
+  background-color: white;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.factor-input:focus,
+.status-select:focus {
+  border-color: #45a049;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
+.factor-value {
+  display: inline-block;
+  padding: 4px 0;
+}
+
+.factors-error {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.actions-cell {
+  white-space: nowrap;
+}
+
+.btn-delete {
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #c62828;
+  background-color: white;
+  border: 1px solid #ef5350;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background-color: #ffebee;
+  color: #b71c1c;
+}
+
+.btn-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
