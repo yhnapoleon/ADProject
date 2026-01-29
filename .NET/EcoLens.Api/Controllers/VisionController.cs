@@ -23,8 +23,9 @@ public class VisionController : ControllerBase
 	/// </summary>
 	[HttpPost("analyze")]
 	[Consumes("multipart/form-data")]
-	public async Task<ActionResult<VisionPredictionResponseDto>> Analyze([FromForm] IFormFile image, CancellationToken ct)
+	public async Task<ActionResult<VisionPredictionResponseDto>> Analyze([FromForm] ImageUploadRequest request, CancellationToken ct)
 	{
+		var image = request.Image;
 		if (image == null || image.Length == 0)
 		{
 			return BadRequest("No image uploaded.");
@@ -53,28 +54,5 @@ public class VisionController : ControllerBase
 		}
 	}
 
-	/// <summary>
-	/// 路由别名：/api/vision/recognize（与前端文档对齐）。
-	/// </summary>
-	[HttpPost("/api/vision/recognize")]
-	[Consumes("multipart/form-data")]
-	public Task<ActionResult<VisionPredictionResponseDto>> Recognize([FromForm] IFormFile image, CancellationToken ct)
-		=> Analyze(image, ct);
-
-	/// <summary>
-	/// 路由别名：/api/vision/meal-detect（与前端文档对齐）。
-	/// </summary>
-	[HttpPost("/api/vision/meal-detect")]
-	[Consumes("multipart/form-data")]
-	public Task<ActionResult<VisionPredictionResponseDto>> MealDetect([FromForm] IFormFile image, CancellationToken ct)
-		=> Analyze(image, ct);
-
-	/// <summary>
-	/// 路由别名：/api/vision/meal-photo（与前端文档对齐）。
-	/// </summary>
-	[HttpPost("/api/vision/meal-photo")]
-	[Consumes("multipart/form-data")]
-	public Task<ActionResult<VisionPredictionResponseDto>> MealPhoto([FromForm] IFormFile image, CancellationToken ct)
-		=> Analyze(image, ct);
 }
 
