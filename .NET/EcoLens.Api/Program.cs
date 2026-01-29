@@ -184,6 +184,18 @@ builder.Services.AddScoped<EcoLens.Api.Services.Caching.IGeocodingCacheService, 
 // External API services
 builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
 builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>();
+builder.Services.AddHttpClient<IAiService, GeminiService>((sp, client) =>
+{
+	var options = sp.GetRequiredService<IOptions<AiSettings>>().Value;
+	var baseUrl = (options.BaseUrl ?? string.Empty).TrimEnd('/');
+	if (!string.IsNullOrWhiteSpace(baseUrl))
+	{
+		client.BaseAddress = new Uri(baseUrl + "/");
+	}
+
+	// 可按需调整
+	client.Timeout = TimeSpan.FromSeconds(60);
+});
 
 // Vision settings binding & HttpClient
 builder.Services.Configure<VisionSettings>(configuration.GetSection("Vision"));
