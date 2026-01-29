@@ -37,18 +37,19 @@ public class UtilityBillController : ControllerBase
 	}
 
 	/// <summary>
-	/// 上传账单文件并自动处理（OCR识别 → 数据提取 → 碳排放计算 → 保存）
+	/// 上传账单文件并识别（OCR识别 → 数据提取 → 碳排放计算，不保存到数据库）
 	/// </summary>
 	/// <remarks>
 	/// 上传账单文件（支持图片：JPG、PNG、BMP、WEBP，或PDF文件），系统会自动识别账单内容，
-	/// 提取用量数据和账单周期，计算碳排放，并保存到数据库。
+	/// 提取用量数据和账单周期，计算碳排放，但**不保存到数据库**。识别结果返回给用户确认后，
+	/// 用户需调用 `/api/utilitybill/manual` 接口保存到数据库。
 	/// 
 	/// **处理流程：**
 	/// 1. 文件验证（类型、大小）
 	/// 2. OCR识别（Google Cloud Vision API）
 	/// 3. 数据提取（从OCR文本中提取用量、日期等）
 	/// 4. 碳排放计算（根据用量和排放因子）
-	/// 5. 保存到数据库
+	/// 5. 返回识别结果（Id = 0 表示还未保存）
 	/// 
 	/// **支持的文件格式：**
 	/// - 图片：JPG、JPEG、PNG、BMP、WEBP
@@ -59,16 +60,17 @@ public class UtilityBillController : ControllerBase
 	/// 
 	/// **示例请求：**
 	/// ```
-	/// POST /api/utility-bills/upload
+	/// POST /api/utilitybill/upload
 	/// Content-Type: multipart/form-data
 	/// 
 	/// file: [账单图片或PDF文件]
 	/// ```
 	/// 
 	/// **注意事项：**
+	/// - 识别后不会自动保存，返回的响应中 Id = 0
+	/// - 用户确认识别结果后，需调用 `/api/utilitybill/manual` 接口保存
 	/// - 如果OCR识别失败，会返回错误，建议使用手动输入
 	/// - 如果数据提取不完整，会返回错误，建议使用手动输入补充
-	/// - 上传的文件不会保存，只保存提取的数据
 	/// </remarks>
 	/// <param name="dto">上传账单文件的请求数据</param>
 	/// <param name="ct">取消令牌</param>
@@ -130,15 +132,20 @@ public class UtilityBillController : ControllerBase
 		=> Upload(dto, ct);
 
 	/// <summary>
-	/// 手动创建账单（碳排放计算 → 保存）
+	/// 手动创建账单或保存识别结果（碳排放计算 → 保存）
 	/// </summary>
 	/// <remarks>
-	/// 手动输入账单数据，系统会自动计算碳排放并保存到数据库。
+	/// 手动输入账单数据，或保存通过 `/api/utilitybill/upload` 识别后的结果。
+	/// 系统会自动计算碳排放并保存到数据库。
 	/// 
 	/// **处理流程：**
 	/// 1. 输入验证（日期范围、用量等）
 	/// 2. 碳排放计算（根据用量和排放因子）
 	/// 3. 保存到数据库
+	/// 
+	/// **使用场景：**
+	/// - 场景1：用户手动输入账单数据
+	/// - 场景2：用户上传账单图片识别后，确认识别结果并保存
 	/// 
 	/// **账单类型说明：**
 	/// - 0: 电费（Electricity）
@@ -155,8 +162,8 @@ public class UtilityBillController : ControllerBase
 	/// ```json
 	/// {
 	///   "billType": 0,
-	///   "billPeriodStart": "2024-01-01T00:00:00",
-	///   "billPeriodEnd": "2024-01-31T23:59:59",
+	///   "billPeriodStart": "2024-01-01",
+	///   "billPeriodEnd": "2024-01-31",
 	///   "electricityUsage": 150.5,
 	///   "waterUsage": null,
 	///   "gasUsage": null
