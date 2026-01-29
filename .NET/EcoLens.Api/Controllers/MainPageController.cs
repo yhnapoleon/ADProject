@@ -42,14 +42,33 @@ public class MainPageController : ControllerBase
 		var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
 		var nextMonth = monthStart.AddMonths(1);
 
-		var logs = await _db.ActivityLogs
+		// 查询 ActivityLogs（食物、工具等）
+		var activityLogs = await _db.ActivityLogs
 			.Where(l => l.UserId == userId.Value && l.CreatedAt >= monthStart && l.CreatedAt < nextMonth)
 			.Include(l => l.CarbonReference)
 			.ToListAsync(ct);
 
-		var food = logs.Where(l => l.CarbonReference!.Category == CarbonCategory.Food).Sum(l => l.TotalEmission);
-		var transport = logs.Where(l => l.CarbonReference!.Category == CarbonCategory.Transport).Sum(l => l.TotalEmission);
-		var utility = logs.Where(l => l.CarbonReference!.Category == CarbonCategory.Utility).Sum(l => l.TotalEmission);
+		// 查询 TravelLogs（出行记录）
+		var travelLogs = await _db.TravelLogs
+			.Where(t => t.UserId == userId.Value && t.CreatedAt >= monthStart && t.CreatedAt < nextMonth)
+			.ToListAsync(ct);
+
+		// 计算各类别的碳排放
+		var food = activityLogs
+			.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Food)
+			.Sum(l => l.TotalEmission);
+
+		// Transport 包括 ActivityLogs 中的 Transport 和所有 TravelLogs
+		var transportFromActivities = activityLogs
+			.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Transport)
+			.Sum(l => l.TotalEmission);
+		
+		var transportFromTravel = travelLogs.Sum(t => t.CarbonEmission);
+		var transport = transportFromActivities + transportFromTravel;
+
+		var utility = activityLogs
+			.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Utility)
+			.Sum(l => l.TotalEmission);
 
 		return Ok(new MainPageStatsDto
 		{
