@@ -32,6 +32,7 @@ public class AboutController : ControllerBase
 		public decimal Food { get; set; }
 		public decimal Transport { get; set; }
 		public decimal Utility { get; set; }
+		public decimal AverageAllUsers { get; set; }
 	}
 
 	[HttpGet]
@@ -49,6 +50,12 @@ public class AboutController : ControllerBase
 			.Include(l => l.CarbonReference)
 			.ToListAsync(ct);
 
+		// 所有用户在该时间窗的记录（用于计算“所有用户的平均碳排放（按月、按人均）”）
+		var allLogs = await _db.ActivityLogs
+			.Where(l => l.CreatedAt >= startMonth && l.CreatedAt < endMonth.AddMonths(1))
+			.Select(l => new { l.UserId, l.TotalEmission, l.CreatedAt })
+			.ToListAsync(ct);
+
 		var result = new List<MonthlyEmissionDto>(12);
 		for (int i = 0; i < 12; i++)
 		{
@@ -60,13 +67,29 @@ public class AboutController : ControllerBase
 			decimal transport = monthLogs.Where(l => l.CarbonReference!.Category == CarbonCategory.Transport).Sum(l => l.TotalEmission);
 			decimal utility = monthLogs.Where(l => l.CarbonReference!.Category == CarbonCategory.Utility).Sum(l => l.TotalEmission);
 
+			// 计算该月“所有用户的平均碳排放”：先按用户汇总当月总排放，再对用户总排放取平均
+			var allMonthLogs = allLogs.Where(l => l.CreatedAt >= mStart && l.CreatedAt < mEnd).ToList();
+			decimal avgAllUsers = 0m;
+			if (allMonthLogs.Count > 0)
+			{
+				var perUserTotals = allMonthLogs
+					.GroupBy(x => x.UserId)
+					.Select(g => g.Sum(x => x.TotalEmission))
+					.ToList();
+				if (perUserTotals.Count > 0)
+				{
+					avgAllUsers = perUserTotals.Average();
+				}
+			}
+
 			result.Add(new MonthlyEmissionDto
 			{
 				Month = mStart.ToString("yyyy-MM"),
 				EmissionsTotal = food + transport + utility,
 				Food = food,
 				Transport = transport,
-				Utility = utility
+				Utility = utility,
+				AverageAllUsers = avgAllUsers
 			});
 		}
 

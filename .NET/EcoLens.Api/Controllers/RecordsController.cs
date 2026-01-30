@@ -44,38 +44,80 @@ public class RecordsController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var items = await _db.ActivityLogs
+		// 获取 ActivityLogs（食物和水电记录）
+		var activityItems = await _db.ActivityLogs
 			.Where(l => l.UserId == userId.Value)
 			.Include(l => l.CarbonReference)
 			.OrderByDescending(l => l.CreatedAt)
 			.Select(l => new RecordItemDto
 			{
-				Id = l.Id.ToString(),
+				Id = "activity_" + l.Id.ToString(),
 				Date = l.CreatedAt.ToString("yyyy-MM-dd"),
 				Type = l.CarbonReference!.Category,
 				Amount = l.TotalEmission,
-				Unit = "kg CO2e",
+				Unit = "kg CO₂e",
 				Description = l.DetectedLabel ?? l.CarbonReference!.LabelName
 			})
 			.ToListAsync(ct);
 
-		return Ok(items);
+		// 获取 TravelLogs（出行记录）
+		var travelItems = await _db.TravelLogs
+			.Where(l => l.UserId == userId.Value)
+			.OrderByDescending(l => l.CreatedAt)
+			.Select(l => new RecordItemDto
+			{
+				Id = "travel_" + l.Id.ToString(),
+				Date = l.CreatedAt.ToString("yyyy-MM-dd"),
+				Type = CarbonCategory.Transport,
+				Amount = l.CarbonEmission,
+				Unit = "kg CO₂e",
+				Description = l.OriginAddress + " → " + l.DestinationAddress + " (" + l.TransportMode.ToString() + ")"
+			})
+			.ToListAsync(ct);
+
+		// 合并并按日期排序
+		var allItems = activityItems.Concat(travelItems)
+			.OrderByDescending(x => x.Date)
+			.ToList();
+
+		return Ok(allItems);
 	}
 
 	/// <summary>
 	/// 删除指定记录（仅限当前用户的记录）。
+	/// 支持删除 ActivityLog 和 TravelLog。
+	/// ID格式：activity_123 或 travel_456
 	/// </summary>
-	[HttpDelete("{id:int}")]
-	public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken ct)
+	[HttpDelete("{id}")]
+	public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
 	{
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var log = await _db.ActivityLogs.FirstOrDefaultAsync(l => l.Id == id && l.UserId == userId.Value, ct);
-		if (log is null) return NotFound();
+		// 解析ID前缀，确定记录类型
+		if (id.StartsWith("activity_"))
+		{
+			var activityId = int.Parse(id.Replace("activity_", ""));
+			var log = await _db.ActivityLogs.FirstOrDefaultAsync(l => l.Id == activityId && l.UserId == userId.Value, ct);
+			if (log is null) return NotFound();
 
-		_db.ActivityLogs.Remove(log);
-		await _db.SaveChangesAsync(ct);
-		return NoContent();
+			_db.ActivityLogs.Remove(log);
+			await _db.SaveChangesAsync(ct);
+			return NoContent();
+		}
+		else if (id.StartsWith("travel_"))
+		{
+			var travelId = int.Parse(id.Replace("travel_", ""));
+			var log = await _db.TravelLogs.FirstOrDefaultAsync(l => l.Id == travelId && l.UserId == userId.Value, ct);
+			if (log is null) return NotFound();
+
+			_db.TravelLogs.Remove(log);
+			await _db.SaveChangesAsync(ct);
+			return NoContent();
+		}
+		else
+		{
+			return BadRequest(new { error = "Invalid ID format. Expected format: activity_123 or travel_456" });
+		}
 	}
 }

@@ -72,6 +72,22 @@ public class LeaderboardController : ControllerBase
 		return Ok(ranked);
 	}
 
+	/// <summary>
+	/// 今日排行榜（等价于 /api/Leaderboard?period=today）
+	/// </summary>
+	[HttpGet("today")]
+	[AllowAnonymous]
+	public async Task<ActionResult<IEnumerable<object>>> GetToday([FromQuery] int limit = 50, CancellationToken ct = default)
+		=> await Get("today", limit, ct);
+
+	/// <summary>
+	/// 月度排行榜（等价于 /api/Leaderboard?period=month）
+	/// </summary>
+	[HttpGet("month")]
+	[AllowAnonymous]
+	public async Task<ActionResult<IEnumerable<object>>> GetMonth([FromQuery] int limit = 50, CancellationToken ct = default)
+		=> await Get("month", limit, ct);
+
 	private int? GetUserId()
 	{
 		var id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
