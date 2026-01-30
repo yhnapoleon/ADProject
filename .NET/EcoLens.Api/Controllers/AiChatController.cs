@@ -30,6 +30,7 @@ public class AiChatController : ControllerBase
 		public string Reply { get; set; } = string.Empty;
 	}
 
+	[AllowAnonymous]
 	[HttpPost("chat")]
 	public async Task<ActionResult<ChatResponseDto>> Chat([FromBody] ChatRequestDto dto, CancellationToken ct)
 	{
@@ -56,6 +57,7 @@ public class AiChatController : ControllerBase
 		public bool? Stream { get; set; }
 	}
 
+	[AllowAnonymous]
 	[HttpPost("/api/assistant/chat")]
 	public async Task<ActionResult<object>> AssistantChat([FromBody] MessagesChatRequestDto req, CancellationToken ct)
 	{
