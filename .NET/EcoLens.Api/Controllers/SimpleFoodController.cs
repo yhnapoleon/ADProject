@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace EcoLens.Api.Controllers;
 
@@ -15,10 +17,12 @@ namespace EcoLens.Api.Controllers;
 public class SimpleFoodController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
+	private readonly IHttpClientFactory _httpClientFactory;
 
-	public SimpleFoodController(ApplicationDbContext db)
+	public SimpleFoodController(ApplicationDbContext db, IHttpClientFactory httpClientFactory)
 	{
 		_db = db;
+		_httpClientFactory = httpClientFactory;
 	}
 
 	private int? GetUserId()
@@ -102,14 +106,43 @@ public class SimpleFoodController : ControllerBase
 		return Ok(new AddFoodResponse { Success = true });
 	}
 
-	private async Task<Models.CarbonReference?> FindFoodByNameAsync(string name, CancellationToken ct)
+	private class CarbonFactorSimple
 	{
-		var query = _db.CarbonReferences.AsNoTracking().Where(c => c.Category == CarbonCategory.Food);
-		var exact = await query.FirstOrDefaultAsync(c => c.LabelName.Equals(name, StringComparison.OrdinalIgnoreCase), ct);
-		if (exact != null) return exact;
+		public string LabelName { get; set; } = string.Empty;
+		public decimal Co2Factor { get; set; }
+		public string Unit { get; set; } = string.Empty;
+	}
 
-		return await query.OrderBy(c => c.LabelName.Length)
-			.FirstOrDefaultAsync(c => c.LabelName.ToLower().Contains(name.ToLower()), ct);
+	private class LookupDto
+	{
+		public int Id { get; set; }
+		public string LabelName { get; set; } = string.Empty;
+		public string Unit { get; set; } = string.Empty;
+		public decimal Co2Factor { get; set; }
+	}
+
+	private async Task<CarbonFactorSimple?> FindFoodByNameAsync(string name, CancellationToken ct)
+	{
+		if (string.IsNullOrWhiteSpace(name)) return null;
+
+		// 调用统一查找 API：/api/carbon/lookup?label=...
+		var baseUri = $"{Request.Scheme}://{Request.Host.Value}";
+		var url = $"{baseUri}/api/carbon/lookup?label={Uri.EscapeDataString(name)}";
+		var client = _httpClientFactory.CreateClient();
+		using var resp = await client.GetAsync(url, ct);
+		if (!resp.IsSuccessStatusCode) return null;
+
+		await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+		var items = await JsonSerializer.DeserializeAsync<List<LookupDto>>(stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+		var item = items?.FirstOrDefault();
+		if (item == null) return null;
+
+		return new CarbonFactorSimple
+		{
+			LabelName = item.LabelName,
+			Co2Factor = item.Co2Factor,
+			Unit = item.Unit
+		};
 	}
 }
 

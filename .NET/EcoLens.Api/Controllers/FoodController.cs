@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace EcoLens.Api.Controllers;
 
@@ -21,12 +23,14 @@ public class FoodController : ControllerBase
 	private readonly ApplicationDbContext _db;
 	private readonly IVisionService _visionService;
 	private readonly ILogger<FoodController> _logger;
+	private readonly IHttpClientFactory _httpClientFactory;
 
-	public FoodController(ApplicationDbContext db, IVisionService visionService, ILogger<FoodController> logger)
+	public FoodController(ApplicationDbContext db, IVisionService visionService, ILogger<FoodController> logger, IHttpClientFactory httpClientFactory)
 	{
 		_db = db;
 		_visionService = visionService;
 		_logger = logger;
+		_httpClientFactory = httpClientFactory;
 	}
 
 	private int? GetUserId()
@@ -54,7 +58,7 @@ public class FoodController : ControllerBase
 			return BadRequest("FoodName is required.");
 		}
 
-		var food = await FindFoodCarbonReferenceAsync(name, ct);
+		var food = await FindFoodCarbonFactorAsync(name, ct);
 		if (food is null)
 		{
 			return NotFound($"未找到食物：{name} 的碳因子。");
@@ -101,7 +105,7 @@ public class FoodController : ControllerBase
 		if (userId is null) return Unauthorized();
 
 		var vision = await _visionService.PredictAsync(req.File, ct);
-		var food = await FindFoodCarbonReferenceAsync(vision.Label, ct);
+		var food = await FindFoodCarbonFactorAsync(vision.Label, ct);
 		if (food is null) return NotFound($"未找到食物：{vision.Label} 的碳因子。");
 
 		// 计算总排放
@@ -148,7 +152,7 @@ public class FoodController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var food = await FindFoodCarbonReferenceAsync(req.Name, ct);
+		var food = await FindFoodCarbonFactorAsync(req.Name, ct);
 		if (food is null) return NotFound($"未找到食物：{req.Name} 的碳因子。");
 
 		var inputUnit = NormalizeUnit(req.Unit);
@@ -189,7 +193,7 @@ public class FoodController : ControllerBase
 	{
 		if (!ModelState.IsValid) return ValidationProblem(ModelState);
 
-		var food = await FindFoodCarbonReferenceAsync(req.Name, ct);
+		var food = await FindFoodCarbonFactorAsync(req.Name, ct);
 		if (food is null) return NotFound($"未找到食物：{req.Name} 的碳因子。");
 
 		var inputUnit = NormalizeUnit(req.Unit);
@@ -250,7 +254,7 @@ public class FoodController : ControllerBase
 		req.Unit ??= "g";
 
 		var vision = await _visionService.PredictAsync(req.File, ct);
-		var food = await FindFoodCarbonReferenceAsync(vision.Label, ct);
+		var food = await FindFoodCarbonFactorAsync(vision.Label, ct);
 		if (food is null)
 		{
 			return NotFound($"未找到食物：{vision.Label} 的碳因子。");
@@ -279,23 +283,53 @@ public class FoodController : ControllerBase
 		return Ok(result);
 	}
 
-	private async Task<CarbonReference?> FindFoodCarbonReferenceAsync(string foodName, CancellationToken ct)
+	private class CarbonFactorSimple
 	{
-		// 优先精确匹配（不区分大小写），其次包含匹配
-		var query = _db.CarbonReferences
-			.AsNoTracking()
-			.Where(c => c.Category == CarbonCategory.Food);
+		public string LabelName { get; set; } = string.Empty;
+		public decimal Co2Factor { get; set; }
+		public string Unit { get; set; } = string.Empty;
+	}
 
-		var exact = await query.FirstOrDefaultAsync(c => c.LabelName.Equals(foodName, StringComparison.OrdinalIgnoreCase), ct);
-		if (exact != null) return exact;
+	private class LookupDto
+	{
+		public int Id { get; set; }
+		public string LabelName { get; set; } = string.Empty;
+		public string Unit { get; set; } = string.Empty;
+		public decimal Co2Factor { get; set; }
+	}
 
-		return await query.OrderBy(c => c.LabelName.Length)
-			.FirstOrDefaultAsync(c => c.LabelName.ToLower().Contains(foodName.ToLower()), ct);
+	private async Task<CarbonFactorSimple?> FindFoodCarbonFactorAsync(string foodName, CancellationToken ct)
+	{
+		if (string.IsNullOrWhiteSpace(foodName)) return null;
+
+		// 使用统一 API 进行查找（静态数据优先）
+		var baseUri = $"{Request.Scheme}://{Request.Host.Value}";
+		var url = $"{baseUri}/api/carbon/lookup?label={Uri.EscapeDataString(foodName)}";
+		var client = _httpClientFactory.CreateClient();
+		using var resp = await client.GetAsync(url, ct);
+		if (!resp.IsSuccessStatusCode) return null;
+
+		await using var stream = await resp.Content.ReadAsStreamAsync(ct);
+		var items = await JsonSerializer.DeserializeAsync<List<LookupDto>>(stream, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+		var item = items?.FirstOrDefault();
+		if (item == null) return null;
+
+		return new CarbonFactorSimple
+		{
+			LabelName = item.LabelName,
+			Co2Factor = item.Co2Factor,
+			Unit = item.Unit
+		};
 	}
 
 	private static string NormalizeUnit(string unit)
 	{
 		var u = (unit ?? string.Empty).Trim().ToLowerInvariant();
+		// 将带有 serving 的单位视为“份量”（portion）
+		if (u.Contains("serving"))
+		{
+			return "portion";
+		}
 		return u switch
 		{
 			"gram" or "grams" or "克" => "g",

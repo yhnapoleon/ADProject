@@ -116,6 +116,120 @@ public class CarbonFactorController : ControllerBase
 
 		return Ok(result);
 	}
+
+	/// <summary>
+	/// 查询或合并查找碳排放因子（优先使用静态数据，再回退数据库）。
+	/// </summary>
+	[HttpGet("carbon/lookup")]
+	public async Task<ActionResult<IEnumerable<CarbonFactorDto>>> LookupFactors([FromQuery] string? label, [FromQuery] string? category, CancellationToken ct)
+	{
+		// Scenario A: 指定 label（Lookup 模式）
+		if (!string.IsNullOrWhiteSpace(label))
+		{
+			var input = label.Trim();
+
+			// 1) 优先从静态数据匹配（大小写不敏感）
+			var staticKey = CarbonEmissionData.Factors.Keys
+				.FirstOrDefault(k => k.Equals(input, System.StringComparison.OrdinalIgnoreCase));
+			if (staticKey != null)
+			{
+				var factor = CarbonEmissionData.Factors[staticKey];
+				var dto = new CarbonFactorDto
+				{
+					Id = 0,
+					LabelName = staticKey,
+					Category = CarbonCategory.Food,
+					Co2Factor = (decimal)factor,
+					Unit = "kg CO2e/serving"
+				};
+				return Ok(new[] { dto });
+			}
+
+			// 2) 数据库回退（大小写不敏感匹配）
+			var entity = await _db.CarbonReferences
+				.AsNoTracking()
+				.FirstOrDefaultAsync(c => c.LabelName.ToLower() == input.ToLower(), ct);
+
+			if (entity != null)
+			{
+				return Ok(new[]
+				{
+					new CarbonFactorDto
+					{
+						Id = entity.Id,
+						LabelName = entity.LabelName,
+						Category = entity.Category,
+						Co2Factor = entity.Co2Factor,
+						Unit = entity.Unit
+					}
+				});
+			}
+
+			// 3) 双重未命中时的默认回退
+			var fallback = new CarbonFactorDto
+			{
+				Id = 0,
+				LabelName = input,
+				Category = CarbonCategory.Food,
+				Co2Factor = 1.0m,
+				Unit = "kg CO2e/serving"
+			};
+			return Ok(new[] { fallback });
+		}
+
+		// Scenario B: 未指定 label（合并列表模式）
+		var dbList = await _db.CarbonReferences
+			.AsNoTracking()
+			.ToListAsync(ct);
+
+		// 合并并去重：静态数据优先
+		var combined = new Dictionary<string, CarbonFactorDto>(System.StringComparer.OrdinalIgnoreCase);
+
+		// 1) 先加入静态数据（优先级高）
+		foreach (var kv in CarbonEmissionData.Factors)
+		{
+			combined[kv.Key] = new CarbonFactorDto
+			{
+				Id = 0,
+				LabelName = kv.Key,
+				Category = CarbonCategory.Food,
+				Co2Factor = (decimal)kv.Value,
+				Unit = "kg CO2e/serving"
+			};
+		}
+
+		// 2) 再加入数据库的数据（若标签已存在则跳过）
+		foreach (var c in dbList)
+		{
+			if (!combined.ContainsKey(c.LabelName))
+			{
+				combined[c.LabelName] = new CarbonFactorDto
+				{
+					Id = c.Id,
+					LabelName = c.LabelName,
+					Category = c.Category,
+					Co2Factor = c.Co2Factor,
+					Unit = c.Unit
+				};
+			}
+		}
+
+		IEnumerable<CarbonFactorDto> resultList = combined.Values;
+
+		// 可选分类过滤
+		if (!string.IsNullOrWhiteSpace(category))
+		{
+			if (!Enum.TryParse<CarbonCategory>(category, true, out var cat))
+			{
+				return BadRequest("Invalid category value.");
+			}
+
+			resultList = resultList.Where(x => x.Category == cat);
+		}
+
+		// 按名称排序以保证稳定输出
+		return Ok(resultList.OrderBy(x => x.LabelName).ToList());
+	}
 }
 
 
