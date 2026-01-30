@@ -375,7 +375,7 @@ const LogMeal = () => {
   const recognizeFood = async (file: File): Promise<VisionResponse | null> => {
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('file', file);
       // 食物识别需运行双模型推理，CPU 上约 15-60 秒
       const response: any = await request.post('/vision/analyze', formData, {
         timeout: 60000,

@@ -1,3 +1,4 @@
+using System;
 using System.Security.Claims;
 using EcoLens.Api.DTOs.Travel;
 using EcoLens.Api.DTOs.UtilityBill;
@@ -119,7 +120,9 @@ public class UtilityBillController : ControllerBase
 		catch (Exception ex)
 		{
 			_logger.LogError(ex, "Error uploading and processing bill: UserId={UserId}", userId);
-			return StatusCode(500, new { error = "Internal server error, please try again later" });
+			var msg = ex.Message ?? ex.InnerException?.Message ?? "";
+			var displayError = string.IsNullOrEmpty(msg) ? $"Internal server error ({ex.GetType().Name}). Please try again later." : msg;
+			return StatusCode(500, new { error = displayError });
 		}
 	}
 
@@ -207,10 +210,49 @@ public class UtilityBillController : ControllerBase
 			_logger.LogWarning(ex, "Invalid input data: UserId={UserId}, Error={Error}", userId, ex.Message);
 			return BadRequest(new { error = ex.Message });
 		}
+		catch (InvalidOperationException ex)
+		{
+			_logger.LogWarning(ex, "Business rule violation: UserId={UserId}, Error={Error}", userId, ex.Message);
+			return BadRequest(new { error = ex.Message });
+		}
 		catch (Exception ex)
 		{
+			var msg = ex.Message ?? "";
+			var inner = ex.InnerException?.Message ?? "";
+			// 收集完整异常链（含 DbUpdateException 内层），便于识别重复/约束错误
+			var fullText = msg + " " + inner;
+			var e = ex.InnerException;
+			while (e != null)
+			{
+				if (!string.IsNullOrEmpty(e.Message)) fullText += " " + e.Message;
+				e = e.InnerException;
+			}
+
+			// 重复账单：业务异常或数据库唯一约束/重复键
+			if (fullText.Contains("重复", StringComparison.Ordinal) ||
+			    fullText.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
+			    fullText.Contains("unique constraint", StringComparison.OrdinalIgnoreCase) ||
+			    fullText.Contains("UNIQUE", StringComparison.Ordinal) ||
+			    fullText.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
+			    fullText.Contains("cannot insert duplicate", StringComparison.OrdinalIgnoreCase))
+			{
+				_logger.LogWarning(ex, "Duplicate bill or constraint: UserId={UserId}", userId);
+				return BadRequest(new { error = "该账单已存在，请勿重复添加。" });
+			}
+			// 因子未找到等业务错误也返回 400
+			if (msg.Contains("factor", StringComparison.OrdinalIgnoreCase) || msg.Contains("因子", StringComparison.Ordinal) ||
+			    msg.Contains("not found", StringComparison.OrdinalIgnoreCase) || msg.Contains("未找到", StringComparison.Ordinal))
+			{
+				_logger.LogWarning(ex, "Config/business error: UserId={UserId}", userId);
+				return BadRequest(new { error = msg });
+			}
 			_logger.LogError(ex, "Error creating bill manually: UserId={UserId}", userId);
-			return StatusCode(500, new { error = "Internal server error, please try again later" });
+			// 优先返回实际异常，fallback 用唯一文案便于确认是否跑的是新代码
+			var errMsg = !string.IsNullOrEmpty(msg) ? msg : inner;
+			var displayError = string.IsNullOrEmpty(errMsg)
+				? $"Server error ({ex.GetType().Name}). Please try again."
+				: errMsg;
+			return StatusCode(500, new { error = displayError });
 		}
 	}
 

@@ -17,6 +17,7 @@ public class UtilityBillService : IUtilityBillService
 	private readonly IOcrService _ocrService;
 	private readonly IUtilityBillParser _parser;
 	private readonly IUtilityBillCalculationService _calculationService;
+	private readonly IDocumentTypeClassifier _documentTypeClassifier;
 	private readonly ILogger<UtilityBillService> _logger;
 
 	public UtilityBillService(
@@ -24,12 +25,14 @@ public class UtilityBillService : IUtilityBillService
 		IOcrService ocrService,
 		IUtilityBillParser parser,
 		IUtilityBillCalculationService calculationService,
+		IDocumentTypeClassifier documentTypeClassifier,
 		ILogger<UtilityBillService> logger)
 	{
 		_db = db;
 		_ocrService = ocrService;
 		_parser = parser;
 		_calculationService = calculationService;
+		_documentTypeClassifier = documentTypeClassifier;
 		_logger = logger;
 	}
 
@@ -58,7 +61,24 @@ public class UtilityBillService : IUtilityBillService
 
 			_logger.LogInformation("OCR completed: {TextLength} characters, Confidence: {Confidence}", ocrResult.Text.Length, ocrResult.Confidence);
 
-			// 3. 数据提取
+			// 3. 文档类型验证（必须在水电账单识别之前）
+			var classificationResult = await _documentTypeClassifier.ClassifyAsync(ocrResult.Text, ct);
+			if (!classificationResult.IsUtilityBill)
+			{
+				_logger.LogWarning(
+					"Document type validation failed for user {UserId}. Detected type: {DocumentType}, Confidence: {Confidence}, MatchedKeywords: {Keywords}",
+					userId, classificationResult.DocumentType, classificationResult.ConfidenceScore, 
+					string.Join(", ", classificationResult.MatchedKeywords));
+
+				throw new InvalidOperationException(
+					classificationResult.ErrorMessage ?? "上传的图片不是水电账单，请上传新加坡的电费、水费或燃气账单");
+			}
+
+			_logger.LogInformation(
+				"Document type validated as utility bill. Confidence: {Confidence}, MatchedKeywords: {Keywords}",
+				classificationResult.ConfidenceScore, string.Join(", ", classificationResult.MatchedKeywords));
+
+			// 4. 数据提取
 			var extractedData = await _parser.ParseBillDataAsync(ocrResult.Text, null, ct);
 			if (extractedData == null)
 			{
@@ -66,7 +86,7 @@ public class UtilityBillService : IUtilityBillService
 				throw new InvalidOperationException("无法从账单中提取数据，请使用手动输入");
 			}
 
-			// 4. 验证提取的数据
+			// 5. 验证提取的数据
 			if (!extractedData.BillPeriodStart.HasValue || !extractedData.BillPeriodEnd.HasValue)
 			{
 				_logger.LogWarning("Missing bill period dates in extracted data for user {UserId}", userId);
@@ -87,14 +107,14 @@ public class UtilityBillService : IUtilityBillService
 				throw new InvalidOperationException($"提取的账单周期日期无效（开始年份: {startYear}, 结束年份: {endYear}），请使用手动输入");
 			}
 
-			// 5. 计算碳排放
+			// 6. 计算碳排放
 			var carbonResult = await _calculationService.CalculateCarbonEmissionAsync(
 				extractedData.ElectricityUsage,
 				extractedData.WaterUsage,
 				extractedData.GasUsage,
 				ct);
 
-			// 6. 创建临时实体（不保存到数据库）
+			// 7. 创建临时实体（不保存到数据库）
 			var utilityBill = new UtilityBill
 			{
 				Id = 0, // 表示还未保存
@@ -102,6 +122,7 @@ public class UtilityBillService : IUtilityBillService
 				BillType = extractedData.BillType,
 				BillPeriodStart = extractedData.BillPeriodStart.Value,
 				BillPeriodEnd = extractedData.BillPeriodEnd.Value,
+				YearMonth = extractedData.BillPeriodEnd.Value.ToString("yyyy-MM"), // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = extractedData.ElectricityUsage,
 				WaterUsage = extractedData.WaterUsage,
 				GasUsage = extractedData.GasUsage,
@@ -142,12 +163,16 @@ public class UtilityBillService : IUtilityBillService
 			}
 
 			// 2. 检查重复账单（同一用户、相同账单周期、相同类型、相同用量）
-			// 注意：decimal? 类型需要特殊处理，使用 HasValue 和 Value 比较
+			// 用日期范围比较避免时区/时间部分导致漏判
+			var startDay = dto.BillPeriodStart.Date;
+			var startNext = startDay.AddDays(1);
+			var endDay = dto.BillPeriodEnd.Date;
+			var endNext = endDay.AddDays(1);
 			var existingBill = await _db.UtilityBills
 				.Where(b => b.UserId == userId &&
 				            b.BillType == dto.BillType &&
-				            b.BillPeriodStart == dto.BillPeriodStart &&
-				            b.BillPeriodEnd == dto.BillPeriodEnd &&
+				            b.BillPeriodStart >= startDay && b.BillPeriodStart < startNext &&
+				            b.BillPeriodEnd >= endDay && b.BillPeriodEnd < endNext &&
 				            ((b.ElectricityUsage.HasValue && dto.ElectricityUsage.HasValue && b.ElectricityUsage.Value == dto.ElectricityUsage.Value) ||
 				             (!b.ElectricityUsage.HasValue && !dto.ElectricityUsage.HasValue)) &&
 				            ((b.WaterUsage.HasValue && dto.WaterUsage.HasValue && b.WaterUsage.Value == dto.WaterUsage.Value) ||
@@ -171,12 +196,15 @@ public class UtilityBillService : IUtilityBillService
 				ct);
 
 			// 4. 创建实体
+			var periodLabel = dto.BillPeriodStart.ToString("yyyy-MM");
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
+				YearMonth = periodLabel,
 				BillType = dto.BillType,
 				BillPeriodStart = dto.BillPeriodStart,
 				BillPeriodEnd = dto.BillPeriodEnd,
+				YearMonth = dto.BillPeriodEnd.ToString("yyyy-MM"), // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = dto.ElectricityUsage,
 				WaterUsage = dto.WaterUsage,
 				GasUsage = dto.GasUsage,
@@ -187,13 +215,62 @@ public class UtilityBillService : IUtilityBillService
 				InputMethod = InputMethod.Manual
 			};
 
-			// 4. 保存到数据库
+			// 5. 保存到数据库
 			await _db.UtilityBills.AddAsync(utilityBill, ct);
 			await _db.SaveChangesAsync(ct);
 
 			_logger.LogInformation("Utility bill created manually: UserId={UserId}, BillId={BillId}", userId, utilityBill.Id);
 
-			// 5. 转换为DTO返回
+			// 6. 生成 ActivityLog，使仪表盘与 Records 能显示水电账单数据
+			try
+			{
+				// 只按 LabelName + Category 查，不依赖 Region，确保能命中种子数据（Electricity/Water/Gas, Utility）
+				async Task<CarbonReference?> FindUtilityFactorAsync(string label)
+				{
+					return await _db.CarbonReferences
+						.AsNoTracking()
+						.FirstOrDefaultAsync(
+							c => c.LabelName == label && c.Category == CarbonCategory.Utility,
+							ct);
+				}
+
+				var now = DateTime.UtcNow;
+				async Task AddActivityLogAsync(string label, decimal usage, decimal emission)
+				{
+					if (usage <= 0 && emission <= 0) return;
+					var factor = await FindUtilityFactorAsync(label);
+					if (factor is null)
+					{
+						_logger.LogWarning("CarbonReference not found for Utility label={Label}, skip ActivityLog", label);
+						return;
+					}
+
+					var log = new ActivityLog
+					{
+						UserId = userId,
+						CarbonReferenceId = factor.Id,
+						Quantity = usage,
+						TotalEmission = emission,
+						DetectedLabel = $"{label} ({periodLabel})",
+						CreatedAt = now,
+						UpdatedAt = now
+					};
+					_db.ActivityLogs.Add(log);
+				}
+
+				await AddActivityLogAsync("Electricity", utilityBill.ElectricityUsage ?? 0m, utilityBill.ElectricityCarbonEmission);
+				await AddActivityLogAsync("Water", utilityBill.WaterUsage ?? 0m, utilityBill.WaterCarbonEmission);
+				await AddActivityLogAsync("Gas", utilityBill.GasUsage ?? 0m, utilityBill.GasCarbonEmission);
+
+				await _db.SaveChangesAsync(ct);
+			}
+			catch (Exception exLog)
+			{
+				// 账单已保存，ActivityLog 失败时仅记录日志、不抛错，用户仍得到 200 与保存成功
+				_logger.LogError(exLog, "Failed to create ActivityLogs for UtilityBill UserId={UserId} BillId={BillId}", userId, utilityBill.Id);
+			}
+
+			// 7. 转换为DTO返回
 			return ToResponseDto(utilityBill);
 		}
 		catch (Exception ex)
