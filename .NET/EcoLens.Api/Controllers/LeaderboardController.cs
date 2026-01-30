@@ -27,7 +27,7 @@ public class LeaderboardController : ControllerBase
 	public async Task<ActionResult<IEnumerable<object>>> Get([FromQuery] string period = "month", [FromQuery] int limit = 50, CancellationToken ct = default)
 	{
 		// 简化实现：按总减排（all），或最近7/30天排放求和排行
-		var users = _db.ApplicationUsers.AsQueryable();
+		var users = _db.ApplicationUsers.Where(u => u.IsActive);
 		var logs = _db.ActivityLogs.AsQueryable();
 		DateTime? from = null;
 		if (string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date;
@@ -55,7 +55,11 @@ public class LeaderboardController : ControllerBase
 						pointsTotal = u.CurrentPoints
 					};
 
-		var list = await query.OrderByDescending(x => x.emissions).Take(limit).ToListAsync(ct);
+		// 要求：排行榜按“积分”降序返回前 50 名，且不包含被封禁用户
+		var list = await query
+			.OrderByDescending(x => x.pointsTotal)
+			.Take(limit)
+			.ToListAsync(ct);
 		var ranked = list.Select((x, i) => new
 		{
 			rank = i + 1,
@@ -81,7 +85,7 @@ public class LeaderboardController : ControllerBase
 	[AllowAnonymous]
 	public async Task<ActionResult<object>> GetByUsername([FromRoute] string username, [FromQuery] string period = "month", CancellationToken ct = default)
 	{
-		var users = _db.ApplicationUsers.AsQueryable();
+		var users = _db.ApplicationUsers.Where(u => u.IsActive);
 		var logs = _db.ActivityLogs.AsQueryable();
 		DateTime? from = null;
 		if (string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date;
@@ -108,7 +112,9 @@ public class LeaderboardController : ControllerBase
 						pointsTotal = u.CurrentPoints
 					};
 
-		var all = await query.OrderByDescending(x => x.emissions).ToListAsync(ct);
+		var all = await query
+			.OrderByDescending(x => x.pointsTotal)
+			.ToListAsync(ct);
 		var item = all.Select((x, i) => new
 		{
 			rank = i + 1,
@@ -130,6 +136,7 @@ public class LeaderboardController : ControllerBase
 	public async Task<ActionResult<IEnumerable<LeaderboardItemDto>>> TopUsers(CancellationToken ct)
 	{
 		var items = await _db.ApplicationUsers
+			.Where(u => u.IsActive)
 			.OrderByDescending(u => u.TotalCarbonSaved)
 			.Take(10)
 			.Select(u => new LeaderboardItemDto
@@ -184,6 +191,7 @@ public class LeaderboardController : ControllerBase
 				f => f.FolloweeId,
 				u => u.Id,
 				(f, u) => u)
+			.Where(u => u.IsActive)
 			.OrderByDescending(u => u.TotalCarbonSaved)
 			.Select(u => new LeaderboardItemDto
 			{
