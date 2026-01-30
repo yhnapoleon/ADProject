@@ -21,6 +21,7 @@ public class VisionController : ControllerBase
 	/// <summary>
 	/// 调用 Python FastAPI 的图像识别服务，返回融合后的预测结果。
 	/// </summary>
+	[AllowAnonymous]
 	[HttpPost("analyze")]
 	[Consumes("multipart/form-data")]
 	public async Task<ActionResult<VisionPredictionResponseDto>> Analyze([FromForm] ImageUploadRequest request, CancellationToken ct)

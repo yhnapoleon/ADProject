@@ -108,12 +108,13 @@
             <summary>
             ??????????????????   /// </summary>
         </member>
-        <member name="M:EcoLens.Api.Controllers.BarcodeController.GetByBarcode(System.String,System.Nullable{System.Boolean},System.Threading.CancellationToken)">
+        <member name="M:EcoLens.Api.Controllers.BarcodeController.GetByBarcode(System.String,System.Nullable{System.Boolean},System.Nullable{System.Boolean},System.Threading.CancellationToken)">
             <summary>
             根据条形码获取映射（优先本地；不存在时从 Open Food Facts 拉取并缓存）。
             </summary>
             <param name="barcode">条形码</param>
             <param name="refresh">为 true 时强制从 Open Food Facts 重新拉取并更新 Co2Factor（解决缓存了错误/旧数据）</param>
+            <param name="useDefault">为 true 时强制使用默认值，忽略 Open Food Facts 的结果</param>
         </member>
         <member name="M:EcoLens.Api.Controllers.BarcodeController.DeleteByBarcode(System.String,System.Threading.CancellationToken)">
             <summary>
@@ -150,11 +151,49 @@
             对帖子进行评论。
             </summary>
         </member>
+        <member name="M:EcoLens.Api.Controllers.DietController.Create(EcoLens.Api.DTOs.Diet.CreateDietRecordDto,System.Threading.CancellationToken)">
+            <summary>
+            创建饮食记录（存储名称、重量、碳排放因子、碳排放值、记录时间）。
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.DietController.GetMyDiets(EcoLens.Api.DTOs.Diet.GetDietRecordsQueryDto,System.Threading.CancellationToken)">
+            <summary>
+            获取当前用户的饮食记录（分页）。
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.DietController.GetById(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            根据ID获取饮食记录详情。
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.DietController.Delete(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            删除饮食记录。
+            </summary>
+        </member>
         <member name="M:EcoLens.Api.Controllers.FoodController.CalculateByName(EcoLens.Api.DTOs.Food.FoodCalculateByNameRequest,System.Threading.CancellationToken)">
             <summary>
             通过食物名称与份量计算总碳排放。
             - 支持单位：g, kg, portion(份/份量/serving)
             - 根据 CarbonReference(Category=Food) 的 Unit 做换算
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.FoodController.IngestFromImage(Microsoft.AspNetCore.Http.IFormFile,System.Double,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            集成式流程：上传图片 + 分量，后端识别名称、计算总排放并入库，返回最终结果。
+            - multipart/form-data: image, quantity, unit, note?
+            - 返回：name, amount(kg), emissionFactor, emission, createdAt
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.FoodController.IngestByName(EcoLens.Api.DTOs.Food.FoodIngestByNameRequest,System.Threading.CancellationToken)">
+            <summary>
+            集成式流程：前端直接传名称 + 分量，后端计算并入库后仅返回最终结果。
+            - JSON: { name, quantity, unit, note? }
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.FoodController.CalculateSimple(EcoLens.Api.DTOs.Food.FoodCalculateSimpleRequest,System.Threading.CancellationToken)">
+            <summary>
+            前端传名称+分量，后端只计算（不入库），返回最小结果：name, quantity, emissionFactor, emission。
             </summary>
         </member>
         <member name="M:EcoLens.Api.Controllers.FoodController.Recognize(Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
@@ -178,10 +217,31 @@
             - 若无法识别单位则返回 -1
             </summary>
         </member>
+        <member name="M:EcoLens.Api.Controllers.FoodController.ToKilograms(System.String,System.Double,System.String)">
+            <summary>
+            将输入数量转换为 kg（入库统一单位）。
+            </summary>
+        </member>
         <member name="M:EcoLens.Api.Controllers.FoodController.MapPortionToGrams(System.String,System.Double)">
             <summary>
             简单的“份量 -> 克数”映射（可按需扩展）。
             未命中则使用通用默认值 100g/份。
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.FoodRecordsController.GetMyRecords(EcoLens.Api.DTOs.Food.GetFoodRecordsQueryDto,System.Threading.CancellationToken)">
+            <summary>
+            获取当前用户的食物记录列表（支持日期与分页）。
+            返回字段：名称、重量、碳排放因子、总碳排放值、创建时间。
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.FoodRecordsController.GetById(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            根据ID获取单条食物记录详情。
+            </summary>
+        </member>
+        <member name="M:EcoLens.Api.Controllers.FoodRecordsController.Delete(System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            删除食物记录（仅可删除当前用户自己的记录）。
             </summary>
         </member>
         <member name="M:EcoLens.Api.Controllers.InsightController.WeeklyReport(System.Threading.CancellationToken)">
@@ -425,18 +485,19 @@
         </member>
         <member name="M:EcoLens.Api.Controllers.UtilityBillController.Upload(EcoLens.Api.DTOs.UtilityBill.UploadUtilityBillDto,System.Threading.CancellationToken)">
             <summary>
-            上传账单文件并自动处理（OCR识别 → 数据提取 → 碳排放计算 → 保存）
+            上传账单文件并识别（OCR识别 → 数据提取 → 碳排放计算，不保存到数据库）
             </summary>
             <remarks>
             上传账单文件（支持图片：JPG、PNG、BMP、WEBP，或PDF文件），系统会自动识别账单内容，
-            提取用量数据和账单周期，计算碳排放，并保存到数据库。
+            提取用量数据和账单周期，计算碳排放，但**不保存到数据库**。识别结果返回给用户确认后，
+            用户需调用 `/api/utilitybill/manual` 接口保存到数据库。
             
             **处理流程：**
             1. 文件验证（类型、大小）
             2. OCR识别（Google Cloud Vision API）
             3. 数据提取（从OCR文本中提取用量、日期等）
             4. 碳排放计算（根据用量和排放因子）
-            5. 保存到数据库
+            5. 返回识别结果（Id = 0 表示还未保存）
             
             **支持的文件格式：**
             - 图片：JPG、JPEG、PNG、BMP、WEBP
@@ -447,16 +508,17 @@
             
             **示例请求：**
             ```
-            POST /api/utility-bills/upload
+            POST /api/utilitybill/upload
             Content-Type: multipart/form-data
             
             file: [账单图片或PDF文件]
             ```
             
             **注意事项：**
+            - 识别后不会自动保存，返回的响应中 Id = 0
+            - 用户确认识别结果后，需调用 `/api/utilitybill/manual` 接口保存
             - 如果OCR识别失败，会返回错误，建议使用手动输入
             - 如果数据提取不完整，会返回错误，建议使用手动输入补充
-            - 上传的文件不会保存，只保存提取的数据
             </remarks>
             <param name="dto">上传账单文件的请求数据</param>
             <param name="ct">取消令牌</param>
@@ -473,15 +535,20 @@
         </member>
         <member name="M:EcoLens.Api.Controllers.UtilityBillController.CreateManually(EcoLens.Api.DTOs.UtilityBill.CreateUtilityBillManuallyDto,System.Threading.CancellationToken)">
             <summary>
-            手动创建账单（碳排放计算 → 保存）
+            手动创建账单或保存识别结果（碳排放计算 → 保存）
             </summary>
             <remarks>
-            手动输入账单数据，系统会自动计算碳排放并保存到数据库。
+            手动输入账单数据，或保存通过 `/api/utilitybill/upload` 识别后的结果。
+            系统会自动计算碳排放并保存到数据库。
             
             **处理流程：**
             1. 输入验证（日期范围、用量等）
             2. 碳排放计算（根据用量和排放因子）
             3. 保存到数据库
+            
+            **使用场景：**
+            - 场景1：用户手动输入账单数据
+            - 场景2：用户上传账单图片识别后，确认识别结果并保存
             
             **账单类型说明：**
             - 0: 电费（Electricity）
@@ -498,8 +565,8 @@
             ```json
             {
               "billType": 0,
-              "billPeriodStart": "2024-01-01T00:00:00",
-              "billPeriodEnd": "2024-01-31T23:59:59",
+              "billPeriodStart": "2024-01-01",
+              "billPeriodEnd": "2024-01-31",
               "electricityUsage": 150.5,
               "waterUsage": null,
               "gasUsage": null
@@ -570,24 +637,9 @@
             获取当前用户的 Utility 账单记录（按月份倒序）。
             </summary>
         </member>
-        <member name="M:EcoLens.Api.Controllers.VisionController.Analyze(Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
+        <member name="M:EcoLens.Api.Controllers.VisionController.Analyze(EcoLens.Api.DTOs.ImageUploadRequest,System.Threading.CancellationToken)">
             <summary>
             调用 Python FastAPI 的图像识别服务，返回融合后的预测结果。
-            </summary>
-        </member>
-        <member name="M:EcoLens.Api.Controllers.VisionController.Recognize(Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
-            <summary>
-            路由别名：/api/vision/recognize（与前端文档对齐）。
-            </summary>
-        </member>
-        <member name="M:EcoLens.Api.Controllers.VisionController.MealDetect(Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
-            <summary>
-            路由别名：/api/vision/meal-detect（与前端文档对齐）。
-            </summary>
-        </member>
-        <member name="M:EcoLens.Api.Controllers.VisionController.MealPhoto(Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
-            <summary>
-            路由别名：/api/vision/meal-photo（与前端文档对齐）。
             </summary>
         </member>
         <member name="P:EcoLens.Api.DTOs.Activity.ActivityLogResponseDto.Category">
@@ -615,6 +667,16 @@
         </member>
         <member name="P:EcoLens.Api.DTOs.Barcode.BarcodeReferenceResponseDto.ClimatiqActivityId">
             <summary>Climatiq Activity ID（如果 Source=Climatiq）</summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Diet.CreateDietRecordDto.Amount">
+            <summary>
+            重量（kg）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Diet.CreateDietRecordDto.EmissionFactor">
+            <summary>
+            排放因子（kgCO2/kg）
+            </summary>
         </member>
         <member name="P:EcoLens.Api.DTOs.Food.FoodCalculateByNameRequest.Quantity">
             <summary>
@@ -656,6 +718,56 @@
             计算得到的总碳排放量（单位同 FactorUnit）
             </summary>
         </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodIngestByNameRequest.Quantity">
+            <summary>
+            数量（配合 unit，可为 g/kg/portion）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodIngestByNameRequest.Unit">
+            <summary>
+            单位：g / kg / portion
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.GetFoodRecordsQueryDto.StartDate">
+            <summary>
+            开始日期（可选）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.GetFoodRecordsQueryDto.EndDate">
+            <summary>
+            结束日期（可选）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.GetFoodRecordsQueryDto.Page">
+            <summary>
+            页码（默认1）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.GetFoodRecordsQueryDto.PageSize">
+            <summary>
+            每页数量（默认20，最大100）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodCalculateSimpleRequest.Quantity">
+            <summary>
+            分量数值（配合 unit 使用）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodCalculateSimpleRequest.Unit">
+            <summary>
+            单位：g / kg / portion
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodSimpleCalcResponse.EmissionFactor">
+            <summary>
+            碳排放因子（数值）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodSimpleCalcResponse.Emission">
+            <summary>
+            碳排放总量（kgCO2）
+            </summary>
+        </member>
         <member name="P:EcoLens.Api.DTOs.Food.CalculateFoodRequest.Amount">
             <summary>
             数量（单位：kg）
@@ -674,6 +786,16 @@
         <member name="P:EcoLens.Api.DTOs.Food.AddFoodRequest.Amount">
             <summary>
             数量（单位：kg）
+            </summary>
+        </member>
+        <member name="T:EcoLens.Api.DTOs.ImageUploadRequest">
+            <summary>
+            图片上传请求 DTO
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.ImageUploadRequest.Image">
+            <summary>
+            图片文件
             </summary>
         </member>
         <member name="T:EcoLens.Api.DTOs.OpenFoodFacts.EcoScoreDataJsonConverter">
@@ -1292,6 +1414,33 @@
         <member name="M:EcoLens.Api.Migrations.AddTreeStateFields.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
             <inheritdoc />
         </member>
+        <member name="T:EcoLens.Api.Migrations.AddUserNickname">
+            <inheritdoc />
+        </member>
+        <member name="M:EcoLens.Api.Migrations.AddUserNickname.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:EcoLens.Api.Migrations.AddUserNickname.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:EcoLens.Api.Migrations.AddUserNickname.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="P:EcoLens.Api.Models.DietRecord.Amount">
+            <summary>
+            重量（kg）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.Models.DietRecord.EmissionFactor">
+            <summary>
+            排放因子（kgCO2/kg）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.Models.DietRecord.Emission">
+            <summary>
+            碳排放值（kgCO2）
+            </summary>
+        </member>
         <member name="T:EcoLens.Api.Models.Enums.InputMethod">
             <summary>
             账单输入方式枚举
@@ -1843,12 +1992,12 @@
         </member>
         <member name="M:EcoLens.Api.Services.IUtilityBillService.UploadAndProcessBillAsync(System.Int32,Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
             <summary>
-            上传账单文件并自动处理（OCR识别 → 数据提取 → 碳排放计算 → 保存）
+            上传账单文件并识别（OCR识别 → 数据提取 → 碳排放计算，不保存到数据库）
             </summary>
             <param name="userId">用户ID</param>
             <param name="file">账单文件（图片或PDF）</param>
             <param name="ct">取消令牌</param>
-            <returns>处理后的账单响应DTO</returns>
+            <returns>识别后的账单响应DTO（Id = 0 表示还未保存，用户确认后需调用 manual 接口保存）</returns>
         </member>
         <member name="M:EcoLens.Api.Services.IUtilityBillService.CreateBillManuallyAsync(System.Int32,EcoLens.Api.DTOs.UtilityBill.CreateUtilityBillManuallyDto,System.Threading.CancellationToken)">
             <summary>
@@ -2068,7 +2217,7 @@
         </member>
         <member name="M:EcoLens.Api.Services.UtilityBillService.UploadAndProcessBillAsync(System.Int32,Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
             <summary>
-            上传账单文件并自动处理
+            上传账单文件并识别（不保存到数据库，仅返回识别结果供用户确认）
             </summary>
         </member>
         <member name="M:EcoLens.Api.Services.UtilityBillService.CreateBillManuallyAsync(System.Int32,EcoLens.Api.DTOs.UtilityBill.CreateUtilityBillManuallyDto,System.Threading.CancellationToken)">
