@@ -186,6 +186,7 @@ builder.Services.Configure<FormOptions>(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITravelService, TravelService>();
 builder.Services.AddScoped<IOcrService, OcrService>();
+builder.Services.AddScoped<IDocumentTypeClassifier, DocumentTypeClassifier>();
 builder.Services.AddScoped<IUtilityBillParser, UtilityBillParser>();
 builder.Services.AddScoped<IUtilityBillCalculationService, UtilityBillCalculationService>();
 builder.Services.AddScoped<IUtilityBillService, UtilityBillService>();

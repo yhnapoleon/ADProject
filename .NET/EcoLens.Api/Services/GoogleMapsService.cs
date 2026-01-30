@@ -48,11 +48,18 @@ public class GoogleMapsService : IGoogleMapsService
 			if (location == null)
 				return null;
 
+			// 提取地址组件（国家、城市等）
+			var addressComponents = result.AddressComponents ?? new List<AddressComponent>();
+			var country = addressComponents.FirstOrDefault(c => c.Types?.Contains("country") == true)?.LongName;
+			var city = addressComponents.FirstOrDefault(c => c.Types?.Contains("locality") == true || c.Types?.Contains("administrative_area_level_1") == true)?.LongName;
+
 			return new GeocodingResult
 			{
 				Latitude = location.Lat,
 				Longitude = location.Lng,
-				FormattedAddress = result.FormattedAddress ?? address
+				FormattedAddress = result.FormattedAddress ?? address,
+				Country = country,
+				City = city
 			};
 		}
 		catch (Exception ex)

@@ -50,6 +50,16 @@ public class GeocodingResult
 	public double Latitude { get; set; }
 	public double Longitude { get; set; }
 	public string FormattedAddress { get; set; } = string.Empty;
+	
+	/// <summary>
+	/// 国家名称（从地址组件中提取）
+	/// </summary>
+	public string? Country { get; set; }
+	
+	/// <summary>
+	/// 城市名称（从地址组件中提取）
+	/// </summary>
+	public string? City { get; set; }
 }
 
 /// <summary>
