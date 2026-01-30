@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Row, Col, Card, Button, Progress, Spin } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
-import { mockLeaderboardData } from '../mock/data';
 import walkingAnimation from '../assets/icons/walking.json';
 import './Dashboard.module.css';
 import mainEatIcon from '../assets/icons/main_eat.svg';
@@ -23,6 +22,10 @@ const Dashboard = () => {
 
   const [statsLoading, setStatsLoading] = useState(true);
   const [stats, setStats] = useState<MainPageStats>({ total: 0, food: 0, transport: 0, utility: 0 });
+  const [stepCount, setStepCount] = useState<number>(0);
+  const [stepsLoading, setStepsLoading] = useState(true);
+  const [todayRanking, setTodayRanking] = useState<{ nickname?: string; username?: string; pointsTotal?: number; pointsToday?: number }[]>([]);
+  const [todayRankingLoading, setTodayRankingLoading] = useState(true);
 
   useEffect(() => {
     const fetchMainPageStats = async () => {
@@ -44,16 +47,45 @@ const Dashboard = () => {
     fetchMainPageStats();
   }, []);
 
+  useEffect(() => {
+    const fetchStepSync = async () => {
+      setStepsLoading(true);
+      try {
+        const res = await request.get<{ todaySteps?: number }>('/api/trees/stats');
+        setStepCount(Number(res?.todaySteps ?? 0));
+      } catch (_e) {
+        setStepCount(0);
+      } finally {
+        setStepsLoading(false);
+      }
+    };
+    fetchStepSync();
+  }, []);
+
+  useEffect(() => {
+    const fetchTodayRanking = async () => {
+      setTodayRankingLoading(true);
+      try {
+        const res: any = await request.get('/api/Leaderboard', {
+          params: { period: 'today', limit: 5 },
+        });
+        const list = Array.isArray(res) ? res : res?.items ?? res ?? [];
+        setTodayRanking(Array.isArray(list) ? list.slice(0, 5) : []);
+      } catch (_e) {
+        setTodayRanking([]);
+      } finally {
+        setTodayRankingLoading(false);
+      }
+    };
+    fetchTodayRanking();
+  }, []);
+
   const targetEmissions = 100.0;
   const thisMonthEmissions = stats.total;
   const progressPercent = targetEmissions > 0 ? Math.min(100, (thisMonthEmissions / targetEmissions) * 100) : 0;
   const foodEmissions = stats.food;
   const travelEmissions = stats.transport;
   const utilitiesEmissions = stats.utility;
-
-  const todayLeaderboard = [...mockLeaderboardData]
-    .sort((a, b) => (b.pointsToday || 0) - (a.pointsToday || 0))
-    .slice(0, 5);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -188,7 +220,7 @@ const Dashboard = () => {
               cursor: 'pointer',
               transition: 'all 0.3s ease',
             }}
-            onClick={() => navigate('/tree-planting', { state: { todaySteps: 9277 } })}
+            onClick={() => navigate('/tree-planting', { state: { steps: stepCount, todaySteps: stepCount } })}
             onMouseEnter={(e) => {
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(103, 79, 163, 0.15)';
             }}
@@ -219,7 +251,11 @@ const Dashboard = () => {
                 whiteSpace: 'nowrap',
               }}>
                 <div style={{ fontSize: '20px', color: '#999' }}>Steps Today</div>
-                <div style={{ fontSize: '35px', fontWeight: 'bold', color: '#674fa3' }}>9,277</div>
+                {stepsLoading ? (
+                  <div style={{ fontSize: '20px', color: '#999' }}>Loading...</div>
+                ) : (
+                  <div style={{ fontSize: '35px', fontWeight: 'bold', color: '#674fa3' }}>{numberFormatter.format(stepCount)}</div>
+                )}
                 <div style={{ fontSize: '20px', color: '#999' }}>Steps</div>
               </div>
 
@@ -247,35 +283,41 @@ const Dashboard = () => {
               </Button>
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {todayLeaderboard.map((user, index) => (
-                <div
-                  key={user.username}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 0',
-                    borderBottom: index < todayLeaderboard.length - 1 ? '1px solid #f0f0f0' : 'none',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: '#674fa3',
-                        minWidth: '24px',
-                      }}
-                    >
-                      {index + 1}
+              {todayRankingLoading ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#999' }}>Loading...</div>
+              ) : todayRanking.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#999' }}>No ranking data yet</div>
+              ) : (
+                todayRanking.map((user, index) => (
+                  <div
+                    key={user.username ?? index}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 0',
+                      borderBottom: index < todayRanking.length - 1 ? '1px solid #f0f0f0' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          color: '#674fa3',
+                          minWidth: '24px',
+                        }}
+                      >
+                        {index + 1}
+                      </span>
+                      <span>{user.nickname ?? user.username ?? '-'}</span>
+                    </div>
+                    <span style={{ fontWeight: 700, color: '#674fa3' }}>
+                      {numberFormatter.format(user.pointsToday ?? user.pointsTotal ?? 0)} pts
                     </span>
-                    <span>{user.nickname}</span>
                   </div>
-                  <span style={{ fontWeight: 700, color: '#674fa3' }}>
-                    {numberFormatter.format(user.pointsToday || 0)} pts
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </Card>
         </Col>

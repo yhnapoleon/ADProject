@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import MainLayout from './components/MainLayout';
-import SplashScreen from './components/SplashScreen';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Records from './pages/Records';
 import Leaderboard from './pages/Leaderboard';
 import AboutMe from './pages/AboutMe';
 import AIAssistant from './pages/AIAssistant';
-import Onboarding from './pages/Onboarding';
 import LogMeal from './pages/LogMeal';
 import LogTravel from './pages/LogTravel';
 import LogUtility from './pages/LogUtility';
@@ -60,20 +58,6 @@ const TitleUpdater: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const [showSplash, setShowSplash] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 2500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (showSplash) return <SplashScreen />;
-  const isAdminPath = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
-  if (showOnboarding && !isAdminPath) {
-    return <Onboarding onFinish={() => setShowOnboarding(false)} />;
-  }
-
   return (
     <ConfigProvider
       theme={{

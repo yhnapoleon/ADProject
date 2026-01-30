@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Progress, message } from 'antd';
+import { Button, Progress, message, Spin } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import Lottie, { LottieRefCurrentProps } from 'lottie-react';
+import request from '../utils/request';
 import backgroundDay from '../assets/icons/background_day.json';
 import plant1 from '../assets/icons/plant1.json';
 import plant2 from '../assets/icons/plant2.json';
@@ -17,31 +18,19 @@ const TreePlanting = () => {
   const location = useLocation();
   const lottiePlantRef = useRef<LottieRefCurrentProps>(null);
   const lottieCelebrationRef = useRef<LottieRefCurrentProps>(null);
-  const floatTipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const floatTipTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 从路由state获取步数，如果没有则使用Dashboard的默认值9277
-  const initialSteps = (location.state as { todaySteps?: number })?.todaySteps ?? 9277;
+  const routeSteps = (location.state as { steps?: number; todaySteps?: number })?.steps
+    ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps ?? 0;
 
-  // 根据步数计算初始成长值（从localStorage获取已转换的成长值，如果没有则根据步数计算）
-  const getInitialGrowth = (): number => {
-    const savedGrowth = localStorage.getItem('treeGrowth');
-    if (savedGrowth) {
-      return parseInt(savedGrowth, 10);
-    }
-    // 如果没有保存的成长值，根据步数计算初始成长值（每150步=1%成长）
-    const calculatedGrowth = Math.floor(initialSteps / 150);
-    return Math.min(calculatedGrowth, 100); // 最多100%
-  };
-
-  // 状态定义（完全复刻Android端）
-  const [todaySteps, setTodaySteps] = useState<number>(initialSteps);
-  const [currentTreeGrowth, setCurrentTreeGrowth] = useState<number>(getInitialGrowth()); // 0-100
-  const [totalPlantedTrees, setTotalPlantedTrees] = useState<number>(
-    parseInt(localStorage.getItem('totalPlantedTrees') || '5', 10)
-  );
+  const [todaySteps, setTodaySteps] = useState<number>(routeSteps);
+  const [currentTreeGrowth, setCurrentTreeGrowth] = useState<number>(0);
+  const [totalPlantedTrees, setTotalPlantedTrees] = useState<number>(0);
   const [isCelebrating, setIsCelebrating] = useState<boolean>(false);
   const [floatTipMessage, setFloatTipMessage] = useState<string>('');
   const [showFloatTip, setShowFloatTip] = useState<boolean>(false);
+  const [treeLoading, setTreeLoading] = useState<boolean>(true);
+  const [convertLoading, setConvertLoading] = useState<boolean>(false);
 
   // 根据currentTreeGrowth计算stage（1-6）
   const calculateStage = (growth: number): number => {
@@ -97,43 +86,76 @@ const TreePlanting = () => {
     }, displayDuration);
   };
 
-  // 处理步数转换（核心业务逻辑）
-  const handleStepConversion = () => {
-    if (isCelebrating) return;
+  useEffect(() => {
+    const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
+      ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
+    if (typeof stepsFromRoute === 'number') {
+      setTodaySteps(stepsFromRoute);
+    }
+  }, [location.state]);
 
-    if (todaySteps > 0) {
-      const growthGain = Math.floor(todaySteps / 150);
-      // 计算当前进度 + 增量的总和
-      const totalPotential = currentTreeGrowth + growthGain;
-      setTodaySteps(0);
-
-      // 树木互动动画（缩放效果）- 通过状态触发CSS动画
-      // 这个效果会在UI更新时自动触发
-
-      if (totalPotential >= 100) {
-        // 核心：计算种成了几棵树，以及剩下多少进度给下一棵
-        const treesPlantedThisTime = Math.floor(totalPotential / 100);
-        const leftoverGrowth = totalPotential % 100;
-
-        setTotalPlantedTrees((prev) => {
-          const newTotal = prev + treesPlantedThisTime;
-          localStorage.setItem('totalPlantedTrees', newTotal.toString());
-          return newTotal;
-        });
-
-        // 先显示当前这棵树为成树状态（100%），同时显示庆祝动画
-        setCurrentTreeGrowth(100);
-        setIsCelebrating(true);
-        
-        // 传入剩余进度，开始庆祝流程
-        startCelebration(leftoverGrowth);
-      } else {
-        setCurrentTreeGrowth(totalPotential);
-        localStorage.setItem('treeGrowth', totalPotential.toString());
-        showAtTreeTop(`Growth +${growthGain}%`);
+  useEffect(() => {
+    const fetchTree = async () => {
+      setTreeLoading(true);
+      try {
+        const stateRes = await request.get('/api/getTree') as { totalTrees?: number; currentProgress?: number };
+        const totalTrees = Number(stateRes?.totalTrees ?? 0);
+        const progress = Number(stateRes?.currentProgress ?? 0);
+        setTotalPlantedTrees(totalTrees);
+        setCurrentTreeGrowth(Math.min(100, Math.max(0, progress)));
+        const statsRes = await request.get('/api/trees/stats') as { todaySteps?: number };
+        const serverSteps = Number(statsRes?.todaySteps ?? 0);
+        const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
+          ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
+        const steps = typeof stepsFromRoute === 'number' && stepsFromRoute > 0 ? stepsFromRoute : serverSteps;
+        setTodaySteps(steps);
+      } catch (_e) {
+        setTotalPlantedTrees(0);
+        setCurrentTreeGrowth(0);
+      } finally {
+        setTreeLoading(false);
       }
-    } else {
+    };
+    fetchTree();
+  }, []);
+
+  const handleStepConversion = async () => {
+    if (isCelebrating || convertLoading) return;
+
+    if (todaySteps <= 0) {
       showAtTreeTop('No steps to convert!');
+      return;
+    }
+
+    const stepsToConvert = todaySteps;
+    const growthGain = Math.floor(stepsToConvert / 150);
+    const totalPotential = currentTreeGrowth + growthGain;
+
+    setConvertLoading(true);
+    try {
+      await request.post<{ currentTreeGrowth?: number; totalPlantedTrees?: number; todaySteps?: number }>(
+        '/api/trees/convert-steps',
+        { steps: stepsToConvert }
+      );
+    } catch (e) {
+      console.error('Convert steps failed:', e);
+      message.error('Failed to convert steps. Please try again.');
+      setConvertLoading(false);
+      return;
+    }
+    setConvertLoading(false);
+    setTodaySteps(0);
+
+    if (totalPotential >= 100) {
+      const treesPlantedThisTime = Math.floor(totalPotential / 100);
+      const leftoverGrowth = totalPotential % 100;
+      setTotalPlantedTrees((prev) => prev + treesPlantedThisTime);
+      setCurrentTreeGrowth(100);
+      setIsCelebrating(true);
+      startCelebration(leftoverGrowth);
+    } else {
+      setCurrentTreeGrowth(totalPotential);
+      showAtTreeTop(`Growth +${growthGain}%`);
     }
   };
 
@@ -353,6 +375,7 @@ const TreePlanting = () => {
         </div>
 
         {/* 核心动画区 - 树木动画 */}
+        <Spin spinning={treeLoading} tip="Loading tree...">
         <div
           style={{
             flex: 1,
@@ -360,6 +383,7 @@ const TreePlanting = () => {
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
+                bottom: '-220px',
           }}
         >
           <div
@@ -367,6 +391,7 @@ const TreePlanting = () => {
             style={{
               width: '320px',
               height: '320px',
+
               transition: 'transform 0.15s ease',
             }}
           >
@@ -382,6 +407,7 @@ const TreePlanting = () => {
             />
           </div>
         </div>
+        </Spin>
 
         {/* 进度条 */}
         <div
@@ -442,7 +468,8 @@ const TreePlanting = () => {
               type="primary"
               size="large"
               onClick={handleStepConversion}
-              disabled={isCelebrating || todaySteps === 0}
+              loading={convertLoading}
+              disabled={isCelebrating || todaySteps === 0 || treeLoading}
               style={{
                 borderRadius: '20px',
                 background: '#674fa3',

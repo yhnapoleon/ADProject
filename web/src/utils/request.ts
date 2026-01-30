@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosRequestConfig } from 'axios';
 
 const rawBase = import.meta.env.VITE_API_URL;
 const baseURL = rawBase ? rawBase.replace(/\/$/, '') : '/api';
@@ -47,4 +47,13 @@ service.interceptors.response.use(
   }
 );
 
-export default service;
+const request = {
+  get: <T = any>(url: string, config?: AxiosRequestConfig) => service.get(url, config) as unknown as Promise<T>,
+  post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => service.post(url, data, config) as unknown as Promise<T>,
+  put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => service.put(url, data, config) as unknown as Promise<T>,
+  delete: <T = any>(url: string, config?: AxiosRequestConfig) => service.delete(url, config) as unknown as Promise<T>,
+  // expose the raw axios instance for advanced use if needed
+  raw: service,
+};
+
+export default request;

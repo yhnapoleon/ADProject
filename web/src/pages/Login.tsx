@@ -1,8 +1,10 @@
 import { Button, Card, Form, Input, message, Typography } from 'antd';
 import { useNavigate, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import splashIcon from '../assets/icons/splash.svg';
 import request from '../utils/request';
+import SplashScreen from '../components/SplashScreen';
+import Onboarding from './Onboarding';
 
 const { Title, Text } = Typography;
 
@@ -24,6 +26,16 @@ type AuthResponse = {
 const Login = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState<'splash' | 'onboarding' | 'login'>('splash');
+
+  useEffect(() => {
+    if (stage === 'splash') {
+      const timer = setTimeout(() => {
+        setStage('onboarding');
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [stage]);
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
@@ -74,6 +86,14 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  if (stage === 'splash') {
+    return <SplashScreen />;
+  }
+
+  if (stage === 'onboarding') {
+    return <Onboarding onFinish={() => setStage('login')} />;
+  }
 
   return (
     <div
