@@ -2,6 +2,7 @@ import { Button, Card, Input, Space, Typography, Form, message } from 'antd';
 import { CarOutlined, EnvironmentOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
@@ -18,10 +19,21 @@ const EMISSION_FACTORS: Record<TravelMode, number> = {
   mrt: 0.041,
 };
 
+// 前端TravelMode到后端TransportMode枚举的映射
+const TRANSPORT_MODE_MAP: Record<TravelMode, number> = {
+  airplane: 9,  // Plane
+  bus: 4,       // Bus
+  cycle: 1,     // Bicycle
+  car: 6,       // CarGasoline
+  ship: 8,      // Ship
+  mrt: 3,       // Subway
+};
+
 const LogTravel = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<TravelMode | null>(null);
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
   const modes = useMemo(
     () => [
@@ -92,8 +104,27 @@ const LogTravel = () => {
             message.error('Please fill in both Origin and Destination');
             return;
           }
-          message.success('Travel logged successfully!');
-          navigate('/dashboard');
+
+          setLoading(true);
+          try {
+            // 调用后端API创建出行记录
+            const response = await request.post('/api/travel', {
+              originAddress: values.origin,
+              destinationAddress: values.destination,
+              transportMode: TRANSPORT_MODE_MAP[mode],
+              notes: values.note || null,
+            });
+
+            message.success('Travel logged successfully!');
+            console.log('Travel log created:', response);
+            navigate('/dashboard');
+          } catch (error: any) {
+            console.error('Failed to log travel:', error);
+            const errorMessage = error.response?.data?.error || 'Failed to log travel. Please try again.';
+            message.error(errorMessage);
+          } finally {
+            setLoading(false);
+          }
         }}>
           <div style={{ marginTop: 10 }}>
             <Title level={4} style={{ margin: 0, marginBottom: 12 }}>
@@ -145,6 +176,7 @@ const LogTravel = () => {
                 type="primary"
                 size="large"
                 htmlType="submit"
+                loading={loading}
                 style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 12, fontWeight: 700 }}
               >
                 Save
