@@ -1,4 +1,5 @@
-import { Row, Col, Card, Button, Progress } from 'antd';
+import { useState, useEffect } from 'react';
+import { Row, Col, Card, Button, Progress, Spin } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import { mockLeaderboardData } from '../mock/data';
@@ -7,18 +8,48 @@ import './Dashboard.module.css';
 import mainEatIcon from '../assets/icons/main_eat.svg';
 import mainTravelIcon from '../assets/icons/main_travel.svg';
 import mainWaterIcon from '../assets/icons/main_water.svg';
+import request from '../utils/request';
+
+interface MainPageStats {
+  total: number;
+  food: number;
+  transport: number;
+  utility: number;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const numberFormatter = new Intl.NumberFormat('en-US');
 
-  // Mock data
-  const thisMonthEmissions = 45.6;
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [stats, setStats] = useState<MainPageStats>({ total: 0, food: 0, transport: 0, utility: 0 });
+
+  useEffect(() => {
+    const fetchMainPageStats = async () => {
+      setStatsLoading(true);
+      try {
+        const res = await request.get<MainPageStats>('/api/mainpage');
+        setStats({
+          total: Number(res?.total ?? 0),
+          food: Number(res?.food ?? 0),
+          transport: Number(res?.transport ?? 0),
+          utility: Number(res?.utility ?? 0),
+        });
+      } catch (_e) {
+        setStats({ total: 0, food: 0, transport: 0, utility: 0 });
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    fetchMainPageStats();
+  }, []);
+
   const targetEmissions = 100.0;
-  const progressPercent = (thisMonthEmissions / targetEmissions) * 100;
-  const foodEmissions = 18.5;
-  const travelEmissions = 20.3;
-  const utilitiesEmissions = 6.8;
+  const thisMonthEmissions = stats.total;
+  const progressPercent = targetEmissions > 0 ? Math.min(100, (thisMonthEmissions / targetEmissions) * 100) : 0;
+  const foodEmissions = stats.food;
+  const travelEmissions = stats.transport;
+  const utilitiesEmissions = stats.utility;
 
   const todayLeaderboard = [...mockLeaderboardData]
     .sort((a, b) => (b.pointsToday || 0) - (a.pointsToday || 0))
@@ -28,55 +59,57 @@ const Dashboard = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* This Month's Emissions Card */}
       <Card style={{ background: 'linear-gradient(135deg, #674fa3 0%, #7d5fb8 100%)', border: 'none', borderRadius: '12px', color: 'white', boxShadow: '0 4px 12px rgba(103, 79, 163, 0.15)' }}>
-        <div style={{ padding: '32px' }}>
-          <Row gutter={24} align="middle">
-            <Col span={12}>
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '35px', opacity: '0.9', marginBottom: '8px' }}>This Month's Emissions</div>
-                <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{thisMonthEmissions.toFixed(2)} kg</div>
-              </div>
-            </Col>
+        <Spin spinning={statsLoading} tip="Loading emissions...">
+          <div style={{ padding: '32px' }}>
+            <Row gutter={24} align="middle">
+              <Col span={12}>
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '35px', opacity: '0.9', marginBottom: '8px' }}>This Month's Emissions</div>
+                  <div style={{ fontSize: '32px', fontWeight: '700', marginBottom: '12px' }}>{thisMonthEmissions.toFixed(2)} kg</div>
+                </div>
+              </Col>
 
-            <Col span={12}>
-              <div style={{ marginBottom: '12px', textAlign: 'right' }}>
-                <div style={{ fontSize: '20px', opacity: '0.9', marginBottom: '8px' }}>Target</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>{targetEmissions.toFixed(2)} kg</div>
-              </div>
-            </Col>
-          </Row>
+              <Col span={12}>
+                <div style={{ marginBottom: '12px', textAlign: 'right' }}>
+                  <div style={{ fontSize: '20px', opacity: '0.9', marginBottom: '8px' }}>Target</div>
+                  <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>{targetEmissions.toFixed(2)} kg</div>
+                </div>
+              </Col>
+            </Row>
 
-          <div style={{ marginTop: '16px', marginBottom: '24px' }}>
-            <Progress
-              percent={progressPercent}
-              strokeColor="#feda00"
-              showInfo={false}
-            />
+            <div style={{ marginTop: '16px', marginBottom: '24px' }}>
+              <Progress
+                percent={progressPercent}
+                strokeColor="#feda00"
+                showInfo={false}
+              />
+            </div>
+
+            <Row gutter={24} style={{ marginTop: '24px' }}>
+              <Col span={8}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <img src={mainEatIcon} alt="Food" style={{ width: '32px', height: '32px' }} />
+                  <div style={{ fontSize: '18px', fontWeight: '700' }}>Food</div>
+                  <div style={{ fontSize: '18px', fontWeight: '700' }}>{foodEmissions.toFixed(2)} kg</div>
+                </div>
+              </Col>
+              <Col span={8}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <img src={mainTravelIcon} alt="Travel" style={{ width: '32px', height: '32px' }} />
+                  <div style={{ fontSize: '18px', fontWeight: '700' }}>Travel</div>
+                  <div style={{ fontSize: '18px', fontWeight: '700' }}>{travelEmissions.toFixed(2)} kg</div>
+                </div>
+              </Col>
+              <Col span={8}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <img src={mainWaterIcon} alt="Utility" style={{ width: '32px', height: '32px' }} />
+                  <div style={{ fontSize: '18px', fontWeight: '700' }}>Utility</div>
+                  <div style={{ fontSize: '18px', fontWeight: '700' }}>{utilitiesEmissions.toFixed(2)} kg</div>
+                </div>
+              </Col>
+            </Row>
           </div>
-
-          <Row gutter={24} style={{ marginTop: '24px' }}>
-            <Col span={8}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <img src={mainEatIcon} alt="Food" style={{ width: '32px', height: '32px' }} />
-                <div style={{ fontSize: '18px', fontWeight: '700' }}>Food</div>
-                <div style={{ fontSize: '18px', fontWeight: '700' }}>{foodEmissions.toFixed(2)} kg</div>
-              </div>
-            </Col>
-            <Col span={8}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <img src={mainTravelIcon} alt="Travel" style={{ width: '32px', height: '32px' }} />
-                <div style={{ fontSize: '18px', fontWeight: '700' }}>Travel</div>
-                <div style={{ fontSize: '18px', fontWeight: '700' }}>{travelEmissions.toFixed(2)} kg</div>
-              </div>
-            </Col>
-            <Col span={8}>
-              <div style={{ background: 'rgba(255, 255, 255, 0.2)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                <img src={mainWaterIcon} alt="Utility" style={{ width: '32px', height: '32px' }} />
-                <div style={{ fontSize: '18px', fontWeight: '700' }}>Utility</div>
-                <div style={{ fontSize: '18px', fontWeight: '700' }}>{utilitiesEmissions.toFixed(2)} kg</div>
-              </div>
-            </Col>
-          </Row>
-        </div>
+        </Spin>
       </Card>
 
       {/* Category Cards */}
