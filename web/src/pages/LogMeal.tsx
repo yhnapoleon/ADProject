@@ -347,23 +347,32 @@ const LogMeal = () => {
     }
   };
 
-  // 调用食物识别API
+  // 调用食物识别API（AI 模型推理较慢，需较长超时）
   const recognizeFood = async (file: File): Promise<VisionResponse | null> => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      
-      // 不要手动设置 Content-Type，让浏览器自动设置（包括 boundary）
-      const response: any = await request.post('/vision/analyze', formData);
+      // 食物识别需运行双模型推理，CPU 上约 15-60 秒
+      const response: any = await request.post('/vision/analyze', formData, {
+        timeout: 60000,
+      });
       // request 拦截器已经返回了 response.data，所以直接使用
       return response as VisionResponse;
     } catch (error: any) {
       console.error('Food recognition error:', error);
       if (error.response?.status === 401) {
-        // 401 错误由 beforeUpload 统一处理，这里只返回 null
         return null;
       }
-      message.error('食物识别失败');
+      const status = error.response?.status;
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+      const msg = isTimeout
+        ? '识别超时，AI 模型处理较慢，请稍后重试'
+        : status === 502
+          ? '食物识别服务未启动，请先启动 Vision 服务 (端口 8000)'
+          : status === 400
+            ? '图片上传无效，请重试'
+            : '食物识别失败';
+      message.error(msg);
       return null;
     }
   };
