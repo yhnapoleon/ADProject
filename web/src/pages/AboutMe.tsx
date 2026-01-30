@@ -5,14 +5,6 @@ import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import './AboutMe.module.css';
 import request from '../utils/request';
 
-interface MonthlyData {
-  month: string;
-  food: number;
-  travel: number;
-  utility: number;
-  total: number;
-}
-
 /** Backend returns array of { Month, EmissionsTotal, Food, Transport, Utility, AverageAllUsers } */
 interface MonthlyEmissionDto {
   Month: string;
@@ -25,43 +17,66 @@ interface MonthlyEmissionDto {
 
 const AboutMe = () => {
   const [loading, setLoading] = useState(true);
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [comparison, setComparison] = useState({ percent: 15, status: 'lower' });
+  const [monthlyEmissions, setMonthlyEmissions] = useState<MonthlyEmissionDto[]>([]);
+  const [comparison, setComparison] = useState<{ percent: number; status: 'lower' | 'higher'; available: boolean }>({ percent: 0, status: 'lower', available: false });
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [latestEmissions, setLatestEmissions] = useState<number>(0);
+  const [totalTrees, setTotalTrees] = useState<number>(0);
 
   useEffect(() => {
     const fetchAboutMeData = async () => {
       setLoading(true);
       try {
-        const res = await request.get<MonthlyEmissionDto[] | { monthlyData: MonthlyData[]; comparisonPercent?: number; comparisonStatus?: string }>('/api/about-me');
+        const res = await request.get<MonthlyEmissionDto[] | { monthlyData: MonthlyEmissionDto[]; comparisonPercent?: number; comparisonStatus?: string }>('/api/about-me');
         if (Array.isArray(res) && res.length > 0) {
           const dtoList = res as MonthlyEmissionDto[];
-          const mapped: MonthlyData[] = dtoList.map((d) => ({
-            month: d.Month,
-            total: Number(d.EmissionsTotal),
-            food: Number(d.Food),
-            travel: Number(d.Transport),
-            utility: Number(d.Utility),
-          }));
-          setMonthlyData(mapped);
+          // store raw DTOs
+          setMonthlyEmissions(dtoList);
+
           const last = dtoList[dtoList.length - 1];
           const avg = Number(last.AverageAllUsers);
           const userTotal = Number(last.EmissionsTotal);
+
+          // Use backend-provided EmissionsTotal for the top metric
+          setLatestEmissions(userTotal);
+
           if (avg > 0) {
             const percent = Math.round(((userTotal - avg) / avg) * 100);
             setComparison({
               percent: Math.abs(percent),
               status: userTotal < avg ? 'lower' : 'higher',
+              available: true,
             });
+          } else {
+            // no comparison available
+            setComparison((c) => ({ ...c, available: false }));
           }
         } else if (res && (res as any).monthlyData?.length > 0) {
-          setMonthlyData((res as any).monthlyData);
+          const monthly = (res as any).monthlyData as MonthlyEmissionDto[];
+          setMonthlyEmissions(monthly);
+
+          // fallback: use last monthly total if DTO format differs
+          const last = monthly[monthly.length - 1];
+          setLatestEmissions(Number(last?.EmissionsTotal ?? 0));
+
           if ((res as any).comparisonPercent !== undefined) {
             setComparison({
               percent: (res as any).comparisonPercent,
               status: (res as any).comparisonStatus || 'lower',
+              available: true,
             });
+          } else {
+            setComparison((c) => ({ ...c, available: false }));
           }
+        }
+
+        // Also fetch total trees from tree service (used in TreePlanting page)
+        try {
+          const treeRes = await request.get('/api/getTree') as { totalTrees?: number };
+          setTotalTrees(Number(treeRes?.totalTrees ?? 0));
+        } catch (e) {
+          console.warn('Failed to load tree data:', e);
+          setTotalTrees(0);
         }
       } catch (error) {
         console.error('Failed to fetch about-me data:', error);
@@ -73,30 +88,30 @@ const AboutMe = () => {
     fetchAboutMeData();
   }, []);
 
-  // Calculate total emissions
-  const totalEmissions = monthlyData.reduce((sum, data) => sum + data.total, 0);
+  // Use latest month's EmissionsTotal from backend
+  const totalEmissions = latestEmissions;
 
-  // Calculate trees planted equivalent (20kg = 1 tree)
-  const treesPlanted = Math.floor(totalEmissions / 20);
+  // Trees planted count comes from tree service (TreePlanting page)
+  const treesPlanted = totalTrees;
 
   // Get pie chart data
   const getPieData = () => {
     if (selectedMonth === 'all') {
-      const foodTotal = monthlyData.reduce((sum, data) => sum + (data.food || 0), 0);
-      const travelTotal = monthlyData.reduce((sum, data) => sum + (data.travel || 0), 0);
-      const utilityTotal = monthlyData.reduce((sum, data) => sum + (data.utility || 0), 0);
+      const foodTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.Food) || 0), 0);
+      const travelTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.Transport) || 0), 0);
+      const utilityTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.Utility) || 0), 0);
       return [
         { name: 'Food', value: foodTotal },
         { name: 'Travel', value: travelTotal },
         { name: 'Utility', value: utilityTotal },
       ];
     } else {
-      const monthData = monthlyData.find(d => d.month === selectedMonth);
+      const monthData = monthlyEmissions.find(d => d.Month === selectedMonth);
       if (monthData) {
         return [
-          { name: 'Food', value: monthData.food || 0 },
-          { name: 'Travel', value: monthData.travel || 0 },
-          { name: 'Utility', value: monthData.utility || 0 },
+          { name: 'Food', value: Number(monthData.Food) || 0 },
+          { name: 'Travel', value: Number(monthData.Transport) || 0 },
+          { name: 'Utility', value: Number(monthData.Utility) || 0 },
         ];
       }
       return [];
@@ -112,8 +127,10 @@ const AboutMe = () => {
 
   const monthOptions = [
     { label: 'All Time', value: 'all' },
-    ...monthlyData.map(d => ({ label: d.month, value: d.month })),
+    ...monthlyEmissions.map(d => ({ label: d.Month, value: d.Month })),
   ];
+
+  const chartData = monthlyEmissions.map(m => ({ month: m.Month, total: Number(m.EmissionsTotal) }));
 
   if (loading) {
     return (
@@ -148,17 +165,18 @@ const AboutMe = () => {
               <div style={{ 
                 fontSize: '28px', 
                 fontWeight: 'bold', 
-                color: comparison.status === 'lower' ? '#52c41a' : '#ff4d4f', 
+                color: comparison.available ? (comparison.status === 'lower' ? '#52c41a' : '#ff4d4f') : '#999', 
                 marginBottom: '8px', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
                 gap: '6px' 
               }}>
-                {comparison.status === 'lower' ? <ArrowDownOutlined /> : <ArrowUpOutlined />} {comparison.percent}%
+                {comparison.available ? (comparison.status === 'lower' ? <ArrowDownOutlined /> : <ArrowUpOutlined />) : null}
+                {comparison.available ? `${comparison.percent}%` : '—'}
               </div>
-              <div style={{ fontSize: '12px', color: comparison.status === 'lower' ? '#52c41a' : '#ff4d4f' }}>
-                {comparison.status} than average
+              <div style={{ fontSize: '12px', color: comparison.available ? (comparison.status === 'lower' ? '#52c41a' : '#ff4d4f') : '#999' }}>
+                {comparison.available ? `${comparison.status} than average` : 'No comparison data'}
               </div>
             </div>
           </Card>
@@ -181,9 +199,9 @@ const AboutMe = () => {
       {/* Monthly Trend Chart */}
       <Card style={{ borderRadius: '12px', border: '1px solid #f0f0f0' }}>
         <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>Monthly Emission Trend</div>
-        {monthlyData.length > 0 ? (
+        {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={monthlyData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="month" />
               <YAxis />
