@@ -1,16 +1,33 @@
 import { Button, Card, DatePicker, Form, InputNumber, Space, Typography, Upload, Input, message } from 'antd';
 import type { UploadProps } from 'antd';
+import dayjs from 'dayjs';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
 const inputBg = { background: '#F3F0FF' } as const;
 
+/** 后端账单类型：0 电 1 水 2 燃气 3 综合 */
+const BILL_TYPE_COMBINED = 3;
+
+/** 上传/识别返回的账单数据（与后端 UtilityBillResponseDto 对齐） */
+type UtilityBillResponse = {
+  id?: number;
+  billType: number;
+  billPeriodStart: string;
+  billPeriodEnd: string;
+  electricityUsage?: number | null;
+  waterUsage?: number | null;
+  gasUsage?: number | null;
+};
+
 type FormValues = {
   electricityUsage?: number;
   waterUsage?: number;
-  month?: any;
+  gasUsage?: number;
+  month?: dayjs.Dayjs;
   note?: string;
 };
 
@@ -18,6 +35,8 @@ const LogUtility = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm<FormValues>();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   const fileToBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -28,8 +47,29 @@ const LogUtility = () => {
     });
 
   const beforeUpload: UploadProps['beforeUpload'] = async (file) => {
-    const base64 = await fileToBase64(file as unknown as File);
+    const rawFile = file as unknown as File;
+    const base64 = await fileToBase64(rawFile);
     setPreviewUrl(base64);
+
+    const formData = new FormData();
+    formData.append('file', rawFile);
+    setUploadLoading(true);
+    try {
+      const res = await request.post<UtilityBillResponse>('/api/UtilityBill/upload', formData);
+      form.setFieldsValue({
+        electricityUsage: res?.electricityUsage ?? undefined,
+        waterUsage: res?.waterUsage ?? undefined,
+        gasUsage: res?.gasUsage ?? undefined,
+        month: res?.billPeriodStart ? dayjs(res.billPeriodStart) : undefined,
+      });
+      message.success('账单识别成功，请核对后保存');
+    } catch (err: any) {
+      console.error('[LogUtility] 上传失败:', err?.response?.status, err?.response?.data);
+      const msg = err?.response?.data?.error ?? err?.message ?? '识别失败，请改用手动填写';
+      message.error(msg);
+    } finally {
+      setUploadLoading(false);
+    }
     return false;
   };
 
@@ -41,7 +81,7 @@ const LogUtility = () => {
         </Title>
 
         {/* Bill scan */}
-        <Upload accept="image/*,.pdf" showUploadList={false} beforeUpload={beforeUpload}>
+        <Upload accept="image/*,.pdf" showUploadList={false} beforeUpload={beforeUpload} disabled={uploadLoading}>
           <div
             style={{
               border: '2px dashed #674fa3',
@@ -65,9 +105,10 @@ const LogUtility = () => {
                 </div>
                 <Button
                   type="primary"
+                  loading={uploadLoading}
                   style={{ marginTop: 14, background: '#674fa3', borderColor: '#674fa3', borderRadius: 999 }}
                 >
-                  Upload Bill
+                  {uploadLoading ? '识别中...' : 'Upload Bill'}
                 </Button>
               </div>
             ) : (
@@ -80,9 +121,33 @@ const LogUtility = () => {
           </div>
         </Upload>
 
-        <Form<FormValues> form={form} layout="vertical" style={{ marginTop: 18 }} onFinish={async () => {
-          message.success('Utility logged successfully!');
-          navigate('/dashboard');
+        <Form<FormValues> form={form} layout="vertical" style={{ marginTop: 18 }} onFinish={async (values) => {
+          const month = values.month;
+          if (!month) {
+            message.error('请选择账单月份');
+            return;
+          }
+          const billPeriodStart = month.startOf('month').format('YYYY-MM-DD');
+          const billPeriodEnd = month.endOf('month').format('YYYY-MM-DD');
+          setSubmitLoading(true);
+          try {
+            await request.post('/api/UtilityBill/manual', {
+              billType: BILL_TYPE_COMBINED,
+              billPeriodStart,
+              billPeriodEnd,
+              electricityUsage: values.electricityUsage ?? null,
+              waterUsage: values.waterUsage ?? null,
+              gasUsage: values.gasUsage ?? null,
+            });
+            message.success('水电账单已保存');
+            navigate('/dashboard');
+          } catch (err: any) {
+            console.error('[LogUtility] 保存失败:', err?.response?.status, err?.response?.data);
+            const msg = err?.response?.data?.error ?? err?.message ?? '保存失败，请重试';
+            message.error(msg);
+          } finally {
+            setSubmitLoading(false);
+          }
         }}>
           <Title level={4} style={{ marginTop: 0 }}>
             Manual Entry
@@ -101,6 +166,13 @@ const LogUtility = () => {
               label="Water - Usage (Cu M)" 
               name="waterUsage"
               rules={[{ required: true, message: 'Please enter water usage' }]}
+            >
+              <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
+            </Form.Item>
+
+            <Form.Item 
+              label="Gas - Usage (kWh or Cu M, optional)" 
+              name="gasUsage"
             >
               <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
             </Form.Item>
@@ -128,12 +200,14 @@ const LogUtility = () => {
               type="primary"
               size="large"
               htmlType="submit"
+              loading={submitLoading}
+              disabled={uploadLoading}
               style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 12, fontWeight: 700 }}
             >
               Save
             </Button>
             <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
-              This adds a utility record into your carbon ledger (stored locally)...
+              保存后将计入您的碳账本并参与统计。
             </Text>
           </Space>
         </Form>

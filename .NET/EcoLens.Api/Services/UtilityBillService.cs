@@ -142,12 +142,16 @@ public class UtilityBillService : IUtilityBillService
 			}
 
 			// 2. 检查重复账单（同一用户、相同账单周期、相同类型、相同用量）
-			// 注意：decimal? 类型需要特殊处理，使用 HasValue 和 Value 比较
+			// 用日期范围比较避免时区/时间部分导致漏判
+			var startDay = dto.BillPeriodStart.Date;
+			var startNext = startDay.AddDays(1);
+			var endDay = dto.BillPeriodEnd.Date;
+			var endNext = endDay.AddDays(1);
 			var existingBill = await _db.UtilityBills
 				.Where(b => b.UserId == userId &&
 				            b.BillType == dto.BillType &&
-				            b.BillPeriodStart == dto.BillPeriodStart &&
-				            b.BillPeriodEnd == dto.BillPeriodEnd &&
+				            b.BillPeriodStart >= startDay && b.BillPeriodStart < startNext &&
+				            b.BillPeriodEnd >= endDay && b.BillPeriodEnd < endNext &&
 				            ((b.ElectricityUsage.HasValue && dto.ElectricityUsage.HasValue && b.ElectricityUsage.Value == dto.ElectricityUsage.Value) ||
 				             (!b.ElectricityUsage.HasValue && !dto.ElectricityUsage.HasValue)) &&
 				            ((b.WaterUsage.HasValue && dto.WaterUsage.HasValue && b.WaterUsage.Value == dto.WaterUsage.Value) ||
@@ -171,9 +175,11 @@ public class UtilityBillService : IUtilityBillService
 				ct);
 
 			// 4. 创建实体
+			var periodLabel = dto.BillPeriodStart.ToString("yyyy-MM");
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
+				YearMonth = periodLabel,
 				BillType = dto.BillType,
 				BillPeriodStart = dto.BillPeriodStart,
 				BillPeriodEnd = dto.BillPeriodEnd,
@@ -187,13 +193,62 @@ public class UtilityBillService : IUtilityBillService
 				InputMethod = InputMethod.Manual
 			};
 
-			// 4. 保存到数据库
+			// 5. 保存到数据库
 			await _db.UtilityBills.AddAsync(utilityBill, ct);
 			await _db.SaveChangesAsync(ct);
 
 			_logger.LogInformation("Utility bill created manually: UserId={UserId}, BillId={BillId}", userId, utilityBill.Id);
 
-			// 5. 转换为DTO返回
+			// 6. 生成 ActivityLog，使仪表盘与 Records 能显示水电账单数据
+			try
+			{
+				// 只按 LabelName + Category 查，不依赖 Region，确保能命中种子数据（Electricity/Water/Gas, Utility）
+				async Task<CarbonReference?> FindUtilityFactorAsync(string label)
+				{
+					return await _db.CarbonReferences
+						.AsNoTracking()
+						.FirstOrDefaultAsync(
+							c => c.LabelName == label && c.Category == CarbonCategory.Utility,
+							ct);
+				}
+
+				var now = DateTime.UtcNow;
+				async Task AddActivityLogAsync(string label, decimal usage, decimal emission)
+				{
+					if (usage <= 0 && emission <= 0) return;
+					var factor = await FindUtilityFactorAsync(label);
+					if (factor is null)
+					{
+						_logger.LogWarning("CarbonReference not found for Utility label={Label}, skip ActivityLog", label);
+						return;
+					}
+
+					var log = new ActivityLog
+					{
+						UserId = userId,
+						CarbonReferenceId = factor.Id,
+						Quantity = usage,
+						TotalEmission = emission,
+						DetectedLabel = $"{label} ({periodLabel})",
+						CreatedAt = now,
+						UpdatedAt = now
+					};
+					_db.ActivityLogs.Add(log);
+				}
+
+				await AddActivityLogAsync("Electricity", utilityBill.ElectricityUsage ?? 0m, utilityBill.ElectricityCarbonEmission);
+				await AddActivityLogAsync("Water", utilityBill.WaterUsage ?? 0m, utilityBill.WaterCarbonEmission);
+				await AddActivityLogAsync("Gas", utilityBill.GasUsage ?? 0m, utilityBill.GasCarbonEmission);
+
+				await _db.SaveChangesAsync(ct);
+			}
+			catch (Exception exLog)
+			{
+				// 账单已保存，ActivityLog 失败时仅记录日志、不抛错，用户仍得到 200 与保存成功
+				_logger.LogError(exLog, "Failed to create ActivityLogs for UtilityBill UserId={UserId} BillId={BillId}", userId, utilityBill.Id);
+			}
+
+			// 7. 转换为DTO返回
 			return ToResponseDto(utilityBill);
 		}
 		catch (Exception ex)
