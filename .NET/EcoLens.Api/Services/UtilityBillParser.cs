@@ -75,19 +75,24 @@ public class UtilityBillParser : IUtilityBillParser
 	/// </summary>
 	private UtilityBillType IdentifyBillType(string lowerText)
 	{
+		// 增强的新加坡水电账单关键词
 		var hasElectricity = ContainsKeywords(lowerText, new[]
 		{
-			"electricity", "electric", "power", "kwh", "kw·h", "sp group", "sp services", "electricity services"
+			"electricity", "electric", "power", "kwh", "kw·h", "kw h", "kilowatt",
+			"sp group", "sp services", "singapore power", "electricity services",
+			"consumption", "usage", "units consumed", "energy consumption"
 		});
 
 		var hasWater = ContainsKeywords(lowerText, new[]
 		{
-			"water", "pub", "m³", "m3", "cubic meter", "litre", "liter", "consumption", "cu m", "water services"
+			"water", "pub", "public utilities board", "water services",
+			"m³", "m3", "cubic meter", "cubic metre", "cu m", "cu.m",
+			"litre", "liter", "l", "water consumption", "water usage"
 		});
 
 		var hasGas = ContainsKeywords(lowerText, new[]
 		{
-			"gas", "town gas", "natural gas", "city gas"
+			"gas", "town gas", "natural gas", "city gas", "gas consumption", "gas usage"
 		});
 
 		if (hasElectricity && hasWater && hasGas)

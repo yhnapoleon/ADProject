@@ -59,7 +59,7 @@ public class TravelService : ITravelService
 			await _cacheService.SetCachedGeocodeAsync(dto.DestinationAddress, destGeocode);
 		}
 
-		// 2. 获取路线信息
+		// 2. 获取路线信息（先获取导航距离，用于验证和计算）
 		var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
 		var route = await _googleMapsService.GetRouteAsync(
 			originGeocode.Latitude,
@@ -74,6 +74,10 @@ public class TravelService : ITravelService
 			throw new InvalidOperationException("Unable to get route information");
 		}
 
+		// 2.5. 验证出行方式的合理性（在获取导航距离之后，使用实际导航距离进行验证）
+		var navigationDistanceKm = route.DistanceMeters / 1000.0;
+		await ValidateTransportModeForRouteAsync(dto.TransportMode, originGeocode, destGeocode, navigationDistanceKm, ct);
+
 		// 3. 查找碳排放因子
 		var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
 		if (carbonFactor == null)
@@ -81,8 +85,8 @@ public class TravelService : ITravelService
 			throw new InvalidOperationException($"Carbon emission factor not found for transport mode: {dto.TransportMode}");
 		}
 
-		// 4. 计算碳排放
-		var distanceKm = (decimal)route.DistanceMeters / 1000m;
+		// 4. 计算碳排放（使用导航距离）
+		var distanceKm = (decimal)navigationDistanceKm;
 		var carbonEmission = distanceKm * carbonFactor.Co2Factor;
 
 		// 5. 创建实体
@@ -144,7 +148,7 @@ public class TravelService : ITravelService
 			await _cacheService.SetCachedGeocodeAsync(dto.DestinationAddress, destGeocode);
 		}
 
-		// 2. 获取路线信息
+		// 2. 获取路线信息（先获取导航距离，用于验证和计算）
 		var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
 		var route = await _googleMapsService.GetRouteAsync(
 			originGeocode.Latitude,
@@ -159,6 +163,10 @@ public class TravelService : ITravelService
 			throw new InvalidOperationException("Unable to get route information");
 		}
 
+		// 2.5. 验证出行方式的合理性（在获取导航距离之后，使用实际导航距离进行验证）
+		var navigationDistanceKm = route.DistanceMeters / 1000.0;
+		await ValidateTransportModeForRouteAsync(dto.TransportMode, originGeocode, destGeocode, navigationDistanceKm, ct);
+
 		// 3. 查找碳排放因子
 		var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
 		if (carbonFactor == null)
@@ -166,8 +174,8 @@ public class TravelService : ITravelService
 			throw new InvalidOperationException($"Carbon emission factor not found for transport mode: {dto.TransportMode}");
 		}
 
-		// 4. 计算碳排放
-		var distanceKm = (decimal)route.DistanceMeters / 1000m;
+		// 4. 计算碳排放（使用导航距离）
+		var distanceKm = (decimal)navigationDistanceKm;
 		var carbonEmission = distanceKm * carbonFactor.Co2Factor;
 
 		// 5. 转换为预览DTO
@@ -427,6 +435,197 @@ public class TravelService : ITravelService
 			TransportMode.Plane => "Plane",
 			_ => mode.ToString()
 		};
+	}
+
+	/// <summary>
+	/// 验证出行方式是否适合该路线（异步版本，支持基础设施检查）
+	/// 避免在新加坡内部使用飞机、轮船等不合理的出行方式
+	/// 检查实际交通工具的可用性（如机场、港口）
+	/// </summary>
+	private async Task ValidateTransportModeForRouteAsync(
+		TransportMode transportMode, 
+		GeocodingResult origin, 
+		GeocodingResult destination, 
+		double navigationDistanceKm,
+		CancellationToken ct)
+	{
+		// 使用导航距离而不是直线距离进行验证
+		var distanceKm = navigationDistanceKm;
+
+		// 检查地址中是否包含新加坡关键词（即使 Country 字段为空也能检测）
+		var originAddressLower = origin.FormattedAddress?.ToLowerInvariant() ?? string.Empty;
+		var destAddressLower = destination.FormattedAddress?.ToLowerInvariant() ?? string.Empty;
+		var originCountryLower = origin.Country?.ToLowerInvariant() ?? string.Empty;
+		var destCountryLower = destination.Country?.ToLowerInvariant() ?? string.Empty;
+
+		var hasSingaporeKeyword = (originAddressLower.Contains("singapore") || originAddressLower.Contains("新加坡") ||
+		                           originCountryLower.Contains("singapore") || originCountryLower.Contains("新加坡")) &&
+		                          (destAddressLower.Contains("singapore") || destAddressLower.Contains("新加坡") ||
+		                           destCountryLower.Contains("singapore") || destCountryLower.Contains("新加坡"));
+
+		// 检查是否在同一国家（特别是新加坡）
+		var sameCountry = !string.IsNullOrWhiteSpace(origin.Country) &&
+		                  !string.IsNullOrWhiteSpace(destination.Country) &&
+		                  string.Equals(origin.Country, destination.Country, StringComparison.OrdinalIgnoreCase);
+
+		var isSingapore = (sameCountry && 
+		                  (string.Equals(origin.Country, "Singapore", StringComparison.OrdinalIgnoreCase) ||
+		                   string.Equals(origin.Country, "新加坡", StringComparison.OrdinalIgnoreCase))) ||
+		                 hasSingaporeKeyword;
+
+		// 验证规则：
+		// 1. 如果距离为 0 或非常小（< 1 公里），不允许使用飞机和轮船
+		// 2. 如果都在新加坡，不允许使用飞机和轮船（短距离）
+		// 3. 如果距离小于100公里，不允许使用飞机
+		// 4. 如果距离小于10公里，不允许使用轮船
+
+		if (transportMode == TransportMode.Plane)
+		{
+			// 首先检查距离是否为 0 或非常小
+			if (distanceKm < 1)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过短（{distanceKm:F2} 公里），不能使用飞机。请选择其他出行方式。");
+			}
+
+			// 检查是否在新加坡内部
+			if (isSingapore)
+			{
+				throw new InvalidOperationException(
+					"在新加坡内部不能使用飞机作为出行方式。请选择其他出行方式，如地铁、公交、出租车或私家车。");
+			}
+
+			// 检查距离是否足够长
+			if (distanceKm < 100)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过短（{distanceKm:F1} 公里），不适合使用飞机。飞机通常用于长途旅行（100公里以上）。请选择其他出行方式。");
+			}
+
+			// 检查出发地和目的地附近是否有机场（使用 Google Places API）
+			var originHasAirport = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "airport", 50000, ct); // 50公里范围内
+			var destHasAirport = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "airport", 50000, ct);
+
+			if (!originHasAirport)
+			{
+				throw new InvalidOperationException(
+					$"出发地附近（50公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+			}
+
+			if (!destHasAirport)
+			{
+				throw new InvalidOperationException(
+					$"目的地附近（50公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+			}
+		}
+
+		if (transportMode == TransportMode.Ship)
+		{
+			// 首先检查距离是否为 0 或非常小
+			if (distanceKm < 1)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过短（{distanceKm:F2} 公里），不能使用轮船。请选择其他出行方式。");
+			}
+
+			// 检查是否在新加坡内部短距离
+			if (isSingapore && distanceKm < 50)
+			{
+				// 新加坡是岛国，但内部短距离不应该用轮船
+				throw new InvalidOperationException(
+					"在新加坡内部短距离出行不适合使用轮船。请选择其他出行方式，如地铁、公交、出租车或私家车。");
+			}
+
+			// 检查距离是否足够长
+			if (distanceKm < 10)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过短（{distanceKm:F1} 公里），不适合使用轮船。请选择其他出行方式。");
+			}
+
+			// 检查出发地和目的地附近是否有港口/码头（使用 Google Places API）
+			var originHasPort = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "port", 30000, ct) ||
+			                    await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "ferry terminal", 30000, ct);
+			var destHasPort = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "port", 30000, ct) ||
+			                  await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "ferry terminal", 30000, ct);
+
+			if (!originHasPort)
+			{
+				throw new InvalidOperationException(
+					$"出发地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。请选择其他出行方式。");
+			}
+
+			if (!destHasPort)
+			{
+				throw new InvalidOperationException(
+					$"目的地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。请选择其他出行方式。");
+			}
+		}
+
+		_logger.LogInformation(
+			"Transport mode validation passed: Mode={TransportMode}, Origin={OriginCountry}, Dest={DestCountry}, NavigationDistance={Distance}km",
+			transportMode, origin.Country, destination.Country, distanceKm);
+	}
+
+	/// <summary>
+	/// 检查指定位置附近是否有特定类型的基础设施（如机场、港口）
+	/// </summary>
+	private async Task<bool> HasNearbyInfrastructureAsync(
+		double latitude, 
+		double longitude, 
+		string keyword, 
+		int radiusMeters,
+		CancellationToken ct)
+	{
+		try
+		{
+			var result = await _googleMapsService.SearchNearbyAsync(latitude, longitude, keyword, radiusMeters, ct);
+			if (result == null || result.Places == null || result.Places.Count == 0)
+			{
+				_logger.LogDebug("No {Infrastructure} found near {Lat}, {Lng} within {Radius}m", keyword, latitude, longitude, radiusMeters);
+				return false;
+			}
+
+			_logger.LogDebug("Found {Count} {Infrastructure} near {Lat}, {Lng}: {Places}", 
+				result.Places.Count, keyword, latitude, longitude, 
+				string.Join(", ", result.Places.Select(p => p.Name)));
+
+			return result.Places.Count > 0;
+		}
+		catch (Exception ex)
+		{
+			_logger.LogWarning(ex, "Error checking for {Infrastructure} near {Lat}, {Lng}", keyword, latitude, longitude);
+			// 如果检查失败，为了不阻塞用户，返回 true（允许使用该交通工具）
+			// 这样可以避免因为 API 调用失败而阻止合理的出行方式
+			return true;
+		}
+	}
+
+	/// <summary>
+	/// 使用 Haversine 公式计算两点间的直线距离（公里）
+	/// 注意：此方法仅用于辅助计算，实际距离验证应使用导航距离
+	/// </summary>
+	private double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
+	{
+		const double earthRadiusKm = 6371.0; // 地球半径（公里）
+
+		var dLat = ToRadians(lat2 - lat1);
+		var dLon = ToRadians(lon2 - lon1);
+
+		var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+		        Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+		        Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+		var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+		return earthRadiusKm * c;
+	}
+
+	/// <summary>
+	/// 将角度转换为弧度
+	/// </summary>
+	private static double ToRadians(double degrees)
+	{
+		return degrees * Math.PI / 180.0;
 	}
 
 	/// <summary>

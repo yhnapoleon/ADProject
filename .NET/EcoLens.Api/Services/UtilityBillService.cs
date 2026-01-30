@@ -17,6 +17,7 @@ public class UtilityBillService : IUtilityBillService
 	private readonly IOcrService _ocrService;
 	private readonly IUtilityBillParser _parser;
 	private readonly IUtilityBillCalculationService _calculationService;
+	private readonly IDocumentTypeClassifier _documentTypeClassifier;
 	private readonly ILogger<UtilityBillService> _logger;
 
 	public UtilityBillService(
@@ -24,12 +25,14 @@ public class UtilityBillService : IUtilityBillService
 		IOcrService ocrService,
 		IUtilityBillParser parser,
 		IUtilityBillCalculationService calculationService,
+		IDocumentTypeClassifier documentTypeClassifier,
 		ILogger<UtilityBillService> logger)
 	{
 		_db = db;
 		_ocrService = ocrService;
 		_parser = parser;
 		_calculationService = calculationService;
+		_documentTypeClassifier = documentTypeClassifier;
 		_logger = logger;
 	}
 
@@ -58,7 +61,24 @@ public class UtilityBillService : IUtilityBillService
 
 			_logger.LogInformation("OCR completed: {TextLength} characters, Confidence: {Confidence}", ocrResult.Text.Length, ocrResult.Confidence);
 
-			// 3. 数据提取
+			// 3. 文档类型验证（必须在水电账单识别之前）
+			var classificationResult = await _documentTypeClassifier.ClassifyAsync(ocrResult.Text, ct);
+			if (!classificationResult.IsUtilityBill)
+			{
+				_logger.LogWarning(
+					"Document type validation failed for user {UserId}. Detected type: {DocumentType}, Confidence: {Confidence}, MatchedKeywords: {Keywords}",
+					userId, classificationResult.DocumentType, classificationResult.ConfidenceScore, 
+					string.Join(", ", classificationResult.MatchedKeywords));
+
+				throw new InvalidOperationException(
+					classificationResult.ErrorMessage ?? "上传的图片不是水电账单，请上传新加坡的电费、水费或燃气账单");
+			}
+
+			_logger.LogInformation(
+				"Document type validated as utility bill. Confidence: {Confidence}, MatchedKeywords: {Keywords}",
+				classificationResult.ConfidenceScore, string.Join(", ", classificationResult.MatchedKeywords));
+
+			// 4. 数据提取
 			var extractedData = await _parser.ParseBillDataAsync(ocrResult.Text, null, ct);
 			if (extractedData == null)
 			{
@@ -66,7 +86,7 @@ public class UtilityBillService : IUtilityBillService
 				throw new InvalidOperationException("无法从账单中提取数据，请使用手动输入");
 			}
 
-			// 4. 验证提取的数据
+			// 5. 验证提取的数据
 			if (!extractedData.BillPeriodStart.HasValue || !extractedData.BillPeriodEnd.HasValue)
 			{
 				_logger.LogWarning("Missing bill period dates in extracted data for user {UserId}", userId);
@@ -87,14 +107,14 @@ public class UtilityBillService : IUtilityBillService
 				throw new InvalidOperationException($"提取的账单周期日期无效（开始年份: {startYear}, 结束年份: {endYear}），请使用手动输入");
 			}
 
-			// 5. 计算碳排放
+			// 6. 计算碳排放
 			var carbonResult = await _calculationService.CalculateCarbonEmissionAsync(
 				extractedData.ElectricityUsage,
 				extractedData.WaterUsage,
 				extractedData.GasUsage,
 				ct);
 
-			// 6. 创建临时实体（不保存到数据库）
+			// 7. 创建临时实体（不保存到数据库）
 			var utilityBill = new UtilityBill
 			{
 				Id = 0, // 表示还未保存
@@ -102,6 +122,7 @@ public class UtilityBillService : IUtilityBillService
 				BillType = extractedData.BillType,
 				BillPeriodStart = extractedData.BillPeriodStart.Value,
 				BillPeriodEnd = extractedData.BillPeriodEnd.Value,
+				YearMonth = extractedData.BillPeriodEnd.Value.ToString("yyyy-MM"), // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = extractedData.ElectricityUsage,
 				WaterUsage = extractedData.WaterUsage,
 				GasUsage = extractedData.GasUsage,
@@ -177,6 +198,7 @@ public class UtilityBillService : IUtilityBillService
 				BillType = dto.BillType,
 				BillPeriodStart = dto.BillPeriodStart,
 				BillPeriodEnd = dto.BillPeriodEnd,
+				YearMonth = dto.BillPeriodEnd.ToString("yyyy-MM"), // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = dto.ElectricityUsage,
 				WaterUsage = dto.WaterUsage,
 				GasUsage = dto.GasUsage,
