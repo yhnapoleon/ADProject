@@ -386,38 +386,120 @@ public class AdminController : ControllerBase
 		public decimal ReductionRate { get; set; }
 	}
 
-	[HttpGet("regions/stats")]
-	public async Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStats(CancellationToken ct)
+	/// <summary>
+	/// 基于 ActivityLogs 在给定时间范围内（[from, to)）按 Region 聚合统计。
+	/// - 若 to 传入的是当天日期，将自动按整天上限转为次日零点的开区间。
+	/// - 若 from/to 任一为空，则按存在的条件过滤。
+	/// </summary>
+	private async Task<List<RegionStatItem>> ComputeRegionStatsByDateRange(DateTime? fromInclusiveUtc, DateTime? toExclusiveUtc, CancellationToken ct)
 	{
-		var groups = await _db.ApplicationUsers
+		// 预先取出各 Region 的用户数（用于保持返回结构一致）
+		var regionUsers = await _db.ApplicationUsers
 			.Where(u => u.Region != null && u.Region != string.Empty)
 			.GroupBy(u => u.Region!)
-			.Select(g => new
-			{
-				Region = g.Key,
-				TotalSaved = g.Sum(x => x.TotalCarbonSaved),
-				UserCount = g.Count()
-			})
+			.Select(g => new { Region = g.Key, UserCount = g.Count() })
 			.ToListAsync(ct);
 
-		var totalSaved = groups.Sum(x => x.TotalSaved);
-		var items = groups.Select(g => new RegionStatItem
+		// 在给定时间窗口内聚合 ActivityLogs，并关联用户以获取 Region
+		var logs = _db.ActivityLogs.AsQueryable();
+		if (fromInclusiveUtc.HasValue)
+			logs = logs.Where(l => l.CreatedAt >= fromInclusiveUtc.Value);
+		if (toExclusiveUtc.HasValue)
+			logs = logs.Where(l => l.CreatedAt < toExclusiveUtc.Value);
+
+		var aggregated = await (from l in logs
+								join u in _db.ApplicationUsers on l.UserId equals u.Id
+								where u.Region != null && u.Region != string.Empty
+								group l by u.Region! into g
+								select new { Region = g.Key, Emission = g.Sum(x => x.TotalEmission) })
+							.ToListAsync(ct);
+
+		var total = aggregated.Sum(x => x.Emission);
+		var emissionByRegion = aggregated.ToDictionary(x => x.Region, x => x.Emission);
+
+		var items = regionUsers.Select(g => new RegionStatItem
 		{
 			RegionCode = g.Region,
 			RegionName = g.Region,
-			CarbonReduced = g.TotalSaved,
+			CarbonReduced = emissionByRegion.TryGetValue(g.Region, out var v) ? v : 0m,
 			UserCount = g.UserCount,
-			ReductionRate = totalSaved > 0 ? Math.Round(g.TotalSaved * 100m / totalSaved, 2) : 0m
+			ReductionRate = total > 0 ? Math.Round((emissionByRegion.TryGetValue(g.Region, out var vv) ? vv : 0m) * 100m / total, 2) : 0m
 		}).ToList();
 
-		return Ok(items);
+		return items;
+	}
+
+	[HttpGet("regions/stats")]
+	public async Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStats(
+		[FromQuery] DateTime? from = null,
+		[FromQuery] DateTime? to = null,
+		[FromQuery] int? days = null,
+		CancellationToken ct = default)
+	{
+		// 当提供了时间范围（from/to/days）时，按 ActivityLogs 在时间窗口内聚合；
+		// 否则维持原有逻辑：按用户累计的 TotalCarbonSaved 聚合。
+		if (from.HasValue || to.HasValue || (days.HasValue && days.Value > 0))
+		{
+			DateTime? start = null;
+			DateTime? endExclusive = null;
+
+			if (days.HasValue && days.Value > 0)
+			{
+				var today = DateTime.UtcNow.Date;
+				start = today.AddDays(-(days.Value - 1));
+				endExclusive = today.AddDays(1);
+			}
+
+			if (from.HasValue) start = from.Value.Date;
+			if (to.HasValue) endExclusive = to.Value.Date.AddDays(1);
+
+			var ranged = await ComputeRegionStatsByDateRange(start, endExclusive, ct);
+			return Ok(ranged);
+		}
+		else
+		{
+			var groups = await _db.ApplicationUsers
+				.Where(u => u.Region != null && u.Region != string.Empty)
+				.GroupBy(u => u.Region!)
+				.Select(g => new
+				{
+					Region = g.Key,
+					TotalSaved = g.Sum(x => x.TotalCarbonSaved),
+					UserCount = g.Count()
+				})
+				.ToListAsync(ct);
+
+			var totalSaved = groups.Sum(x => x.TotalSaved);
+			var items = groups.Select(g => new RegionStatItem
+			{
+				RegionCode = g.Region,
+				RegionName = g.Region,
+				CarbonReduced = g.TotalSaved,
+				UserCount = g.UserCount,
+				ReductionRate = totalSaved > 0 ? Math.Round(g.TotalSaved * 100m / totalSaved, 2) : 0m
+			}).ToList();
+
+			return Ok(items);
+		}
 	}
 
 	/// <summary>
 	/// 路由别名：/api/regions/stats（与前端文档对齐，仍需 Admin 权限）
 	/// </summary>
 	[HttpGet("/api/regions/stats")]
-	public Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStatsAlias(CancellationToken ct) => RegionStats(ct);
+	public Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStatsAlias(CancellationToken ct) => RegionStats(null, null, null, ct);
+
+	/// <summary>
+	/// 便捷接口：近 7 天区域热力统计
+	/// </summary>
+	[HttpGet("regions/stats/weekly")]
+	public Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStatsWeekly(CancellationToken ct) => RegionStats(null, null, 7, ct);
+
+	/// <summary>
+	/// 便捷接口：近 30 天区域热力统计
+	/// </summary>
+	[HttpGet("regions/stats/monthly")]
+	public Task<ActionResult<IEnumerable<RegionStatItem>>> RegionStatsMonthly(CancellationToken ct) => RegionStats(null, null, 30, ct);
 
 	[HttpGet("impact/weekly")]
 	public async Task<ActionResult<IEnumerable<object>>> WeeklyImpact(CancellationToken ct)

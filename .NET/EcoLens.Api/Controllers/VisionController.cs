@@ -20,23 +20,23 @@ public class VisionController : ControllerBase
 
 	/// <summary>
 	/// 调用 Python FastAPI 的图像识别服务，返回融合后的预测结果。
-	/// 表单字段：image（与前端 formData.append('image', file) 对应）
+	/// 表单字段：file（与前端 formData.append('file', file) 对应）
 	/// </summary>
 	[AllowAnonymous]
 	[HttpPost("analyze")]
 	[Consumes("multipart/form-data")]
 	public async Task<ActionResult<VisionPredictionResponseDto>> Analyze(
-		[FromForm(Name = "image")] IFormFile? image,
+		[FromForm] FileUploadDto dto,
 		CancellationToken ct)
 	{
-		if (image == null || image.Length == 0)
+		if (dto.File == null || dto.File.Length == 0)
 		{
 			return BadRequest("No image uploaded.");
 		}
 
 		try
 		{
-			var result = await _visionService.PredictAsync(image, ct);
+			var result = await _visionService.PredictAsync(dto.File, ct);
 			return Ok(result);
 		}
 		catch (ArgumentException ex)

@@ -4,6 +4,7 @@ using EcoLens.Api.DTOs;
 using EcoLens.Api.Services;
 using EcoLens.Api.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -151,6 +152,23 @@ EcoLens 是一个帮助用户追踪和管理个人碳排放的应用系统。
 			},
 			Array.Empty<string>()
 		}
+	});
+
+	// 显式映射 IFormFile 到 Swagger 的文件上传控件
+	c.MapType<IFormFile>(() => new OpenApiSchema
+	{
+		Type = "string",
+		Format = "binary"
+	});
+	c.MapType<IFormFileCollection>(() => new OpenApiSchema
+	{
+		Type = "array",
+		Items = new OpenApiSchema { Type = "string", Format = "binary" }
+	});
+	c.MapType<IEnumerable<IFormFile>>(() => new OpenApiSchema
+	{
+		Type = "array",
+		Items = new OpenApiSchema { Type = "string", Format = "binary" }
 	});
 });
 

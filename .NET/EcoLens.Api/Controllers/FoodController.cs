@@ -92,27 +92,27 @@ public class FoodController : ControllerBase
 	/// </summary>
 	[HttpPost("ingest-from-image")]
 	[Consumes("multipart/form-data")]
-	public async Task<ActionResult<FoodSimpleCalcResponse>> IngestFromImage([FromForm] IFormFile image, [FromForm] double quantity, [FromForm] string unit, [FromForm] string? note, CancellationToken ct)
+	public async Task<ActionResult<FoodSimpleCalcResponse>> IngestFromImage([FromForm] FoodIngestFromImageRequest req, CancellationToken ct)
 	{
-		if (image == null || image.Length == 0) return BadRequest("未上传图片。");
-		if (quantity < 0) return BadRequest("Quantity 必须为非负数。");
+		if (req.File == null || req.File.Length == 0) return BadRequest("未上传图片。");
+		if (req.Quantity < 0) return BadRequest("Quantity 必须为非负数。");
 
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var vision = await _visionService.PredictAsync(image, ct);
+		var vision = await _visionService.PredictAsync(req.File, ct);
 		var food = await FindFoodCarbonReferenceAsync(vision.Label, ct);
 		if (food is null) return NotFound($"未找到食物：{vision.Label} 的碳因子。");
 
 		// 计算总排放
-		var inputUnit = NormalizeUnit(unit);
+		var inputUnit = NormalizeUnit(req.Unit);
 		var factorUnit = NormalizeUnit(food.Unit);
-		var normalizedQuantity = ConvertToFactorUnit(vision.Label, quantity, inputUnit, factorUnit);
+		var normalizedQuantity = ConvertToFactorUnit(vision.Label, req.Quantity, inputUnit, factorUnit);
 		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
 		var total = (decimal)normalizedQuantity * food.Co2Factor;
 
 		// 入库（amount 统一保存为 kg）
-		var amountKg = ToKilograms(vision.Label, quantity, inputUnit);
+		var amountKg = ToKilograms(vision.Label, req.Quantity, inputUnit);
 		if (amountKg < 0) return BadRequest("份量换算失败（kg）。");
 
 		var record = new FoodRecord
@@ -122,7 +122,7 @@ public class FoodController : ControllerBase
 			Amount = amountKg,
 			EmissionFactor = food.Co2Factor,
 			Emission = Math.Round(total, 6),
-			Note = note
+			Note = req.Note
 		};
 		await _db.FoodRecords.AddAsync(record, ct);
 		await _db.SaveChangesAsync(ct);
@@ -130,7 +130,7 @@ public class FoodController : ControllerBase
 		return Ok(new FoodSimpleCalcResponse
 		{
 			Name = record.Name,
-			Quantity = quantity,
+			Quantity = req.Quantity,
 			EmissionFactor = record.EmissionFactor,
 			Emission = record.Emission
 		});
@@ -213,14 +213,14 @@ public class FoodController : ControllerBase
 	/// </summary>
 	[HttpPost("recognize")]
 	[Consumes("multipart/form-data")]
-	public async Task<ActionResult<FoodRecognizeResponseDto>> Recognize([FromForm] IFormFile image, CancellationToken ct)
+	public async Task<ActionResult<FoodRecognizeResponseDto>> Recognize([FromForm] FoodImageUploadDto dto, CancellationToken ct)
 	{
-		if (image == null || image.Length == 0)
+		if (dto.File == null || dto.File.Length == 0)
 		{
 			return BadRequest("未上传图片。");
 		}
 
-		var vision = await _visionService.PredictAsync(image, ct);
+		var vision = await _visionService.PredictAsync(dto.File, ct);
 
 		return Ok(new FoodRecognizeResponseDto
 		{
@@ -237,28 +237,28 @@ public class FoodController : ControllerBase
 	/// </summary>
 	[HttpPost("calculate-from-image")]
 	[Consumes("multipart/form-data")]
-	public async Task<ActionResult<FoodCalculationResultDto>> CalculateFromImage([FromForm] IFormFile image, [FromForm] double quantity, [FromForm] string unit, CancellationToken ct)
+	public async Task<ActionResult<FoodCalculationResultDto>> CalculateFromImage([FromForm] FoodCalculateFromImageRequest req, CancellationToken ct)
 	{
-		if (image == null || image.Length == 0)
+		if (req.File == null || req.File.Length == 0)
 		{
 			return BadRequest("未上传图片。");
 		}
-		if (quantity < 0)
+		if (req.Quantity < 0)
 		{
 			return BadRequest("Quantity 必须为非负数。");
 		}
-		unit ??= "g";
+		req.Unit ??= "g";
 
-		var vision = await _visionService.PredictAsync(image, ct);
+		var vision = await _visionService.PredictAsync(req.File, ct);
 		var food = await FindFoodCarbonReferenceAsync(vision.Label, ct);
 		if (food is null)
 		{
 			return NotFound($"未找到食物：{vision.Label} 的碳因子。");
 		}
 
-		var inputUnit = NormalizeUnit(unit);
+		var inputUnit = NormalizeUnit(req.Unit);
 		var factorUnit = NormalizeUnit(food.Unit);
-		var normalizedQuantity = ConvertToFactorUnit(vision.Label, quantity, inputUnit, factorUnit);
+		var normalizedQuantity = ConvertToFactorUnit(vision.Label, req.Quantity, inputUnit, factorUnit);
 		if (normalizedQuantity < 0)
 		{
 			return BadRequest("份量换算失败，请检查单位与数值。");
@@ -271,8 +271,8 @@ public class FoodController : ControllerBase
 			FoodName = food.LabelName,
 			Co2Factor = food.Co2Factor,
 			FactorUnit = food.Unit,
-			Quantity = quantity,
-			QuantityUnit = unit,
+			Quantity = req.Quantity,
+			QuantityUnit = req.Unit,
 			NormalizedQuantityInFactorUnit = Math.Round(normalizedQuantity, 6),
 			TotalEmission = Math.Round(total, 6)
 		};

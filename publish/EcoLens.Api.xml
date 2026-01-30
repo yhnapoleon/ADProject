@@ -178,7 +178,7 @@
             - 根据 CarbonReference(Category=Food) 的 Unit 做换算
             </summary>
         </member>
-        <member name="M:EcoLens.Api.Controllers.FoodController.IngestFromImage(Microsoft.AspNetCore.Http.IFormFile,System.Double,System.String,System.String,System.Threading.CancellationToken)">
+        <member name="M:EcoLens.Api.Controllers.FoodController.IngestFromImage(EcoLens.Api.DTOs.Food.FoodIngestFromImageRequest,System.Threading.CancellationToken)">
             <summary>
             集成式流程：上传图片 + 分量，后端识别名称、计算总排放并入库，返回最终结果。
             - multipart/form-data: image, quantity, unit, note?
@@ -196,12 +196,12 @@
             前端传名称+分量，后端只计算（不入库），返回最小结果：name, quantity, emissionFactor, emission。
             </summary>
         </member>
-        <member name="M:EcoLens.Api.Controllers.FoodController.Recognize(Microsoft.AspNetCore.Http.IFormFile,System.Threading.CancellationToken)">
+        <member name="M:EcoLens.Api.Controllers.FoodController.Recognize(EcoLens.Api.DTOs.Food.FoodImageUploadDto,System.Threading.CancellationToken)">
             <summary>
             图片识别获取食物名称。
             </summary>
         </member>
-        <member name="M:EcoLens.Api.Controllers.FoodController.CalculateFromImage(Microsoft.AspNetCore.Http.IFormFile,System.Double,System.String,System.Threading.CancellationToken)">
+        <member name="M:EcoLens.Api.Controllers.FoodController.CalculateFromImage(EcoLens.Api.DTOs.Food.FoodCalculateFromImageRequest,System.Threading.CancellationToken)">
             <summary>
             组合流程：上传图片 + 份量，后端识别名称并计算总排放。
             - 前端可直接调用本接口完成识别+计算的一站式处理
@@ -637,9 +637,10 @@
             获取当前用户的 Utility 账单记录（按月份倒序）。
             </summary>
         </member>
-        <member name="M:EcoLens.Api.Controllers.VisionController.Analyze(EcoLens.Api.DTOs.ImageUploadRequest,System.Threading.CancellationToken)">
+        <member name="M:EcoLens.Api.Controllers.VisionController.Analyze(EcoLens.Api.DTOs.FileUploadDto,System.Threading.CancellationToken)">
             <summary>
             调用 Python FastAPI 的图像识别服务，返回融合后的预测结果。
+            表单字段：file（与前端 formData.append('file', file) 对应）
             </summary>
         </member>
         <member name="P:EcoLens.Api.DTOs.Activity.ActivityLogResponseDto.Category">
@@ -688,6 +689,26 @@
             输入的份量单位，支持：g, kg, portion(份/份量/serving)
             </summary>
         </member>
+        <member name="T:EcoLens.Api.DTOs.Food.FoodCalculateFromImageRequest">
+            <summary>
+            组合流程：图片 + 分量
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodCalculateFromImageRequest.File">
+            <summary>
+            图片文件（字段名：file）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodCalculateFromImageRequest.Quantity">
+            <summary>
+            分量
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodCalculateFromImageRequest.Unit">
+            <summary>
+            单位（g、kg、portion）
+            </summary>
+        </member>
         <member name="P:EcoLens.Api.DTOs.Food.FoodCalculationResultDto.Co2Factor">
             <summary>
             查询到的碳排放因子（与 FactorUnit 对应的单位一致）
@@ -718,6 +739,16 @@
             计算得到的总碳排放量（单位同 FactorUnit）
             </summary>
         </member>
+        <member name="T:EcoLens.Api.DTOs.Food.FoodImageUploadDto">
+            <summary>
+            仅上传图片的表单请求
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodImageUploadDto.File">
+            <summary>
+            图片文件（字段名：file）
+            </summary>
+        </member>
         <member name="P:EcoLens.Api.DTOs.Food.FoodIngestByNameRequest.Quantity">
             <summary>
             数量（配合 unit，可为 g/kg/portion）
@@ -726,6 +757,31 @@
         <member name="P:EcoLens.Api.DTOs.Food.FoodIngestByNameRequest.Unit">
             <summary>
             单位：g / kg / portion
+            </summary>
+        </member>
+        <member name="T:EcoLens.Api.DTOs.Food.FoodIngestFromImageRequest">
+            <summary>
+            集成式流程：图片 + 分量 + 可选备注，并入库
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodIngestFromImageRequest.File">
+            <summary>
+            图片文件（字段名：file）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodIngestFromImageRequest.Quantity">
+            <summary>
+            分量
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodIngestFromImageRequest.Unit">
+            <summary>
+            单位（g、kg、portion）
+            </summary>
+        </member>
+        <member name="P:EcoLens.Api.DTOs.Food.FoodIngestFromImageRequest.Note">
+            <summary>
+            备注（可选）
             </summary>
         </member>
         <member name="P:EcoLens.Api.DTOs.Food.GetFoodRecordsQueryDto.StartDate">
