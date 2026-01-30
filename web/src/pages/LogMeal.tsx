@@ -347,23 +347,56 @@ const LogMeal = () => {
     }
   };
 
-  // 调用食物识别API
+  /** 根据食物名称从后端获取碳排放因子（用于食物识别后自动填充） */
+  const fetchEmissionFactorByFoodName = async (foodName: string): Promise<{ co2Factor: number; factorUnit: string } | null> => {
+    try {
+      const response: any = await request.post('/food/calculate', {
+        FoodName: foodName,
+        Quantity: 1,
+        Unit: 'kg',
+      });
+      if (response?.co2Factor != null) {
+        return {
+          co2Factor: Number(response.co2Factor),
+          factorUnit: response.factorUnit || 'kg',
+        };
+      }
+      return null;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null; // 未找到该食物的碳因子，保持不填充
+      }
+      console.error('Fetch emission factor by food name:', error);
+      return null;
+    }
+  };
+
+  // 调用食物识别API（AI 模型推理较慢，需较长超时）
   const recognizeFood = async (file: File): Promise<VisionResponse | null> => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      
-      // 不要手动设置 Content-Type，让浏览器自动设置（包括 boundary）
-      const response: any = await request.post('/vision/analyze', formData);
+      // 食物识别需运行双模型推理，CPU 上约 15-60 秒
+      const response: any = await request.post('/vision/analyze', formData, {
+        timeout: 60000,
+      });
       // request 拦截器已经返回了 response.data，所以直接使用
       return response as VisionResponse;
     } catch (error: any) {
       console.error('Food recognition error:', error);
       if (error.response?.status === 401) {
-        // 401 错误由 beforeUpload 统一处理，这里只返回 null
         return null;
       }
-      message.error('食物识别失败');
+      const status = error.response?.status;
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+      const msg = isTimeout
+        ? '识别超时，AI 模型处理较慢，请稍后重试'
+        : status === 502
+          ? '食物识别服务未启动，请先启动 Vision 服务 (端口 8000)'
+          : status === 400
+            ? '图片上传无效，请重试'
+            : '食物识别失败';
+      message.error(msg);
       return null;
     }
   };
@@ -431,7 +464,13 @@ const LogMeal = () => {
             form.setFieldsValue({
               foodName: foodInfo.label,
             });
-            message.success({ content: `识别为：${foodInfo.label}`, key: 'detecting' });
+            const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
+            if (factorResult) {
+              form.setFieldsValue({ co2Factor: factorResult.co2Factor });
+              message.success({ content: `识别为：${foodInfo.label}，已自动匹配碳排放因子`, key: 'detecting' });
+            } else {
+              message.success({ content: `识别为：${foodInfo.label}`, key: 'detecting' });
+            }
           } else {
             // 再次检查 token 是否被清除（表示 401 错误）
             const tokenAfterFood = localStorage.getItem('token') || localStorage.getItem('adminToken');
@@ -463,7 +502,13 @@ const LogMeal = () => {
           form.setFieldsValue({
             foodName: foodInfo.label,
           });
-          message.success({ content: `识别为：${foodInfo.label}`, key: 'detecting' });
+          const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
+          if (factorResult) {
+            form.setFieldsValue({ co2Factor: factorResult.co2Factor });
+            message.success({ content: `识别为：${foodInfo.label}，已自动匹配碳排放因子`, key: 'detecting' });
+          } else {
+            message.success({ content: `识别为：${foodInfo.label}`, key: 'detecting' });
+          }
         } else {
           // 检查 token 是否被清除（表示 401 错误）
           const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
@@ -673,9 +718,16 @@ const LogMeal = () => {
               <div style={{ color: '#595959' }}>
                 置信度: {((detectedInfo.data as VisionResponse).confidence * 100).toFixed(1)}%
               </div>
-              <div style={{ color: '#8c8c8c', fontSize: 11, marginTop: 4 }}>
-                请手动输入数量和碳排放因子
-              </div>
+              {co2Factor != null && Number(co2Factor) > 0 && (
+                <div style={{ color: '#595959' }}>
+                  碳排放因子: {Number(co2Factor)} kg CO2e/kg
+                </div>
+              )}
+              {(!co2Factor || Number(co2Factor) <= 0) && (
+                <div style={{ color: '#8c8c8c', fontSize: 11, marginTop: 4 }}>
+                  未匹配到该食物的碳因子，请手动输入数量和碳排放因子
+                </div>
+              )}
             </div>
           </Card>
         )}
@@ -714,7 +766,7 @@ const LogMeal = () => {
                 name="co2Factor"
               >
                 <InputNumber
-                  readOnly={detectedInfo?.type === 'barcode' && !!co2Factor}
+                  readOnly={!!detectedInfo && !!co2Factor}
                   style={{ width: '100%', ...inputBg }}
                   min={0}
                   step={0.1}
