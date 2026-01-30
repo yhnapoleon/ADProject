@@ -94,6 +94,9 @@ const AdminDashboard: React.FC = () => {
     carbonGrowth: 0,
   });
   const [loading, setLoading] = useState(true);
+  /** Regional Reduction Trends 时间范围：近7天 / 近30天 */
+  const [regionTrendsRange, setRegionTrendsRange] = useState<'7' | '30'>('30');
+  const regionTrendsRangeInitialized = useRef(false);
 
   // 计算边界框和投影配置，确保地图完整显示
   const calculateBounds = (data: any) => {
@@ -154,10 +157,11 @@ const AdminDashboard: React.FC = () => {
     const loadAllData = async () => {
       setLoading(true);
       try {
-        // 并行加载所有数据
-        const [geoJsonRes, regionsRes, weeklyRes, factorsRes] = await Promise.allSettled([
+        // 并行加载：全量区域统计（用于顶部卡片）、近30天热力图、其余数据
+        const [geoJsonRes, regionsRes, regionMapRes, weeklyRes, factorsRes] = await Promise.allSettled([
           fetch(singaporeGeoJsonUrl).then(res => res.json()),
           request.get('/admin/regions/stats'),
+          request.get('/admin/regions/stats/monthly'),
           request.get('/admin/impact/weekly'),
           request.get('/admin/emission-factors', { params: { page: 1, pageSize: 10 } }),
         ]);
@@ -170,18 +174,9 @@ const AdminDashboard: React.FC = () => {
           setBounds(calculatedBounds);
         }
 
-        // 加载区域统计数据
+        // 全量区域统计 → 仅用于顶部 Carbon Reduced / Total Eco-Users 卡片
         if (regionsRes.status === 'fulfilled') {
           const regions: RegionData[] = regionsRes.value || [];
-          const regionDataMap: Record<string, RegionData> = {};
-          regions.forEach((region: RegionData) => {
-            if (region.regionCode) {
-              regionDataMap[region.regionCode] = region;
-            }
-          });
-          setRegionData(regionDataMap);
-
-          // 计算总体统计数据
           const totalUsers = regions.reduce((sum, r) => sum + (r.userCount || 0), 0);
           const totalCarbonReduced = regions.reduce((sum, r) => sum + (r.carbonReduced || 0), 0);
           setStats(prev => ({
@@ -191,6 +186,20 @@ const AdminDashboard: React.FC = () => {
           }));
         } else {
           console.error('Failed to load regions stats:', regionsRes.reason);
+        }
+
+        // 热力图默认近30天数据
+        if (regionMapRes.status === 'fulfilled') {
+          const regions: RegionData[] = regionMapRes.value || [];
+          const regionDataMap: Record<string, RegionData> = {};
+          regions.forEach((region: RegionData) => {
+            if (region.regionCode) {
+              regionDataMap[region.regionCode] = region;
+            }
+          });
+          setRegionData(regionDataMap);
+        } else {
+          console.error('Failed to load region map stats:', regionMapRes.reason);
         }
 
         // 加载周报数据
@@ -233,6 +242,26 @@ const AdminDashboard: React.FC = () => {
 
     loadAllData();
   }, []);
+
+  // 切换近7天/近30天时重新拉取热力图数据
+  useEffect(() => {
+    if (!regionTrendsRangeInitialized.current) {
+      regionTrendsRangeInitialized.current = true;
+      return;
+    }
+    const url = regionTrendsRange === '7' ? '/admin/regions/stats/weekly' : '/admin/regions/stats/monthly';
+    request
+      .get(url)
+      .then((regions: RegionData[] | any) => {
+        const list = Array.isArray(regions) ? regions : regions?.items ?? regions?.data ?? [];
+        const regionDataMap: Record<string, RegionData> = {};
+        list.forEach((r: RegionData) => {
+          if (r.regionCode) regionDataMap[r.regionCode] = r;
+        });
+        setRegionData(regionDataMap);
+      })
+      .catch((e) => console.error('Failed to load region stats by range:', e));
+  }, [regionTrendsRange]);
 
   // 根据区域数据获取颜色
   const getRegionColor = (regionCode: string): string => {
@@ -311,7 +340,29 @@ const AdminDashboard: React.FC = () => {
 
       <div className="charts-container">
         <div className="chart-card">
-          <h3>Regional Reduction Trends (Singapore)</h3>
+          <div className="chart-card-header-with-tabs">
+            <h3>Regional Reduction Trends (Singapore)</h3>
+            <div className="region-trends-tabs" role="tablist" aria-label="时间范围">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={regionTrendsRange === '7'}
+                className={`region-trends-tab ${regionTrendsRange === '7' ? 'active' : ''}`}
+                onClick={() => setRegionTrendsRange('7')}
+              >
+                近7天
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={regionTrendsRange === '30'}
+                className={`region-trends-tab ${regionTrendsRange === '30' ? 'active' : ''}`}
+                onClick={() => setRegionTrendsRange('30')}
+              >
+                近30天
+              </button>
+            </div>
+          </div>
           <div 
             className="singapore-map-container"
             onMouseLeave={() => {
