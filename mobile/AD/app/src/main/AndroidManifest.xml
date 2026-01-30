@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="iss.nus.edu.sg.sharedprefs.admobile">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />     <application
+    android:allowBackup="true"
+    android:dataExtractionRules="@xml/data_extraction_rules"
+    android:fullBackupContent="@xml/backup_rules"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:networkSecurityConfig="@xml/network_security_config"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.ADMobile">
+
+    <meta-data
+        android:name="com.google.android.geo.API_KEY"
+        android:value="AIzaSyCM7mWNDAl1ZzJ5Kw2eCdSpBwq_gqyNPr0" />
+
+    <activity
+        android:name=".SplashActivity"
+        android:exported="true"
+        android:theme="@style/Theme.ADMobile.NoActionBar">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
+
+    <activity
+        android:name=".IntroActivity"
+        android:exported="false"
+        android:theme="@style/Theme.ADMobile.NoActionBar" />
+
+    <activity
+        android:name=".LoginActivity"
+        android:exported="false"
+        android:theme="@style/Theme.ADMobile.NoActionBar" />
+
+    <activity
+        android:name=".RegisterActivity"
+        android:exported="false"
+        android:theme="@style/Theme.ADMobile.NoActionBar" />
+
+    <activity
+        android:name=".AddFoodActivity"
+        android:exported="false"
+        android:theme="@style/Theme.ADMobile.NoActionBar" />
+
+    <activity
+        android:name=".AddTravelActivity"
+        android:exported="false"
+        android:theme="@style/Theme.ADMobile.NoActionBar" />
+
+    <activity
+        android:name=".AddUtilityActivity"
+        android:exported="false"
+        android:theme="@style/Theme.ADMobile.NoActionBar" />
+
+    <activity
+        android:name=".MainActivity"
+        android:exported="true"
+        android:windowSoftInputMode="adjustResize"/>
+
+    <activity
+        android:name=".AiAssistantActivity"
+        android:exported="false" />
+
+    <activity
+        android:name=".LeaderboardActivity"
+        android:exported="false" />
+
+    <activity
+        android:name=".ProfileActivity"
+        android:exported="false" />
+
+    <activity
+        android:name=".TreePlantingActivity"
+        android:exported="false"/>
+
+    <activity
+        android:name=".ProfileStatsActivity"
+        android:exported="false"/>
+
+    <activity
+        android:name=".EmissionRecordsActivity"
+        android:exported="false"/>
+
+
+
+
+</application>
+
+</manifest>
