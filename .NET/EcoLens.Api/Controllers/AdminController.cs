@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs.Admin;
@@ -748,6 +749,383 @@ public class AdminController : ControllerBase
 	[HttpPatch("users/batch")]
 	public Task<ActionResult<object>> BatchUpdateUsersPatch([FromBody] BatchUserUpdateRequest req, CancellationToken ct)
 		=> BatchUpdateUsers(req, ct);
+
+	#endregion
+
+	#region Database Management
+
+	/// <summary>
+	/// 获取数据库统计信息（各表的记录数）。
+	/// </summary>
+	[HttpGet("database/statistics")]
+	public async Task<ActionResult<object>> GetDatabaseStatistics(CancellationToken ct)
+	{
+		var stats = new Dictionary<string, object>();
+
+		// 基础表（肯定存在）
+		stats["users"] = await _db.ApplicationUsers.CountAsync(ct);
+		stats["activeUsers"] = await _db.ApplicationUsers.CountAsync(u => u.IsActive, ct);
+		stats["adminUsers"] = await _db.ApplicationUsers.CountAsync(u => u.Role == UserRole.Admin, ct);
+		stats["travelLogs"] = await _db.TravelLogs.CountAsync(ct);
+		stats["utilityBills"] = await _db.UtilityBills.CountAsync(ct);
+		stats["activityLogs"] = await _db.ActivityLogs.CountAsync(ct);
+		stats["posts"] = await _db.Posts.CountAsync(ct);
+		stats["comments"] = await _db.Comments.CountAsync(ct);
+		stats["carbonReferences"] = await _db.CarbonReferences.CountAsync(ct);
+		stats["userFollows"] = await _db.UserFollows.CountAsync(ct);
+
+		// 可能不存在的表（使用 try-catch）
+		try { stats["foodRecords"] = await _db.FoodRecords.CountAsync(ct); } catch { stats["foodRecords"] = 0; }
+		try { stats["dietRecords"] = await _db.DietRecords.CountAsync(ct); } catch { stats["dietRecords"] = 0; }
+		try { stats["barcodeReferences"] = await _db.BarcodeReferences.CountAsync(ct); } catch { stats["barcodeReferences"] = 0; }
+		try { stats["aiInsights"] = await _db.AiInsights.CountAsync(ct); } catch { stats["aiInsights"] = 0; }
+		try { stats["stepRecords"] = await _db.StepRecords.CountAsync(ct); } catch { stats["stepRecords"] = 0; }
+
+		return Ok(stats);
+	}
+
+	/// <summary>
+	/// 删除指定用户的所有数据（包括出行记录、账单、活动日志、帖子、评论等）。
+	/// </summary>
+	/// <param name="userId">用户ID</param>
+	/// <param name="deleteAccount">是否同时删除用户账号（默认false，只删除数据）</param>
+	/// <param name="ct">取消令牌</param>
+	[HttpDelete("users/{userId:int}/data")]
+	public async Task<ActionResult<object>> DeleteUserData(
+		[FromRoute] int userId,
+		[FromQuery] bool deleteAccount = false,
+		CancellationToken ct = default)
+	{
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+		if (user is null)
+		{
+			return NotFound(new { error = "User not found" });
+		}
+
+		var currentAdminId = GetCurrentAdminId();
+		if (currentAdminId is null) return Unauthorized();
+
+		// 保护机制：防止管理员删除自己的数据
+		if (user.Id == currentAdminId.Value)
+		{
+			return BadRequest(new { error = "Cannot delete your own data. Please ask another admin to perform this action." });
+		}
+
+		// 保护机制：如果目标用户是管理员，检查是否是最后一个活跃的管理员
+		if (user.Role == UserRole.Admin && deleteAccount)
+		{
+			var activeAdminCount = await _db.ApplicationUsers
+				.CountAsync(u => u.Role == UserRole.Admin && u.IsActive && u.Id != userId, ct);
+			
+			if (activeAdminCount == 0)
+			{
+				return BadRequest(new { error = "Cannot delete the last active admin account. At least one admin must remain active." });
+			}
+		}
+
+		var deletedCounts = new Dictionary<string, int>();
+
+		try
+		{
+			// 按正确顺序删除数据（考虑外键约束）
+			// 1. 删除评论（依赖Posts和Users）
+			var comments = await _db.Comments.Where(c => c.UserId == userId).ToListAsync(ct);
+			deletedCounts["comments"] = comments.Count;
+			_db.Comments.RemoveRange(comments);
+
+			// 2. 删除帖子（依赖Users，Comments已删除）
+			var posts = await _db.Posts.Where(p => p.UserId == userId).ToListAsync(ct);
+			deletedCounts["posts"] = posts.Count;
+			// 先删除这些帖子的所有评论
+			var postIds = posts.Select(p => p.Id).ToList();
+			var postComments = await _db.Comments.Where(c => postIds.Contains(c.PostId)).ToListAsync(ct);
+			_db.Comments.RemoveRange(postComments);
+			_db.Posts.RemoveRange(posts);
+
+			// 3. 删除用户关注关系
+			var follows = await _db.UserFollows
+				.Where(f => f.FollowerId == userId || f.FolloweeId == userId)
+				.ToListAsync(ct);
+			deletedCounts["userFollows"] = follows.Count;
+			_db.UserFollows.RemoveRange(follows);
+
+			// 4. 删除出行记录
+			var travelLogs = await _db.TravelLogs.Where(t => t.UserId == userId).ToListAsync(ct);
+			deletedCounts["travelLogs"] = travelLogs.Count;
+			_db.TravelLogs.RemoveRange(travelLogs);
+
+			// 5. 删除账单
+			var utilityBills = await _db.UtilityBills.Where(b => b.UserId == userId).ToListAsync(ct);
+			deletedCounts["utilityBills"] = utilityBills.Count;
+			_db.UtilityBills.RemoveRange(utilityBills);
+
+			// 6. 删除活动日志
+			var activityLogs = await _db.ActivityLogs.Where(a => a.UserId == userId).ToListAsync(ct);
+			deletedCounts["activityLogs"] = activityLogs.Count;
+			_db.ActivityLogs.RemoveRange(activityLogs);
+
+			// 7. 删除食物记录（如果表存在）
+			try
+			{
+				var foodRecords = await _db.FoodRecords.Where(f => f.UserId == userId).ToListAsync(ct);
+				deletedCounts["foodRecords"] = foodRecords.Count;
+				_db.FoodRecords.RemoveRange(foodRecords);
+			}
+			catch (Exception)
+			{
+				deletedCounts["foodRecords"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 8. 删除饮食记录（如果表存在）
+			try
+			{
+				var dietRecords = await _db.DietRecords.Where(d => d.UserId == userId).ToListAsync(ct);
+				deletedCounts["dietRecords"] = dietRecords.Count;
+				_db.DietRecords.RemoveRange(dietRecords);
+			}
+			catch (Exception)
+			{
+				deletedCounts["dietRecords"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 9. 删除AI洞察（如果表存在）
+			try
+			{
+				var aiInsights = await _db.AiInsights.Where(i => i.UserId == userId).ToListAsync(ct);
+				deletedCounts["aiInsights"] = aiInsights.Count;
+				_db.AiInsights.RemoveRange(aiInsights);
+			}
+			catch (Exception)
+			{
+				deletedCounts["aiInsights"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 10. 删除步数记录（如果表存在）
+			try
+			{
+				var stepRecords = await _db.StepRecords.Where(s => s.UserId == userId).ToListAsync(ct);
+				deletedCounts["stepRecords"] = stepRecords.Count;
+				_db.StepRecords.RemoveRange(stepRecords);
+			}
+			catch (Exception)
+			{
+				deletedCounts["stepRecords"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 11. 可选：删除用户账号
+			if (deleteAccount)
+			{
+				_db.ApplicationUsers.Remove(user);
+				deletedCounts["user"] = 1;
+			}
+			else
+			{
+				// 重置用户统计数据
+				user.TotalCarbonSaved = 0;
+				user.CurrentPoints = 0;
+			}
+
+			await _db.SaveChangesAsync(ct);
+
+			return Ok(new
+			{
+				success = true,
+				message = deleteAccount ? "User account and all data deleted successfully" : "User data deleted successfully, account preserved",
+				deletedCounts,
+				totalDeleted = deletedCounts.Values.Sum()
+			});
+		}
+		catch (Exception ex)
+		{
+			return StatusCode(500, new
+			{
+				error = "Failed to delete user data",
+				message = ex.Message,
+				deletedCounts
+			});
+		}
+	}
+
+	/// <summary>
+	/// 清空所有数据（需要确认码 "CONFIRM"）。
+	/// </summary>
+	/// <param name="dto">包含确认码的请求</param>
+	/// <param name="ct">取消令牌</param>
+	[HttpPost("database/clear-all")]
+	public async Task<ActionResult<object>> ClearAllData([FromBody] ClearAllDataRequestDto dto, CancellationToken ct = default)
+	{
+		// 验证确认码
+		if (string.IsNullOrWhiteSpace(dto.ConfirmationCode) || 
+			!dto.ConfirmationCode.Equals("CONFIRM", StringComparison.OrdinalIgnoreCase))
+		{
+			return BadRequest(new { error = "Invalid confirmation code. Please provide 'CONFIRM' to proceed." });
+		}
+
+		var deletedCounts = new Dictionary<string, int>();
+
+		try
+		{
+			// 按正确顺序删除所有数据（考虑外键约束）
+			// 1. 删除评论（依赖Posts和Users）
+			var comments = await _db.Comments.ToListAsync(ct);
+			deletedCounts["comments"] = comments.Count;
+			_db.Comments.RemoveRange(comments);
+			await _db.SaveChangesAsync(ct);
+
+			// 2. 删除帖子（依赖Users）
+			var posts = await _db.Posts.ToListAsync(ct);
+			deletedCounts["posts"] = posts.Count;
+			_db.Posts.RemoveRange(posts);
+			await _db.SaveChangesAsync(ct);
+
+			// 3. 删除用户关注关系
+			var follows = await _db.UserFollows.ToListAsync(ct);
+			deletedCounts["userFollows"] = follows.Count;
+			_db.UserFollows.RemoveRange(follows);
+			await _db.SaveChangesAsync(ct);
+
+			// 4. 删除出行记录
+			var travelLogs = await _db.TravelLogs.ToListAsync(ct);
+			deletedCounts["travelLogs"] = travelLogs.Count;
+			_db.TravelLogs.RemoveRange(travelLogs);
+			await _db.SaveChangesAsync(ct);
+
+			// 5. 删除账单
+			var utilityBills = await _db.UtilityBills.ToListAsync(ct);
+			deletedCounts["utilityBills"] = utilityBills.Count;
+			_db.UtilityBills.RemoveRange(utilityBills);
+			await _db.SaveChangesAsync(ct);
+
+			// 6. 删除活动日志
+			var activityLogs = await _db.ActivityLogs.ToListAsync(ct);
+			deletedCounts["activityLogs"] = activityLogs.Count;
+			_db.ActivityLogs.RemoveRange(activityLogs);
+			await _db.SaveChangesAsync(ct);
+
+			// 7. 删除食物记录（如果表存在）
+			try
+			{
+				var foodRecords = await _db.FoodRecords.ToListAsync(ct);
+				deletedCounts["foodRecords"] = foodRecords.Count;
+				_db.FoodRecords.RemoveRange(foodRecords);
+				await _db.SaveChangesAsync(ct);
+			}
+			catch (Exception)
+			{
+				deletedCounts["foodRecords"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 8. 删除饮食记录（如果表存在）
+			try
+			{
+				var dietRecords = await _db.DietRecords.ToListAsync(ct);
+				deletedCounts["dietRecords"] = dietRecords.Count;
+				_db.DietRecords.RemoveRange(dietRecords);
+				await _db.SaveChangesAsync(ct);
+			}
+			catch (Exception)
+			{
+				deletedCounts["dietRecords"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 9. 删除AI洞察（如果表存在）
+			try
+			{
+				var aiInsights = await _db.AiInsights.ToListAsync(ct);
+				deletedCounts["aiInsights"] = aiInsights.Count;
+				_db.AiInsights.RemoveRange(aiInsights);
+				await _db.SaveChangesAsync(ct);
+			}
+			catch (Exception)
+			{
+				deletedCounts["aiInsights"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 10. 删除步数记录（如果表存在）
+			try
+			{
+				var stepRecords = await _db.StepRecords.ToListAsync(ct);
+				deletedCounts["stepRecords"] = stepRecords.Count;
+				_db.StepRecords.RemoveRange(stepRecords);
+				await _db.SaveChangesAsync(ct);
+			}
+			catch (Exception)
+			{
+				deletedCounts["stepRecords"] = 0;
+				// 表不存在，跳过
+			}
+
+			// 11. 删除用户（保留管理员账号，如果dto.PreserveAdmins为true）
+			var usersToDelete = _db.ApplicationUsers.AsQueryable();
+			if (dto.PreserveAdmins)
+			{
+				usersToDelete = usersToDelete.Where(u => u.Role != UserRole.Admin);
+			}
+			var users = await usersToDelete.ToListAsync(ct);
+			deletedCounts["users"] = users.Count;
+			_db.ApplicationUsers.RemoveRange(users);
+			await _db.SaveChangesAsync(ct);
+
+			// 12. 可选：删除条形码引用（如果dto.IncludeReferences为true）
+			if (dto.IncludeReferences)
+			{
+				var barcodeReferences = await _db.BarcodeReferences.ToListAsync(ct);
+				deletedCounts["barcodeReferences"] = barcodeReferences.Count;
+				_db.BarcodeReferences.RemoveRange(barcodeReferences);
+				await _db.SaveChangesAsync(ct);
+			}
+
+			// 注意：不删除 CarbonReferences 和 SystemSettings，这些是系统配置数据
+
+			return Ok(new
+			{
+				success = true,
+				message = "All data cleared successfully",
+				deletedCounts,
+				totalDeleted = deletedCounts.Values.Sum(),
+				preservedAdmins = dto.PreserveAdmins,
+				preservedReferences = !dto.IncludeReferences
+			});
+		}
+		catch (Exception ex)
+		{
+			return StatusCode(500, new
+			{
+				error = "Failed to clear all data",
+				message = ex.Message,
+				deletedCounts
+			});
+		}
+	}
+
+	/// <summary>
+	/// 清空所有数据的请求DTO。
+	/// </summary>
+	public class ClearAllDataRequestDto
+	{
+		/// <summary>
+		/// 确认码，必须为 "CONFIRM" 才能执行删除操作。
+		/// </summary>
+		[Required]
+		public string ConfirmationCode { get; set; } = string.Empty;
+
+		/// <summary>
+		/// 是否保留管理员账号（默认true）。
+		/// </summary>
+		public bool PreserveAdmins { get; set; } = true;
+
+		/// <summary>
+		/// 是否同时删除条形码引用等系统引用数据（默认false）。
+		/// </summary>
+		public bool IncludeReferences { get; set; } = false;
+	}
 
 	#endregion
 }
