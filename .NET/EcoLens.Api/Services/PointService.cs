@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using EcoLens.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +10,7 @@ public class PointService : IPointService
 	private readonly ApplicationDbContext _db;
 	private const decimal DailyBenchmark = 15.0m; // kg CO2e
 	private const int PointsPerTree = 30;
+	private const decimal StepToCarbonFactor = 0.0001m; // kg CO2e per step
 
 	public PointService(ApplicationDbContext db)
 	{
@@ -93,6 +96,64 @@ public class PointService : IPointService
 		}
 
 		user.CurrentPoints += treesPlantedCount * PointsPerTree;
+		await _db.SaveChangesAsync();
+	}
+
+	public async Task<decimal> CalculateDailyNetValueAsync(int userId, DateTime date)
+	{
+		var dayStart = date.Date;
+		var dayEnd = dayStart.AddDays(1);
+
+		// 基础存在性检查
+		var hasFood = await _db.FoodRecords.AnyAsync(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd);
+		var hasTravel = await _db.TravelLogs.AnyAsync(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd);
+		var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId && r.RecordDate == dayStart);
+		var steps = stepRecord?.StepCount ?? 0;
+
+		if (!hasFood || !hasTravel || steps <= 0)
+		{
+			return 0m;
+		}
+
+		var foodEmission = await _db.FoodRecords
+			.Where(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd)
+			.SumAsync(r => (decimal?)r.Emission) ?? 0m;
+		var travelEmission = await _db.TravelLogs
+			.Where(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd)
+			.SumAsync(r => (decimal?)r.CarbonEmission) ?? 0m;
+
+		var dailyTotalEmission = foodEmission + travelEmission;
+		var stepSaving = (decimal)steps * StepToCarbonFactor;
+
+		var net = stepSaving + (DailyBenchmark - dailyTotalEmission);
+		return net;
+	}
+
+	public async Task RecalculateTotalCarbonSavedAsync(int userId)
+	{
+		// 收集该用户所有参与计算的日期（来自步数、食物与出行）
+		var stepDates = await _db.StepRecords.Where(r => r.UserId == userId).Select(r => r.RecordDate.Date).Distinct().ToListAsync();
+		var foodDates = await _db.FoodRecords.Where(r => r.UserId == userId).Select(r => r.CreatedAt.Date).Distinct().ToListAsync();
+		var travelDates = await _db.TravelLogs.Where(r => r.UserId == userId).Select(r => r.CreatedAt.Date).Distinct().ToListAsync();
+
+		var allDates = stepDates
+			.Concat(foodDates)
+			.Concat(travelDates)
+			.Distinct()
+			.OrderBy(d => d)
+			.ToList();
+
+		decimal total = 0m;
+		foreach (var d in allDates)
+		{
+			total += await CalculateDailyNetValueAsync(userId, d);
+		}
+
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId);
+		if (user is null) return;
+
+		// TotalCarbonSaved 列精度为 (18,2)，此处四舍五入到 2 位
+		user.TotalCarbonSaved = decimal.Round(total, 2, MidpointRounding.AwayFromZero);
 		await _db.SaveChangesAsync();
 	}
 }

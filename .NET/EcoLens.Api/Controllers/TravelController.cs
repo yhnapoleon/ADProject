@@ -89,6 +89,8 @@ public class TravelController : ControllerBase
 			try
 			{
 				await _pointService.CheckAndAwardPointsAsync(userId.Value, result.CreatedAt.Date);
+				// 创建出行记录后，重算总碳减排
+				await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
 			}
 			catch (Exception ex)
 			{
@@ -127,6 +129,7 @@ public class TravelController : ControllerBase
 		try
 		{
 			await _pointService.CheckAndAwardPointsAsync(userId.Value, result.CreatedAt.Date);
+			await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
 		}
 		catch (Exception ex)
 		{

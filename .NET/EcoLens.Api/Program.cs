@@ -227,7 +227,7 @@ builder.Services.AddHttpClient<IVisionService, PythonVisionService>((sp, client)
 	var baseUrl = (options.BaseUrl ?? "http://localhost:8000/").TrimEnd('/') + "/";
 	client.BaseAddress = new Uri(baseUrl);
 
-	var timeoutSeconds = config.GetValue<int?>("Vision:TimeoutSeconds") ?? 30;
+	var timeoutSeconds = config.GetValue<int?>("Vision:TimeoutSeconds") ?? 60;
 	client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 
@@ -243,16 +243,29 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 	app.UseSwaggerUI();
 }
 
+// HTTPS 重定向
+app.UseHttpsRedirection();
+
+// 静态文件（用于访问 wwwroot/uploads）
+app.UseStaticFiles();
+
+// 显式路由（确保 CORS 能正确拦截）
+app.UseRouting();
+
 // CORS 必须在 Authentication 之前
 app.UseCors(AllowAllCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 静态文件（用于访问 wwwroot/uploads）
-app.UseStaticFiles();
-
 app.MapControllers();
+
+// 启动时自动应用未执行的迁移（解决 Azure 数据库与代码结构不一致导致的 500）
+using (var scope = app.Services.CreateScope())
+{
+	var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+	context.Database.Migrate();
+}
 
 app.Run();
 
