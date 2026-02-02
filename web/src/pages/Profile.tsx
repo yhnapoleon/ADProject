@@ -327,9 +327,6 @@ const Profile = () => {
                   <span style={{ fontWeight: 600 }}>Total Points:</span>
                   <span style={{ fontWeight: 700 }}>{user.pointsTotal}</span>
                 </div>
-                <div style={{ marginTop: 8, fontSize: 14, color: '#666' }}>
-                  Carbon saved: <strong>{totalCarbonSaved.toFixed(1)}</strong> kg CO₂e
-                </div>
                 {rank > 0 && (
                   <div style={{ marginTop: 4, fontSize: 14, color: '#666' }}>
                     Rank: <strong>#{rank}</strong>
