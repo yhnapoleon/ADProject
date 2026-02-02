@@ -22,13 +22,15 @@ public class FoodController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
 	private readonly IVisionService _visionService;
+	private readonly IPointService _pointService;
 	private readonly ILogger<FoodController> _logger;
 	private readonly IHttpClientFactory _httpClientFactory;
 
-	public FoodController(ApplicationDbContext db, IVisionService visionService, ILogger<FoodController> logger, IHttpClientFactory httpClientFactory)
+	public FoodController(ApplicationDbContext db, IVisionService visionService, IPointService pointService, ILogger<FoodController> logger, IHttpClientFactory httpClientFactory)
 	{
 		_db = db;
 		_visionService = visionService;
+		_pointService = pointService;
 		_logger = logger;
 		_httpClientFactory = httpClientFactory;
 	}
@@ -131,6 +133,16 @@ public class FoodController : ControllerBase
 		await _db.FoodRecords.AddAsync(record, ct);
 		await _db.SaveChangesAsync(ct);
 
+		// 积分奖励检查（忽略异常，避免影响主流程）
+		try
+		{
+			await _pointService.CheckAndAwardPointsAsync(userId.Value, record.CreatedAt.Date);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogWarning(ex, "CheckAndAwardPoints failed after food ingest-from-image for UserId={UserId}", userId);
+		}
+
 		return Ok(new FoodSimpleCalcResponse
 		{
 			Name = record.Name,
@@ -175,6 +187,16 @@ public class FoodController : ControllerBase
 		};
 		await _db.FoodRecords.AddAsync(record, ct);
 		await _db.SaveChangesAsync(ct);
+
+		// 积分奖励检查（忽略异常，避免影响主流程）
+		try
+		{
+			await _pointService.CheckAndAwardPointsAsync(userId.Value, record.CreatedAt.Date);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogWarning(ex, "CheckAndAwardPoints failed after food ingest-by-name for UserId={UserId}", userId);
+		}
 
 		return Ok(new FoodSimpleCalcResponse
 		{

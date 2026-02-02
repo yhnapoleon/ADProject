@@ -30,7 +30,7 @@ public class StepController : ControllerBase
 	/// 自动累计到用户 TotalCarbonSaved 与 CurrentPoints。
 	/// </summary>
 	[HttpPost("sync")]
-	public async Task<IActionResult> Sync([FromBody] SyncStepsRequestDto dto, CancellationToken ct)
+	public async Task<ActionResult<SyncStepsResponseDto>> Sync([FromBody] SyncStepsRequestDto dto, CancellationToken ct)
 	{
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
@@ -45,6 +45,13 @@ public class StepController : ControllerBase
 
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (user is null) return NotFound();
+
+		// 日重置：以请求体中的 date（按其 date 部分）作为当日判定
+		if (!user.LastStepUsageDate.HasValue || user.LastStepUsageDate.Value.Date != date)
+		{
+			user.StepsUsedToday = 0;
+			user.LastStepUsageDate = date;
+		}
 
 		if (record is null)
 		{
@@ -76,7 +83,17 @@ public class StepController : ControllerBase
 		}
 
 		await _db.SaveChangesAsync(ct);
-		return Ok();
+
+		var total = record.StepCount;
+		var used = Math.Max(0, user.StepsUsedToday);
+		var available = Math.Max(0, total - used);
+
+		return Ok(new SyncStepsResponseDto
+		{
+			TotalSteps = total,
+			UsedSteps = used,
+			AvailableSteps = available
+		});
 	}
 }
 

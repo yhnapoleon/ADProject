@@ -232,6 +232,7 @@ builder.Services.AddHttpClient<IVisionService, PythonVisionService>((sp, client)
 
 // Diet Template services
 builder.Services.AddScoped<IDietTemplateService, DietTemplateService>();
+builder.Services.AddScoped<IPointService, PointService>();
 var app = builder.Build();
 
 // Middleware pipeline

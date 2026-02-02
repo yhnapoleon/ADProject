@@ -282,11 +282,11 @@ const LogMeal = () => {
       text = await tryDecodeFromUrl(dataUrl);
       if (text) return { barcode: text };
 
-      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? '未检测到条形码' : '检测到条形码但无法解析数字');
+      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? 'Barcode not detected' : 'Barcode detected but could not decode');
       return { barcode: null, failureReason: lastReason };
     } catch (error) {
       console.log('Barcode scan failed:', error);
-      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? '未检测到条形码' : '检测到条形码但无法解析数字');
+      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? 'Barcode not detected' : 'Barcode detected but could not decode');
       return { barcode: null, failureReason: lastReason };
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -306,9 +306,9 @@ const LogMeal = () => {
         return null;
       }
       if (error.response?.status === 404) {
-        message.warning('条形码未找到，将尝试食物识别');
+        message.warning('Barcode not found, will try food recognition');
       } else {
-        message.error('条形码查询失败');
+        message.error('Barcode lookup failed');
       }
       return null;
     }
@@ -319,7 +319,7 @@ const LogMeal = () => {
     const raw = manualBarcode.replace(/\s+/g, '').replace(/-/g, '');
     const digits = raw.replace(/\D/g, '');
     if (digits.length < 8 || digits.length > 14) {
-      message.warning('请输入 8～14 位条形码数字（如 EAN-13 为 13 位）');
+      message.warning('Please enter 8–14 digit barcode (e.g. EAN-13 is 13 digits)');
       return;
     }
     setManualBarcodeLoading(true);
@@ -332,14 +332,14 @@ const LogMeal = () => {
           foodName: info.productName || info.carbonReferenceLabel || '',
           co2Factor: info.co2Factor ?? undefined,
         });
-        message.success(`已查询：${info.productName || info.carbonReferenceLabel || '未知产品'}`);
+        message.success(`Found: ${info.productName || info.carbonReferenceLabel || 'Unknown product'}`);
       } else {
         const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
         if (!token) {
-          message.error('登录已过期，请重新登录');
+          message.error('Session expired, please log in again');
           navigate('/login');
         } else {
-          message.warning('未找到该条形码对应的产品信息');
+          message.warning('No product found for this barcode');
         }
       }
     } finally {
@@ -390,12 +390,12 @@ const LogMeal = () => {
       const status = error.response?.status;
       const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
       const msg = isTimeout
-        ? '识别超时，AI 模型处理较慢，请稍后重试'
+        ? 'Recognition timed out; AI is slow, please try again later'
         : status === 502
-          ? '食物识别服务未启动，请先启动 Vision 服务 (端口 8000)'
+          ? 'Food recognition service not running. Start Vision service (port 8000) first'
           : status === 400
-            ? '图片上传无效，请重试'
-            : '食物识别失败';
+            ? 'Invalid image upload, please try again'
+            : 'Food recognition failed';
       message.error(msg);
       return null;
     }
@@ -408,7 +408,7 @@ const LogMeal = () => {
     // 检查 token 是否存在（用于 API 调用）
     const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
     if (!token) {
-      message.error('登录已过期，请重新登录');
+      message.error('Session expired, please log in again');
       // 清除登录状态
       localStorage.removeItem('isLoggedIn');
       setTimeout(() => {
@@ -431,7 +431,7 @@ const LogMeal = () => {
       
       if (barcode) {
         setDetectionType('barcode');
-        message.loading({ content: '识别到条形码，正在查询产品信息...', key: 'detecting', duration: 0 });
+        message.loading({ content: 'Barcode detected, fetching product...', key: 'detecting', duration: 0 });
         
         const barcodeInfo = await fetchBarcodeInfo(barcode);
         if (barcodeInfo) {
@@ -441,13 +441,13 @@ const LogMeal = () => {
             foodName: barcodeInfo.productName || barcodeInfo.carbonReferenceLabel || '',
             co2Factor: barcodeInfo.co2Factor || undefined,
           });
-          message.success({ content: `识别成功：${barcodeInfo.productName || barcodeInfo.carbonReferenceLabel}`, key: 'detecting' });
+          message.success({ content: `Recognized: ${barcodeInfo.productName || barcodeInfo.carbonReferenceLabel}`, key: 'detecting' });
         } else {
           // 检查 token 是否被清除（表示 401 错误）
           const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
           if (!token) {
             // 401 错误，显示提示并跳转
-            message.error({ content: '登录已过期，请重新登录', key: 'detecting' });
+            message.error({ content: 'Session expired, please log in again', key: 'detecting' });
             setLoading(false);
             setTimeout(() => {
               navigate('/login');
@@ -456,7 +456,7 @@ const LogMeal = () => {
           }
           
           // 条形码查询失败，尝试食物识别
-          message.loading({ content: '条形码查询失败，尝试食物识别...', key: 'detecting' });
+          message.loading({ content: 'Barcode lookup failed, trying food recognition...', key: 'detecting' });
           const foodInfo = await recognizeFood(file as unknown as File);
           if (foodInfo) {
             setDetectionType('food');
@@ -467,34 +467,34 @@ const LogMeal = () => {
             const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
             if (factorResult) {
               form.setFieldsValue({ co2Factor: factorResult.co2Factor });
-              message.success({ content: `识别为：${foodInfo.label}，已自动匹配碳排放因子`, key: 'detecting' });
+              message.success({ content: `Recognized: ${foodInfo.label}, emission factor matched`, key: 'detecting' });
             } else {
-              message.success({ content: `识别为：${foodInfo.label}`, key: 'detecting' });
+              message.success({ content: `Recognized: ${foodInfo.label}`, key: 'detecting' });
             }
           } else {
             // 再次检查 token 是否被清除（表示 401 错误）
             const tokenAfterFood = localStorage.getItem('token') || localStorage.getItem('adminToken');
             if (!tokenAfterFood) {
               // 401 错误，显示提示并跳转
-              message.error({ content: '登录已过期，请重新登录', key: 'detecting' });
+              message.error({ content: 'Session expired, please log in again', key: 'detecting' });
               setLoading(false);
               setTimeout(() => {
                 navigate('/login');
               }, 2000);
               return false;
             }
-            message.warning({ content: '未能识别图片内容，请手动输入', key: 'detecting' });
+            message.warning({ content: 'Could not recognize image, please enter manually', key: 'detecting' });
           }
         }
       } else {
         // 没有识别到条形码，尝试食物识别
         setDetectionType('food');
         const reasonHint = barcodeFailureReason === 'decode_failed'
-          ? '检测到条形码但无法解析数字，'
+          ? 'Barcode detected but could not decode. '
           : barcodeFailureReason === 'not_found'
-            ? '未检测到条形码，'
+            ? 'No barcode detected. '
             : '';
-        message.loading({ content: `${reasonHint}正在识别食物...`, key: 'detecting', duration: 0 });
+        message.loading({ content: `${reasonHint}Recognizing food...`, key: 'detecting', duration: 0 });
         
         const foodInfo = await recognizeFood(file as unknown as File);
         if (foodInfo) {
@@ -505,16 +505,16 @@ const LogMeal = () => {
           const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
           if (factorResult) {
             form.setFieldsValue({ co2Factor: factorResult.co2Factor });
-            message.success({ content: `识别为：${foodInfo.label}，已自动匹配碳排放因子`, key: 'detecting' });
+            message.success({ content: `Recognized: ${foodInfo.label}, emission factor matched`, key: 'detecting' });
           } else {
-            message.success({ content: `识别为：${foodInfo.label}`, key: 'detecting' });
+            message.success({ content: `Recognized: ${foodInfo.label}`, key: 'detecting' });
           }
         } else {
           // 检查 token 是否被清除（表示 401 错误）
           const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
           if (!token) {
             // 401 错误，显示提示并跳转
-            message.error({ content: '登录已过期，请重新登录', key: 'detecting' });
+            message.error({ content: 'Session expired, please log in again', key: 'detecting' });
             setLoading(false);
             setTimeout(() => {
               navigate('/login');
@@ -522,22 +522,22 @@ const LogMeal = () => {
             return false;
           }
           const manualHint = barcodeFailureReason === 'decode_failed'
-            ? '检测到条形码但无法解析数字，请确保条形码清晰、完整、少反光，或只拍条形码区域重试。可手动输入条形码数字查询。'
+            ? 'Barcode detected but could not decode. Ensure barcode is clear, complete, and not reflective, or try capturing only the barcode. You can also enter the barcode number manually.'
             : barcodeFailureReason === 'not_found'
-              ? '未检测到条形码；食物识别也未成功。罐装/曲面条码可手动输入条形码数字查询，或直接填写食物信息。'
-              : '未能识别图片内容，请手动输入。';
+              ? 'No barcode detected; food recognition also failed. For cans/curved barcodes you can enter the barcode number manually or fill in food details.'
+              : 'Could not recognize image, please enter manually.';
           message.warning({ content: manualHint, key: 'detecting', duration: 6 });
         }
       }
     } catch (error: any) {
       console.error('Detection error:', error);
       if (error.response?.status === 401) {
-        message.error({ content: '登录已过期，请重新登录', key: 'detecting' });
+        message.error({ content: 'Session expired, please log in again', key: 'detecting' });
         setTimeout(() => {
           navigate('/login');
         }, 2000);
       } else {
-        message.error({ content: '识别过程出错', key: 'detecting' });
+        message.error({ content: 'Recognition error', key: 'detecting' });
       }
     } finally {
       setLoading(false);
@@ -606,7 +606,7 @@ const LogMeal = () => {
               <div style={{ textAlign: 'center' }}>
                 <Spin size="large" />
                 <div style={{ marginTop: 16, color: '#674fa3', fontSize: 14 }}>
-                  正在识别图片...
+                  Recognizing image...
                 </div>
               </div>
             ) : !previewUrl ? (
@@ -616,7 +616,7 @@ const LogMeal = () => {
                   Tap to choose an image, or drag & drop here
                 </div>
                 <div style={{ color: '#8c8c8c', fontSize: 11, marginTop: 4 }}>
-                  (支持条形码和食物识别)
+                  (Barcode & food recognition)
                 </div>
                 <Button
                   type="primary"
@@ -646,7 +646,7 @@ const LogMeal = () => {
                       fontWeight: 600,
                     }}
                   >
-                    {detectionType === 'barcode' ? '📷 条形码' : '🍽️ 食物'}
+                    {detectionType === 'barcode' ? '📷 Barcode' : '🍽️ Food'}
                   </div>
                 )}
               </div>
@@ -666,13 +666,13 @@ const LogMeal = () => {
           }}
         >
           <div style={{ fontWeight: 600, marginBottom: 6, color: '#ad8b00' }}>
-            罐装 / 曲面条形码识别不到？手动输入条形码数字
+            Can&apos;t scan barcode? Enter barcode number manually
           </div>
           <Space.Compact style={{ width: '100%' }}>
             <Input
               value={manualBarcode}
               onChange={(e) => setManualBarcode(e.target.value)}
-              placeholder="如 8888200708696（可含空格）"
+              placeholder="e.g. 8888200708696 (spaces allowed)"
               maxLength={20}
               style={{ flex: 1 }}
               onPressEnter={handleManualBarcodeQuery}
@@ -683,7 +683,7 @@ const LogMeal = () => {
               onClick={handleManualBarcodeQuery}
               style={{ background: '#faad14', borderColor: '#faad14' }}
             >
-              查询
+              Look up
             </Button>
           </Space.Compact>
         </div>
@@ -700,24 +700,24 @@ const LogMeal = () => {
           >
             <div style={{ fontSize: 13 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                📦 产品信息
+                📦 Product info
               </div>
               <div style={{ color: '#595959' }}>
-                产品名称: {(detectedInfo.data as BarcodeResponse).productName || (detectedInfo.data as BarcodeResponse).carbonReferenceLabel}
+                Product: {(detectedInfo.data as BarcodeResponse).productName || (detectedInfo.data as BarcodeResponse).carbonReferenceLabel}
               </div>
               {(detectedInfo.data as BarcodeResponse).brand && (
                 <div style={{ color: '#595959' }}>
-                  品牌: {(detectedInfo.data as BarcodeResponse).brand}
+                  Brand: {(detectedInfo.data as BarcodeResponse).brand}
                 </div>
               )}
               {(detectedInfo.data as BarcodeResponse).category && (
                 <div style={{ color: '#595959' }}>
-                  类别: {(detectedInfo.data as BarcodeResponse).category}
+                  Category: {(detectedInfo.data as BarcodeResponse).category}
                 </div>
               )}
               {(detectedInfo.data as BarcodeResponse).co2Factor && (
                 <div style={{ color: '#595959', marginTop: 4 }}>
-                  碳排放因子: {(detectedInfo.data as BarcodeResponse).co2Factor} {(detectedInfo.data as BarcodeResponse).unit || 'kg CO2e/kg'}
+                  Emission factor: {(detectedInfo.data as BarcodeResponse).co2Factor} {(detectedInfo.data as BarcodeResponse).unit || 'kg CO2e/kg'}
                 </div>
               )}
             </div>
@@ -735,22 +735,22 @@ const LogMeal = () => {
           >
             <div style={{ fontSize: 13 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                🍽️ 食物识别结果
+                🍽️ Food recognition
               </div>
               <div style={{ color: '#595959' }}>
-                识别为: {(detectedInfo.data as VisionResponse).label}
+                Recognized: {(detectedInfo.data as VisionResponse).label}
               </div>
               <div style={{ color: '#595959' }}>
-                置信度: {((detectedInfo.data as VisionResponse).confidence * 100).toFixed(1)}%
+                Confidence: {((detectedInfo.data as VisionResponse).confidence * 100).toFixed(1)}%
               </div>
               {co2Factor != null && Number(co2Factor) > 0 && (
                 <div style={{ color: '#595959' }}>
-                  碳排放因子: {Number(co2Factor)} kg CO2e/kg
+                  Emission factor: {Number(co2Factor)} kg CO2e/kg
                 </div>
               )}
               {(!co2Factor || Number(co2Factor) <= 0) && (
                 <div style={{ color: '#8c8c8c', fontSize: 11, marginTop: 4 }}>
-                  未匹配到该食物的碳因子，请手动输入数量和碳排放因子
+                  No emission factor for this food; enter amount and factor manually
                 </div>
               )}
             </div>
@@ -795,7 +795,7 @@ const LogMeal = () => {
                   style={{ width: '100%', ...inputBg }}
                   min={0}
                   step={0.1}
-                  placeholder="自动识别或手动输入"
+                  placeholder="Auto or enter manually"
                 />
               </Form.Item>
               <Form.Item label="Carbon Emissions (kg CO2e)">
@@ -803,7 +803,7 @@ const LogMeal = () => {
                   readOnly
                   value={emissions !== null ? emissions.toFixed(3) : ''}
                   style={inputBg}
-                  placeholder="自动计算"
+                  placeholder="Auto-calculated"
                 />
               </Form.Item>
             </div>

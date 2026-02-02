@@ -50,6 +50,26 @@ public class ApplicationUser : BaseEntity
 	[Required]
 	public DateTime BirthDate { get; set; }
 
+	/// <summary>
+	/// 最近一次达成“碳中和日”的日期（按 UTC 日期存储）。
+	/// </summary>
+	public DateTime? LastNeutralDate { get; set; }
+
+	/// <summary>
+	/// 连续达成“碳中和日”的天数（从 1 开始累计，未达成则在下次达成时重置为 1）。
+	/// </summary>
+	public int ContinuousNeutralDays { get; set; }
+
+	/// <summary>
+	/// 当日已用于树木生长消耗的步数（每天重置）。
+	/// </summary>
+	public int StepsUsedToday { get; set; }
+
+	/// <summary>
+	/// 最近一次消耗步数用于树木生长的日期（按 UTC 日期的 date 部分存储，用于每日重置）。
+	/// </summary>
+	public DateTime? LastStepUsageDate { get; set; }
+
 	public bool IsActive { get; set; } = true;
 
 	// 植树相关：总树数与当前树生长进度（0-100）
