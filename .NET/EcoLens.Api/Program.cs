@@ -184,6 +184,7 @@ builder.Services.Configure<FormOptions>(options =>
 
 // DI registrations
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<ISensitiveWordService, SensitiveWordService>();
 builder.Services.AddScoped<ITravelService, TravelService>();
 builder.Services.AddScoped<IOcrService, OcrService>();
 builder.Services.AddScoped<IDocumentTypeClassifier, DocumentTypeClassifier>();
@@ -226,7 +227,7 @@ builder.Services.AddHttpClient<IVisionService, PythonVisionService>((sp, client)
 	var baseUrl = (options.BaseUrl ?? "http://localhost:8000/").TrimEnd('/') + "/";
 	client.BaseAddress = new Uri(baseUrl);
 
-	var timeoutSeconds = config.GetValue<int?>("Vision:TimeoutSeconds") ?? 30;
+	var timeoutSeconds = config.GetValue<int?>("Vision:TimeoutSeconds") ?? 60;
 	client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 });
 
@@ -258,6 +259,13 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// 启动时自动应用未执行的迁移（解决 Azure 数据库与代码结构不一致导致的 500）
+using (var scope = app.Services.CreateScope())
+{
+	var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+	context.Database.Migrate();
+}
 
 app.Run();
 
