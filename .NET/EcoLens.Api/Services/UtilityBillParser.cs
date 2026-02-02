@@ -644,7 +644,9 @@ public class UtilityBillParser : IUtilityBillParser
 				return false;
 			}
 			
-			_logger.LogDebug("Successfully parsed date: {Date} from {Day} {Month} {Year}", date, dayStr, monthStr, yearStr);
+			// 验证解析后的月份是否与输入的月份字符串匹配
+			_logger.LogDebug("Successfully parsed date: {Date} (Year={Year}, Month={Month}, Day={Day}) from input: day={DayStr}, month={MonthStr}, year={YearStr}", 
+				date, date.Year, date.Month, date.Day, dayStr, monthStr, yearStr);
 			return true;
 		}
 		catch (Exception ex)

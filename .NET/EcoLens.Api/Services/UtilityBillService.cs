@@ -115,14 +115,21 @@ public class UtilityBillService : IUtilityBillService
 				ct);
 
 			// 7. 创建临时实体（不保存到数据库）
+			// 计算 YearMonth：基于 BillPeriodEnd 的年月，确保月份正确
+			var endDate = extractedData.BillPeriodEnd.Value;
+			var yearMonth = $"{endDate.Year:D4}-{endDate.Month:D2}"; // 使用 D2 确保月份是两位数（01-12）
+			
+			_logger.LogInformation("Calculating YearMonth: BillPeriodEnd={EndDate} (Year={Year}, Month={Month}), YearMonth={YearMonth}", 
+				endDate, endDate.Year, endDate.Month, yearMonth);
+			
 			var utilityBill = new UtilityBill
 			{
 				Id = 0, // 表示还未保存
 				UserId = userId,
 				BillType = extractedData.BillType,
 				BillPeriodStart = extractedData.BillPeriodStart.Value,
-				BillPeriodEnd = extractedData.BillPeriodEnd.Value,
-				YearMonth = extractedData.BillPeriodEnd.Value.ToString("yyyy-MM"), // 基于结束日期计算年月（格式：YYYY-MM）
+				BillPeriodEnd = endDate,
+				YearMonth = yearMonth, // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = extractedData.ElectricityUsage,
 				WaterUsage = extractedData.WaterUsage,
 				GasUsage = extractedData.GasUsage,
@@ -196,14 +203,18 @@ public class UtilityBillService : IUtilityBillService
 				ct);
 
 			// 4. 创建实体
-			var periodLabel = dto.BillPeriodEnd.ToString("yyyy-MM"); // 用于 ActivityLog 的标签
+			// 计算 YearMonth：基于 BillPeriodEnd 的年月，确保月份正确
+			var endDate = dto.BillPeriodEnd;
+			var yearMonth = $"{endDate.Year:D4}-{endDate.Month:D2}"; // 使用 D2 确保月份是两位数（01-12）
+			var periodLabel = yearMonth; // 用于 ActivityLog 的标签
+			
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
 				BillType = dto.BillType,
 				BillPeriodStart = dto.BillPeriodStart,
-				BillPeriodEnd = dto.BillPeriodEnd,
-				YearMonth = periodLabel, // 基于结束日期计算年月（格式：YYYY-MM）
+				BillPeriodEnd = endDate,
+				YearMonth = yearMonth, // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = dto.ElectricityUsage,
 				WaterUsage = dto.WaterUsage,
 				GasUsage = dto.GasUsage,
