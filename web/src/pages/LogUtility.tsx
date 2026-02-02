@@ -63,10 +63,10 @@ const LogUtility = () => {
         // 使用 billPeriodEnd 来设置月份，因为账单属于结束日期所在的月份
         month: res?.billPeriodEnd ? dayjs(res.billPeriodEnd) : undefined,
       });
-      message.success('账单识别成功，请核对后保存');
+      message.success('Bill recognized. Please review and save.');
     } catch (err: any) {
-      console.error('[LogUtility] 上传失败:', err?.response?.status, err?.response?.data);
-      const msg = err?.response?.data?.error ?? err?.message ?? '识别失败，请改用手动填写';
+      console.error('[LogUtility] Upload failed:', err?.response?.status, err?.response?.data);
+      const msg = err?.response?.data?.error ?? err?.message ?? 'Recognition failed. Please enter manually.';
       message.error(msg);
     } finally {
       setUploadLoading(false);
@@ -109,7 +109,7 @@ const LogUtility = () => {
                   loading={uploadLoading}
                   style={{ marginTop: 14, background: '#674fa3', borderColor: '#674fa3', borderRadius: 999 }}
                 >
-                  {uploadLoading ? '识别中...' : 'Upload Bill'}
+                  {uploadLoading ? 'Recognizing...' : 'Upload Bill'}
                 </Button>
               </div>
             ) : (
@@ -125,7 +125,7 @@ const LogUtility = () => {
         <Form<FormValues> form={form} layout="vertical" style={{ marginTop: 18 }} onFinish={async (values) => {
           const month = values.month;
           if (!month) {
-            message.error('请选择账单月份');
+            message.error('Please select bill month.');
             return;
           }
           const billPeriodStart = month.startOf('month').format('YYYY-MM-DD');
@@ -140,11 +140,11 @@ const LogUtility = () => {
               waterUsage: values.waterUsage ?? null,
               gasUsage: values.gasUsage ?? null,
             });
-            message.success('水电账单已保存');
+            message.success('Utility bill saved.');
             navigate('/dashboard');
           } catch (err: any) {
-            console.error('[LogUtility] 保存失败:', err?.response?.status, err?.response?.data);
-            const msg = err?.response?.data?.error ?? err?.message ?? '保存失败，请重试';
+            console.error('[LogUtility] Save failed:', err?.response?.status, err?.response?.data);
+            const msg = err?.response?.data?.error ?? err?.message ?? 'Save failed. Please try again.';
             message.error(msg);
           } finally {
             setSubmitLoading(false);
@@ -208,7 +208,7 @@ const LogUtility = () => {
               Save
             </Button>
             <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
-              保存后将计入您的碳账本并参与统计。
+              This will be added to your carbon ledger and included in stats.
             </Text>
           </Space>
         </Form>

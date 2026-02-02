@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, Table, Select, Button, Modal, message, Row, Col, Tag } from 'antd';
 import { DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { Record, EmissionType } from '../types/index';
@@ -8,10 +8,11 @@ import mainTravelIcon from '../assets/icons/main_travel.svg';
 import mainWaterIcon from '../assets/icons/main_water.svg';
 import request from '../utils/request';
 
-/** 内部记录类型，包含原始 ID 和来源类型 */
+/** 内部记录类型，包含原始 ID、来源类型和 API 返回的 notes */
 interface InternalRecord extends Record {
   _source: 'food' | 'travel' | 'utility';
   _originalId: number;
+  notes?: string;
 }
 
 const Records = () => {
@@ -39,10 +40,11 @@ const Records = () => {
         type: 'Food' as EmissionType,
         amount: item.totalEmission ?? item.carbonEmission ?? 0,
         unit: 'kg CO₂e',
-        description: item.foodName || item.name || item.detectedLabel || '食物记录',
+        description: item.foodName || item.name || item.detectedLabel || 'Food record',
+        notes: item.notes ?? item.note ?? '',
       }));
 
-      // 处理出行记录
+      // 处理出行记录（API 返回 notes）
       const travelList = (Array.isArray(travelRes) ? travelRes : travelRes?.items || []).map((item: any) => ({
         id: `travel_${item.id}`,
         _source: 'travel' as const,
@@ -52,6 +54,7 @@ const Records = () => {
         amount: item.carbonEmission ?? 0,
         unit: 'kg CO₂e',
         description: `${item.originAddress || ''} → ${item.destinationAddress || ''} (${item.transportModeName || item.transportMode || ''})`,
+        notes: item.notes ?? item.Notes ?? '',
       }));
 
       // 处理水电账单记录
@@ -63,27 +66,13 @@ const Records = () => {
         type: 'Utilities' as EmissionType,
         amount: item.totalCarbonEmission ?? 0,
         unit: 'kg CO₂e',
-        description: `水电账单 ${item.yearMonth || ''} (电 ${item.electricityUsage ?? 0}kWh / 水 ${item.waterUsage ?? 0}m³ / 气 ${item.gasUsage ?? 0})`,
+        description: `Utility bill ${item.yearMonth || ''} (Elec ${item.electricityUsage ?? 0}kWh / Water ${item.waterUsage ?? 0}m³ / Gas ${item.gasUsage ?? 0})`,
+        notes: item.notes ?? item.note ?? '',
       }));
 
-      // 合并并排序（按日期降序）
-      let allRecords: InternalRecord[] = [...foodList, ...travelList, ...utilityList];
+      // 合并并排序（按日期降序），不在此处筛选，由前端根据 filter 筛选
+      const allRecords: InternalRecord[] = [...foodList, ...travelList, ...utilityList];
       allRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      // 应用类型筛选
-      if (filterType && filterType !== 'all') {
-        allRecords = allRecords.filter(r => r.type === filterType);
-      }
-
-      // 应用月份筛选
-      if (filterMonth && filterMonth !== 'all') {
-        allRecords = allRecords.filter(r => {
-          const d = new Date(r.date);
-          const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          return ym === filterMonth;
-        });
-      }
-
       setRecords(allRecords);
     } catch (error: any) {
       console.error('Failed to fetch records:', error);
@@ -95,7 +84,23 @@ const Records = () => {
 
   useEffect(() => {
     fetchRecords();
-  }, [filterType, filterMonth]);
+  }, []);
+
+  // 前端筛选：类型 + 月份
+  const filteredRecords = useMemo(() => {
+    let list = records;
+    if (filterType && filterType !== 'all') {
+      list = list.filter((r) => r.type === filterType);
+    }
+    if (filterMonth && filterMonth !== 'all') {
+      list = list.filter((r) => {
+        const d = new Date(r.date);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return ym === filterMonth;
+      });
+    }
+    return list;
+  }, [records, filterType, filterMonth]);
 
   const getTypeColor = (type: EmissionType) => {
     const colorMap: { [key in EmissionType]: string } = {
@@ -148,11 +153,10 @@ const Records = () => {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
-      render: (text: string) => new Date(text).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      }),
+      render: (text: string, record: InternalRecord) =>
+        record._source === 'utility'
+          ? new Date(text).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+          : new Date(text).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
       width: '15%',
     },
     {
@@ -172,15 +176,16 @@ const Records = () => {
       title: 'Amount',
       dataIndex: 'amount',
       key: 'amount',
-      render: (text: number, record: Record) => `${text} ${record.unit || 'kg CO₂e'}`,
+      render: (text: number, record: InternalRecord) => `${Number(text).toFixed(2)} ${record.unit || 'kg CO₂e'}`,
       width: '15%',
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
+      title: 'Notes',
+      dataIndex: 'notes',
+      key: 'notes',
       ellipsis: true,
       width: '40%',
+      render: (_: unknown, record: InternalRecord) => record.notes?.trim() || record.description || '—',
     },
     {
       title: 'Action',
@@ -207,12 +212,18 @@ const Records = () => {
     { label: 'Utilities', value: 'Utilities' as EmissionType },
   ];
 
-  const monthOptions = [
-    { label: 'All Months', value: 'all' },
-    { label: 'January 2026', value: '2026-01' },
-    { label: 'December 2025', value: '2025-12' },
-    { label: 'November 2025', value: '2025-11' },
-  ];
+  // 最近 12 个月（含当月）
+  const monthOptions = useMemo(() => {
+    const options = [{ label: 'All Months', value: 'all' }];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+      options.push({ label, value: ym });
+    }
+    return options;
+  }, []);
 
   return (
     <div style={{ width: '100%' }}>
@@ -271,7 +282,7 @@ const Records = () => {
           <Table
             columns={columns}
             loading={loading}
-            dataSource={records.map((record) => ({
+            dataSource={filteredRecords.map((record) => ({
               ...record,
               key: record.id,
             }))}
@@ -287,17 +298,17 @@ const Records = () => {
         </div>
 
         {/* Summary */}
-        {!loading && records.length > 0 && (
+        {!loading && filteredRecords.length > 0 && (
           <div style={{ marginTop: '20px', padding: '16px', background: '#f8f5fb', borderRadius: '8px', borderLeft: '4px solid #674fa3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '14px', color: '#666' }}>
-              Total Emissions: <span style={{ fontWeight: '700', color: '#674fa3', fontSize: '16px' }}>
-                {records.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)} kg CO₂e
+              Total Emissions ({filteredRecords.length} records): <span style={{ fontWeight: '700', color: '#674fa3', fontSize: '16px' }}>
+                {filteredRecords.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)} kg CO₂e
               </span>
             </div>
           </div>
         )}
 
-        {!loading && records.length === 0 && (
+        {!loading && filteredRecords.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: '#999' }}>
             <div style={{ fontSize: '16px' }}>
               No records found. Adjust your filters to see data.

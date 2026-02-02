@@ -59,9 +59,10 @@ const Profile = () => {
   const [user, setUser] = useState<User>(defaultUser);
   const [totalCarbonSaved, setTotalCarbonSaved] = useState(0);
   const [rank, setRank] = useState(0);
-  const [password, setPassword] = useState<string>('');
   const [avatarUrl, setAvatarUrl] = useState<string>('');
-  const watchedPassword: string = Form.useWatch('password', form) ?? '';
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordForm] = Form.useForm();
+  const watchedNewPassword: string = Form.useWatch('newPassword', passwordForm) ?? '';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -143,19 +144,26 @@ const Profile = () => {
     return `${user.joinDays} days`;
   }, [user.joinDays]);
 
+  // Password strength logic aligned with Register page
   const passwordStrength = useMemo(() => {
-    const pwd = watchedPassword ?? '';
+    const pwd = watchedNewPassword ?? '';
     const hasLower = /[a-z]/.test(pwd);
     const hasUpper = /[A-Z]/.test(pwd);
     const hasDigit = /\d/.test(pwd);
     const hasLetter = hasLower || hasUpper;
-    const isStrong = pwd.length >= 9 && hasLower && hasUpper && hasDigit;
-    const isMedium = pwd.length >= 9 && hasLetter && hasDigit;
+
+    if (pwd.length < 8) {
+      if (pwd.length === 0) return { label: 'Weak', percent: 0, color: '#ff4d4f', canSave: false };
+      return { label: 'Weak', percent: 33, color: '#ff4d4f', canSave: false };
+    }
+
+    const isStrong = hasLower && hasUpper && hasDigit;
+    const isMedium = hasLetter && hasDigit;
+
     if (isStrong) return { label: 'Strong', percent: 100, color: '#52c41a', canSave: true };
     if (isMedium) return { label: 'Medium', percent: 66, color: '#faad14', canSave: true };
-    if (pwd.length === 0) return { label: 'Weak', percent: 0, color: '#ff4d4f', canSave: false };
     return { label: 'Weak', percent: 33, color: '#ff4d4f', canSave: false };
-  }, [watchedPassword]);
+  }, [watchedNewPassword]);
 
   const locationOptions = useMemo(
     () => [
@@ -174,7 +182,6 @@ const Profile = () => {
       username: user.name,
       nickname: user.nickname,
       email: user.email,
-      password: password || undefined,
       location: user.location,
       birthDate: user.birthDate ? dayjs(user.birthDate) : undefined,
     });
@@ -187,29 +194,13 @@ const Profile = () => {
 
   const saveProfile = async () => {
     const values = await form.validateFields();
-
-    const pwd = values.password as string | undefined;
-    if (pwd && pwd.trim() !== '') {
-      const hasLower = /[a-z]/.test(pwd);
-      const hasUpper = /[A-Z]/.test(pwd);
-      const hasDigit = /\d/.test(pwd);
-      const hasLetter = hasLower || hasUpper;
-      const mediumOrAbove = pwd.length >= 9 && hasLetter && hasDigit;
-      if (!mediumOrAbove) {
-        message.error('Password is too weak (at least 9 characters, including letters and numbers).');
-        return;
-      }
-    }
-
     try {
-      const payload: { nickname?: string; email?: string; location?: string; birthDate?: string; password?: string } = {
+      const payload: { nickname?: string; email?: string; location?: string; birthDate?: string } = {
         nickname: values.nickname,
         email: values.email,
         location: values.location,
         birthDate: values.birthDate ? values.birthDate.format('YYYY-MM-DD') : undefined,
       };
-      if (pwd && pwd.trim() !== '') payload.password = pwd;
-
       const meRes: MeDto = await request.put('/api/user/me', payload);
       setUser((prev) => ({
         ...prev,
@@ -224,12 +215,31 @@ const Profile = () => {
         pointsTotal: meRes.pointsTotal ?? prev.pointsTotal,
         joinDays: meRes.joinDays ?? prev.joinDays,
       }));
-      if (pwd) setPassword(pwd);
-
       setIsEditing(false);
       message.success('Profile updated successfully');
     } catch (e: any) {
       const msg = e.response?.data?.message ?? e.response?.data ?? e.message ?? 'Update failed';
+      message.error(typeof msg === 'string' ? msg : msg.message || msg);
+    }
+  };
+
+  const submitChangePassword = async () => {
+    try {
+      const values = await passwordForm.validateFields();
+      if (!passwordStrength.canSave) {
+        message.error('Password must be at least medium strength (length >= 8, contains letters and digits).');
+        return;
+      }
+      await request.post('/api/user/change-password', {
+        oldPassword: values.oldPassword,
+        newPassword: values.newPassword,
+      });
+      message.success('Password changed successfully');
+      setPasswordModalOpen(false);
+      passwordForm.resetFields();
+    } catch (e: any) {
+      if (e.errorFields) throw e; // validation error: keep modal open, no toast
+      const msg = e.response?.data ?? e.message ?? 'Failed to change password';
       message.error(typeof msg === 'string' ? msg : msg.message || msg);
     }
   };
@@ -347,14 +357,22 @@ const Profile = () => {
             <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '18px', fontWeight: '600' }}>Personal Information</div>
               {!isEditing ? (
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={startEditing}
-                  style={{ background: '#674fa3', borderColor: '#674fa3' }}
-                >
-                  Edit Profile
-                </Button>
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<EditOutlined />}
+                    onClick={startEditing}
+                    style={{ background: '#674fa3', borderColor: '#674fa3' }}
+                  >
+                    Edit Profile
+                  </Button>
+                  <Button
+                    icon={<LockOutlined />}
+                    onClick={() => setPasswordModalOpen(true)}
+                  >
+                    Change Password
+                  </Button>
+                </Space>
               ) : (
                 <Space>
                   <Button
@@ -449,20 +467,6 @@ const Profile = () => {
                 >
                   <Input placeholder="Enter your email" />
                 </Form.Item>
-                <Form.Item label="Password" name="password">
-                  <Input.Password placeholder="Enter new password if you want to change it" />
-                </Form.Item>
-                <div style={{ marginTop: -8, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 6 }}>
-                    <span>Password strength</span>
-                    <span style={{ color: passwordStrength.color, fontWeight: 600 }}>{passwordStrength.label}</span>
-                  </div>
-                  <Progress
-                    percent={passwordStrength.percent}
-                    showInfo={false}
-                    strokeColor={passwordStrength.color}
-                  />
-                </div>
                 <Form.Item
                   label="Location"
                   name="location"
@@ -482,6 +486,59 @@ const Profile = () => {
           </Card>
         </Col>
       </Row>
+
+      <Modal
+        title="Change Password"
+        open={passwordModalOpen}
+        onCancel={() => { setPasswordModalOpen(false); passwordForm.resetFields(); }}
+        onOk={submitChangePassword}
+        okText="Change password"
+        cancelText="Cancel"
+        destroyOnClose
+      >
+        <Form form={passwordForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            label="Current password"
+            name="oldPassword"
+            rules={[{ required: true, message: 'Please enter your current password' }]}
+          >
+            <Input.Password placeholder="Enter current password" autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item
+            label="New password"
+            name="newPassword"
+            rules={[
+              { required: true, message: 'Please enter a new password' },
+              { min: 8, message: 'At least 8 characters' },
+            ]}
+          >
+            <Input.Password placeholder="Enter new password" autoComplete="new-password" />
+          </Form.Item>
+          <div style={{ marginTop: -8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 6 }}>
+              <span>Password strength</span>
+              <span style={{ color: passwordStrength.color, fontWeight: 600 }}>{passwordStrength.label}</span>
+            </div>
+            <Progress percent={passwordStrength.percent} showInfo={false} strokeColor={passwordStrength.color} />
+          </div>
+          <Form.Item
+            label="Confirm new password"
+            name="confirmPassword"
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: 'Please confirm your new password' },
+              ({ getFieldValue }: { getFieldValue: (name: string) => unknown }) => ({
+                validator(_: unknown, value: string) {
+                  if (!value || getFieldValue('newPassword') === value) return Promise.resolve();
+                  return Promise.reject(new Error('Passwords do not match'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="Confirm new password" autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

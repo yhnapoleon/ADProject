@@ -1,5 +1,5 @@
 import { Button, Card, Form, Input, message, Typography } from 'antd';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import splashIcon from '../assets/icons/splash.svg';
 import request from '../utils/request';
@@ -25,8 +25,11 @@ type AuthResponse = {
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
-  const [stage, setStage] = useState<'splash' | 'onboarding' | 'login'>('splash');
+  const [stage, setStage] = useState<'splash' | 'onboarding' | 'login'>(() =>
+    (location.state as { fromRegister?: boolean })?.fromRegister ? 'login' : 'splash'
+  );
 
   useEffect(() => {
     if (stage === 'splash') {
@@ -66,13 +69,15 @@ const Login = () => {
       const respData = resp?.data;
       const serverMsg = (respData?.error || respData?.message || '') as string;
 
-      // 优先根据 HTTP 状态码判断，再回退到服务器返回的信息关键词
+      // Prefer HTTP status: 401 → user is banned; 403/404/msg → other cases
       if (resp) {
-        if (resp.status === 404 || /not\s+found|no\s+account|user\s+not\s+found/i.test(serverMsg)) {
+        if (resp.status === 401) {
+          message.error('User is banned');
+        } else if (resp.status === 404 || /not\s+found|no\s+account|user\s+not\s+found/i.test(serverMsg)) {
           message.error('No account found with this email');
         } else if (resp.status === 403 || /banned|disabled|forbidden/i.test(serverMsg)) {
           message.error('Your account has been banned');
-        } else if (resp.status === 401 || /invalid|incorrect|password|credentials/i.test(serverMsg)) {
+        } else if (/invalid|incorrect|password|credentials/i.test(serverMsg)) {
           message.error('Incorrect email or password');
         } else {
           const fallback = serverMsg || error.message || 'Login failed. Please check your credentials.';

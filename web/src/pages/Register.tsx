@@ -88,9 +88,9 @@ const Register = () => {
       // 调用注册 API
       await request.post('/Auth/register', registerData);
 
-      // 注册成功
+      // 注册成功：直接进入登录页，不经过启动页和 onboarding
       message.success('Registration successful! Please log in.');
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state: { fromRegister: true } });
     } catch (error: any) {
       console.error('Registration error:', error);
       console.error('Error response:', error.response?.data);
