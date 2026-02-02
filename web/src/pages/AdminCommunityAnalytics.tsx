@@ -62,7 +62,7 @@ const AdminCommunityAnalytics: React.FC = () => {
       
       <div className="charts-container">
         <div className="chart-card">
-          <h3>Total Reduction Share by Category</h3>
+          <h3>Emission Share by Category</h3>
           {loading && pieData.length === 0 ? (
             <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Loading category share...

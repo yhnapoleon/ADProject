@@ -39,36 +39,54 @@ public class MainPageController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+		var now = DateTime.UtcNow;
+		var monthStart = DateTime.SpecifyKind(new DateTime(now.Year, now.Month, 1), DateTimeKind.Utc);
 		var nextMonth = monthStart.AddMonths(1);
 
-		// 查询 ActivityLogs（食物、工具等）
+		// 查询 ActivityLogs（食物、水电等，按本月 CreatedAt）
 		var activityLogs = await _db.ActivityLogs
 			.Where(l => l.UserId == userId.Value && l.CreatedAt >= monthStart && l.CreatedAt < nextMonth)
 			.Include(l => l.CarbonReference)
 			.ToListAsync(ct);
 
-		// 查询 TravelLogs（出行记录）
+		// 查询 FoodRecords（LogMeal 保存的食物记录；表可能不存在则忽略）
+		decimal foodRecordsEmission = 0;
+		try
+		{
+			foodRecordsEmission = await _db.FoodRecords
+				.Where(r => r.UserId == userId.Value && r.CreatedAt >= monthStart && r.CreatedAt < nextMonth)
+				.SumAsync(r => r.Emission, ct);
+		}
+		catch (Exception)
+		{
+			// FoodRecords 表可能不存在（未执行迁移），忽略
+		}
+
+		// 查询 TravelLogs（出行记录，按本月 CreatedAt）
 		var travelLogs = await _db.TravelLogs
 			.Where(t => t.UserId == userId.Value && t.CreatedAt >= monthStart && t.CreatedAt < nextMonth)
 			.ToListAsync(ct);
 
+		// 查询 UtilityBills（水电账单，按 BillPeriodEnd 所属本月）
+		var utilityBillsEmission = await _db.UtilityBills
+			.Where(b => b.UserId == userId.Value && b.BillPeriodEnd >= monthStart && b.BillPeriodEnd < nextMonth)
+			.SumAsync(b => b.TotalCarbonEmission, ct);
+
 		// 计算各类别的碳排放
-		var food = activityLogs
+		// Food：ActivityLogs 中的 Food + FoodRecords 表
+		var foodFromActivities = activityLogs
 			.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Food)
 			.Sum(l => l.TotalEmission);
+		var food = foodFromActivities + foodRecordsEmission;
 
-		// Transport 包括 ActivityLogs 中的 Transport 和所有 TravelLogs
+		// Transport：ActivityLogs 中的 Transport + TravelLogs
 		var transportFromActivities = activityLogs
 			.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Transport)
 			.Sum(l => l.TotalEmission);
-		
-		var transportFromTravel = travelLogs.Sum(t => t.CarbonEmission);
-		var transport = transportFromActivities + transportFromTravel;
+		var transport = transportFromActivities + travelLogs.Sum(t => t.CarbonEmission);
 
-		var utility = activityLogs
-			.Where(l => l.CarbonReference != null && l.CarbonReference.Category == CarbonCategory.Utility)
-			.Sum(l => l.TotalEmission);
+		// Utility：仅从 UtilityBills 统计（按 BillPeriodEnd 月份），与 Records 一致，避免与 ActivityLogs 重复
+		var utility = utilityBillsEmission;
 
 		return Ok(new MainPageStatsDto
 		{

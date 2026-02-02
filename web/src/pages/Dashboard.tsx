@@ -38,7 +38,8 @@ const Dashboard = () => {
           transport: Number(res?.transport ?? 0),
           utility: Number(res?.utility ?? 0),
         });
-      } catch (_e) {
+      } catch (e: any) {
+        console.error('[Dashboard] Failed to fetch mainpage stats:', e?.response?.status, e?.response?.data ?? e?.message);
         setStats({ total: 0, food: 0, transport: 0, utility: 0 });
       } finally {
         setStatsLoading(false);

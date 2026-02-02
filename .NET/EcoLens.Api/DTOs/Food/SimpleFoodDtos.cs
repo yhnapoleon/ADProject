@@ -11,7 +11,7 @@ public class CalculateFoodRequest
 	public string Name { get; set; } = string.Empty;
 
 	/// <summary>
-	/// 数量（单位：kg）
+	/// 数量（克，g）。后端 /1000 转为 kg 再计算排放。
 	/// </summary>
 	[JsonPropertyName("amount")]
 	[Range(0, double.MaxValue)]
@@ -47,7 +47,7 @@ public class AddFoodRequest
 	public string Name { get; set; } = string.Empty;
 
 	/// <summary>
-	/// 数量（单位：kg）
+	/// 数量（克，g）。后端统一 /1000 转为 kg 再计算碳排放并存储。
 	/// </summary>
 	[JsonPropertyName("amount")]
 	[Range(0, double.MaxValue)]
