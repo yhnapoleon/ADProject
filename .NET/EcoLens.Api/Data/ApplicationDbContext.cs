@@ -96,9 +96,9 @@ public class ApplicationDbContext : DbContext
 			.HasForeignKey(a => a.CarbonReferenceId)
 			.OnDelete(DeleteBehavior.Restrict);
 
-		// FoodRecord -> ApplicationUser
+		// FoodRecord -> ApplicationUser（显式绑定 User 导航，避免生成 UserId1 影子列）
 		modelBuilder.Entity<FoodRecord>()
-			.HasOne<ApplicationUser>()
+			.HasOne(f => f.User)
 			.WithMany()
 			.HasForeignKey(f => f.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
