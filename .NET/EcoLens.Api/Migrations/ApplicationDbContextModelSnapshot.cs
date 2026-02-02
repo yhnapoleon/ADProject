@@ -686,6 +686,10 @@ namespace EcoLens.Api.Migrations
                     b.Property<string>("OcrRawText")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<decimal>("TotalCarbonEmission")
                         .HasColumnType("decimal(18,4)");
 
