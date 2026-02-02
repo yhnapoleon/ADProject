@@ -60,7 +60,8 @@ const LogUtility = () => {
         electricityUsage: res?.electricityUsage ?? undefined,
         waterUsage: res?.waterUsage ?? undefined,
         gasUsage: res?.gasUsage ?? undefined,
-        month: res?.billPeriodStart ? dayjs(res.billPeriodStart) : undefined,
+        // 使用 billPeriodEnd 来设置月份，因为账单属于结束日期所在的月份
+        month: res?.billPeriodEnd ? dayjs(res.billPeriodEnd) : undefined,
       });
       message.success('账单识别成功，请核对后保存');
     } catch (err: any) {
