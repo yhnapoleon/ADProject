@@ -242,14 +242,20 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 	app.UseSwaggerUI();
 }
 
+// HTTPS 重定向
+app.UseHttpsRedirection();
+
+// 静态文件（用于访问 wwwroot/uploads）
+app.UseStaticFiles();
+
+// 显式路由（确保 CORS 能正确拦截）
+app.UseRouting();
+
 // CORS 必须在 Authentication 之前
 app.UseCors(AllowAllCorsPolicy);
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-// 静态文件（用于访问 wwwroot/uploads）
-app.UseStaticFiles();
 
 app.MapControllers();
 
