@@ -1,0 +1,268 @@
+.admin-user-emissions {
+  padding: 32px;
+  background-color: #f5f5f5;
+  min-height: 100vh;
+}
+
+.admin-user-emissions .page-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.admin-user-emissions .page-desc {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 24px 0;
+}
+
+.query-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.form-row {
+  margin-bottom: 20px;
+}
+
+.form-row > label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.input-field {
+  width: 100%;
+  max-width: 280px;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: #674fa3;
+}
+
+.search-user-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-user-row .search-input {
+  max-width: 320px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.search-user-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background-color: #5a4190;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.search-user-btn:hover:not(:disabled) {
+  background-color: #674fa3;
+}
+
+.search-user-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.user-matches-list {
+  margin: 8px 0 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #fafafa;
+}
+
+.user-match-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.user-match-item:last-child {
+  border-bottom: none;
+}
+
+.user-match-item:hover {
+  background: #f0ebf8;
+}
+
+.match-id {
+  color: #666;
+  min-width: 48px;
+}
+
+.match-name {
+  font-weight: 500;
+  color: #333;
+  min-width: 100px;
+}
+
+.match-email {
+  color: #666;
+  font-size: 13px;
+}
+
+.selected-user-hint {
+  margin: 10px 0 0 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.selected-user-hint .clear-selection {
+  margin-left: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: #674fa3;
+  background: none;
+  border: 1px solid #674fa3;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.selected-user-hint .clear-selection:hover {
+  background: #f0ebf8;
+}
+
+.time-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+}
+
+.radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+}
+
+.radio-label input {
+  cursor: pointer;
+}
+
+.date-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-range .input-field {
+  max-width: 160px;
+}
+
+.date-range label {
+  margin-bottom: 0;
+  margin-right: 4px;
+}
+
+.form-actions {
+  margin-top: 24px;
+}
+
+.query-btn {
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background-color: #674fa3;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.query-btn:hover:not(:disabled) {
+  background-color: #5a4190;
+}
+
+.query-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.emissions-error {
+  padding: 12px 16px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.result-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.result-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+}
+
+.result-list {
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.result-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.result-row dt {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  min-width: 140px;
+}
+
+.result-row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.result-row.highlight dd {
+  font-size: 18px;
+  color: #674fa3;
+}
