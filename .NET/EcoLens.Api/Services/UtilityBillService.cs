@@ -371,10 +371,27 @@ public class UtilityBillService : IUtilityBillService
 			return false;
 		}
 
+		// 同时删除关联的 ActivityLogs（水电账单在创建时会生成 Electricity/Water/Gas 的 ActivityLog）
+		// 通过 DetectedLabel 中包含的 YearMonth 和 Utility 类别来匹配
+		var yearMonth = bill.YearMonth;
+		var utilityActivityLogs = await _db.ActivityLogs
+			.Where(l => l.UserId == userId 
+				&& l.CarbonReference != null 
+				&& l.CarbonReference.Category == CarbonCategory.Utility
+				&& l.DetectedLabel != null 
+				&& l.DetectedLabel.Contains($"({yearMonth})"))
+			.ToListAsync(ct);
+
+		if (utilityActivityLogs.Any())
+		{
+			_db.ActivityLogs.RemoveRange(utilityActivityLogs);
+			_logger.LogInformation("Removing {Count} ActivityLogs for UtilityBill YearMonth={YearMonth}", utilityActivityLogs.Count, yearMonth);
+		}
+
 		_db.UtilityBills.Remove(bill);
 		await _db.SaveChangesAsync(ct);
 
-		_logger.LogInformation("Utility bill deleted: UserId={UserId}, BillId={BillId}", userId, id);
+		_logger.LogInformation("Utility bill deleted: UserId={UserId}, BillId={BillId}, YearMonth={YearMonth}", userId, id, yearMonth);
 
 		return true;
 	}
