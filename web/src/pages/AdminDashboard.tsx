@@ -334,7 +334,7 @@ const AdminDashboard: React.FC = () => {
           <div className="stat-value">
             {loading ? 'Loading...' : stats.activeFactors.toLocaleString()}
           </div>
-          <div className="stat-change">Database Updated</div>
+          <div className="stat-change positive">Database Updated</div>
         </div>
       </div>
 

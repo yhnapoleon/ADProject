@@ -45,12 +45,11 @@ const FALLBACK_FACTORS: Record<string, number> = {
   CarElectric: 0.05,
 };
 
-/** Display order: original 6 then Motorcycle (ElectricBike), Car (electric), Car (gasoline) */
+/** Display order (Car option removed); 4 per row */
 const DISPLAY_ORDER: { labelName: string; key: string }[] = [
   { labelName: 'Plane', key: 'Plane' },
   { labelName: 'Bus', key: 'Bus' },
   { labelName: 'Bicycle', key: 'Bicycle' },
-  { labelName: 'CarGasoline', key: 'Car' },
   { labelName: 'Ship', key: 'Ship' },
   { labelName: 'Subway', key: 'Subway' },
   { labelName: 'ElectricBike', key: 'Motorcycle' },
@@ -140,7 +139,7 @@ const LogTravel = () => {
           {optionsLoading ? (
             <div style={{ padding: 24, textAlign: 'center', color: '#666' }}>Loading transport modes...</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {transportOptions.map((m) => {
                 const active = selectedMode?.key === m.key;
                 return (

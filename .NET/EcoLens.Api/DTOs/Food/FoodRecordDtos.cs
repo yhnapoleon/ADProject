@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace EcoLens.Api.DTOs.Food;
 
@@ -36,5 +37,8 @@ public class FoodRecordResponseDto
 	public double Amount { get; set; }
 	public decimal EmissionFactor { get; set; }
 	public decimal Emission { get; set; }
+
+	[JsonPropertyName("notes")]
+	public string? Notes { get; set; }
 }
 
