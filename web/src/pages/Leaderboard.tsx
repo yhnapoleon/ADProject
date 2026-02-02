@@ -3,31 +3,32 @@ import type { ColumnsType } from 'antd/es/table';
 import { useMemo, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { LeaderboardEntry } from '../types';
-import { getPoints, type PointsPeriod } from '../utils/points';
 import { TrophyFilled } from '@ant-design/icons';
 import './Leaderboard.module.css';
 import request from '../utils/request';
+
+export type LeaderboardPeriod = 'today' | 'month' | 'all';
 
 const Leaderboard = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<LeaderboardEntry[]>([]);
-  const [period, setPeriod] = useState<PointsPeriod>(() => {
+  const [period, setPeriod] = useState<LeaderboardPeriod>(() => {
     const defaultTab = (location.state as any)?.defaultTab;
-    if (defaultTab && ['today', 'week', 'month', 'all'].includes(defaultTab)) {
-      return defaultTab as PointsPeriod;
+    if (defaultTab && ['today', 'month', 'all'].includes(defaultTab)) {
+      return defaultTab as LeaderboardPeriod;
     }
     return 'month';
   });
 
-  const fetchLeaderboard = async (currentPeriod: string) => {
+  const fetchLeaderboard = async (currentPeriod: LeaderboardPeriod) => {
     setLoading(true);
     try {
-      // 后端 API: /api/Leaderboard?period=...
-      const res: any = await request.get(`/api/Leaderboard`, {
-        params: { period: currentPeriod }
-      });
-      // 假设返回的是数组，或者在 res.items 中
+      let url: string;
+      if (currentPeriod === 'today') url = '/api/Leaderboard/today';
+      else if (currentPeriod === 'month') url = '/api/Leaderboard/month';
+      else url = '/api/Leaderboard';
+      const res: any = await request.get(url);
       const list = Array.isArray(res) ? res : res.items || [];
       setData(list);
     } catch (error: any) {
@@ -80,17 +81,18 @@ const Leaderboard = () => {
     },
     {
       title: 'User',
-      dataIndex: 'username',
-      key: 'username',
-      render: (_: string, row) => {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
-        const avatarSrc = row.avatarUrl 
-          ? (row.avatarUrl.startsWith('http') ? row.avatarUrl : `${baseUrl}${row.avatarUrl}`)
+      dataIndex: 'nickname',
+      key: 'user',
+      render: (_: string, row: any) => {
+        const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+        const avatarUrl = row.avatarUrl ?? row.avatar;
+        const avatarSrc = avatarUrl
+          ? (String(avatarUrl).startsWith('http') ? String(avatarUrl) : `${baseUrl}/${String(avatarUrl).replace(/^\//, '')}`)
           : undefined;
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Avatar src={avatarSrc} />
-            <span>{row.nickname || row.username}</span>
+            <span>{row.nickname ?? row.username ?? '-'}</span>
           </div>
         );
       },
@@ -99,12 +101,16 @@ const Leaderboard = () => {
       title: 'Points',
       key: 'points',
       width: 160,
-      render: (_, row) => (
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-          <span style={{ fontWeight: 700 }}>{getPoints(row, period)}</span>
-          <span style={{ fontSize: 12, color: '#999' }}>{(row.emissions || 0).toFixed(2)} kg CO₂e</span>
-        </div>
-      ),
+      render: (_: unknown, row: any) => {
+        const points = row.pointsTotal ?? 0;
+        const emissions = row.emissionsTotal ?? row.emissions ?? 0;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+            <span style={{ fontWeight: 700 }}>{Number(points).toLocaleString()} pts</span>
+            <span style={{ fontSize: 12, color: '#999' }}>{Number(emissions).toFixed(2)} kg CO₂e</span>
+          </div>
+        );
+      },
     },
   ];
 
@@ -117,17 +123,16 @@ const Leaderboard = () => {
         <Space style={{ marginBottom: 16 }}>
           <Segmented
             value={period}
-            onChange={(val) => setPeriod(val as PointsPeriod)}
+            onChange={(val) => setPeriod(val as LeaderboardPeriod)}
             options={[
               { label: 'Today', value: 'today' },
-              { label: 'This Week', value: 'week' },
               { label: 'This Month', value: 'month' },
               { label: 'All Time', value: 'all' },
             ]}
           />
         </Space>
         <Table
-          rowKey={(row) => row.username}
+          rowKey={(row) => row.username ?? String(row.rank ?? Math.random())}
           columns={columns}
           dataSource={dataSource}
           loading={loading}
