@@ -8,25 +8,83 @@ import mainTravelIcon from '../assets/icons/main_travel.svg';
 import mainWaterIcon from '../assets/icons/main_water.svg';
 import request from '../utils/request';
 
+/** 内部记录类型，包含原始 ID 和来源类型 */
+interface InternalRecord extends Record {
+  _source: 'food' | 'travel' | 'utility';
+  _originalId: number;
+}
+
 const Records = () => {
   const [loading, setLoading] = useState(false);
-  const [records, setRecords] = useState<Record[]>([]);
+  const [records, setRecords] = useState<InternalRecord[]>([]);
   const [filterType, setFilterType] = useState<EmissionType | 'all' | undefined>('all');
   const [filterMonth, setFilterMonth] = useState<string | 'all'>('all');
 
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      // 这里的 params 需要根据后端实际支持的过滤字段调整
-      const res: any = await request.get('/api/records', {
-        params: {
-          type: filterType === 'all' ? undefined : filterType,
-          month: filterMonth === 'all' ? undefined : filterMonth,
-        }
-      });
-      // 兼容数组或带 total 的对象
-      const list = Array.isArray(res) ? res : res.items || [];
-      setRecords(list);
+      // 并行调用三个独立接口
+      const [foodRes, travelRes, utilityRes] = await Promise.all([
+        request.get('/api/FoodRecords/my-records').catch(() => ({ items: [] })),
+        request.get('/api/Travel/my-travels').catch(() => ({ items: [] })),
+        request.get('/api/UtilityBill/my-bills').catch(() => ({ items: [] })),
+      ]);
+
+      // 处理食物记录
+      const foodList = (Array.isArray(foodRes) ? foodRes : foodRes?.items || []).map((item: any) => ({
+        id: `food_${item.id}`,
+        _source: 'food' as const,
+        _originalId: item.id,
+        date: item.createdAt || item.date,
+        type: 'Food' as EmissionType,
+        amount: item.totalEmission ?? item.carbonEmission ?? 0,
+        unit: 'kg CO₂e',
+        description: item.foodName || item.name || item.detectedLabel || '食物记录',
+      }));
+
+      // 处理出行记录
+      const travelList = (Array.isArray(travelRes) ? travelRes : travelRes?.items || []).map((item: any) => ({
+        id: `travel_${item.id}`,
+        _source: 'travel' as const,
+        _originalId: item.id,
+        date: item.createdAt || item.date,
+        type: 'Transport' as EmissionType,
+        amount: item.carbonEmission ?? 0,
+        unit: 'kg CO₂e',
+        description: `${item.originAddress || ''} → ${item.destinationAddress || ''} (${item.transportModeName || item.transportMode || ''})`,
+      }));
+
+      // 处理水电账单记录
+      const utilityList = (Array.isArray(utilityRes) ? utilityRes : utilityRes?.items || []).map((item: any) => ({
+        id: `utility_${item.id}`,
+        _source: 'utility' as const,
+        _originalId: item.id,
+        date: item.billPeriodEnd || item.createdAt || item.date,
+        type: 'Utilities' as EmissionType,
+        amount: item.totalCarbonEmission ?? 0,
+        unit: 'kg CO₂e',
+        description: `水电账单 ${item.yearMonth || ''} (电 ${item.electricityUsage ?? 0}kWh / 水 ${item.waterUsage ?? 0}m³ / 气 ${item.gasUsage ?? 0})`,
+      }));
+
+      // 合并并排序（按日期降序）
+      let allRecords: InternalRecord[] = [...foodList, ...travelList, ...utilityList];
+      allRecords.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // 应用类型筛选
+      if (filterType && filterType !== 'all') {
+        allRecords = allRecords.filter(r => r.type === filterType);
+      }
+
+      // 应用月份筛选
+      if (filterMonth && filterMonth !== 'all') {
+        allRecords = allRecords.filter(r => {
+          const d = new Date(r.date);
+          const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return ym === filterMonth;
+        });
+      }
+
+      setRecords(allRecords);
     } catch (error: any) {
       console.error('Failed to fetch records:', error);
       message.error('Failed to load records');
@@ -57,7 +115,7 @@ const Records = () => {
     return iconMap[type];
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (record: InternalRecord) => {
     Modal.confirm({
       title: 'Delete Record',
       icon: <ExclamationCircleOutlined />,
@@ -67,7 +125,14 @@ const Records = () => {
       cancelText: 'Cancel',
       async onOk() {
         try {
-          await request.delete(`/api/records/${id}`);
+          // 根据记录来源调用对应的删除接口
+          const deleteUrl = {
+            food: `/api/FoodRecords/${record._originalId}`,
+            travel: `/api/Travel/${record._originalId}`,
+            utility: `/api/UtilityBill/${record._originalId}`,
+          }[record._source];
+
+          await request.delete(deleteUrl);
           message.success('Record deleted successfully');
           fetchRecords(); // 刷新列表
         } catch (error: any) {
@@ -120,12 +185,12 @@ const Records = () => {
     {
       title: 'Action',
       key: 'action',
-      render: (_: any, record: Record) => (
+      render: (_: any, record: InternalRecord) => (
         <Button
           type="text"
           danger
           icon={<DeleteOutlined />}
-          onClick={() => handleDelete(record.id)}
+          onClick={() => handleDelete(record)}
           size="small"
         >
           Delete
