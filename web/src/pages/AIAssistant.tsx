@@ -1,6 +1,7 @@
-import { Button, Card, Input, Space, Typography } from 'antd';
+import { Button, Card, Input, Space, Typography, message } from 'antd';
 import { AppleFilled, BulbFilled, CarFilled, SendOutlined } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
@@ -12,6 +13,7 @@ type ChatMessage = {
 
 const AIAssistant = () => {
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -47,14 +49,45 @@ const AIAssistant = () => {
     []
   );
 
-  const sendMessage = (content: string) => {
+  const sendMessage = async (content: string) => {
     const trimmed = content.trim();
     if (!trimmed) return;
-    setMessages((prev) => [
-      ...prev,
-      { id: `${Date.now()}-u`, role: 'user', content: trimmed },
-    ]);
+    const userMsg: ChatMessage = { id: `${Date.now()}-u`, role: 'user', content: trimmed };
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setLoading(true);
+    try {
+      const res: any = await request.post('/api/ai/chat', { Message: trimmed }, { timeout: 30000 }); // AI requests timeout set to 30s
+      // API may return: string, { reply: string }, { Reply: string }, or { data: { reply } }
+      const replyText =
+        typeof res === 'string'
+          ? res
+          : (res?.reply ?? res?.Reply ?? res?.data?.reply ?? res?.data?.Reply ?? '');
+      const content =
+        typeof replyText === 'string' && replyText.trim()
+          ? replyText.trim()
+          : 'No response from assistant.';
+      const assistantMsg: ChatMessage = {
+        id: `${Date.now()}-a`,
+        role: 'assistant',
+        content,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+    } catch (error: any) {
+      console.error('AI chat error:', error);
+      const errMsg = error?.response?.data ?? error?.message ?? 'Failed to get reply';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-err`,
+          role: 'assistant',
+          content: `Sorry, something went wrong: ${typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg)}`,
+        },
+      ]);
+      message.error('Failed to get AI reply');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -137,6 +170,7 @@ const AIAssistant = () => {
             <Button
               type="primary"
               icon={<SendOutlined />}
+              loading={loading}
               style={{ background: '#674fa3', borderColor: '#674fa3' }}
               onClick={() => sendMessage(input)}
             >
