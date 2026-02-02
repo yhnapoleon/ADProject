@@ -47,19 +47,4 @@ public class CreateTravelLogDto
 	/// </summary>
 	[MaxLength(1000, ErrorMessage = "Notes cannot exceed 1000 characters")]
 	public string? Notes { get; set; }
-
-	/// <summary>
-	/// 乘客数量（可选，仅对共享交通工具有效：飞机、轮船、巴士、地铁）
-	/// 如果不提供，将使用默认值：
-	/// - 飞机：150人
-	/// - 轮船：200人
-	/// - 巴士：40人
-	/// - 地铁：200人
-	/// </summary>
-	/// <remarks>
-	/// 对于共享交通工具，碳排放会按乘客数量分摊。
-	/// 例如：如果飞机总碳排放是 1500 kg CO2，乘客数量是 150，则每人分摊 10 kg CO2。
-	/// </remarks>
-	[Range(1, 10000, ErrorMessage = "Passenger count must be between 1 and 10000")]
-	public int? PassengerCount { get; set; }
 }

@@ -89,8 +89,8 @@ public class TravelService : ITravelService
 		var distanceKm = (decimal)navigationDistanceKm;
 		var totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
 
-		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放
-		var passengerCount = GetPassengerCount(dto.TransportMode, dto.PassengerCount);
+		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		var passengerCount = GetPassengerCount(dto.TransportMode);
 		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
 		// 5. 创建实体
@@ -186,8 +186,8 @@ public class TravelService : ITravelService
 		var distanceKm = (decimal)navigationDistanceKm;
 		var totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
 
-		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放
-		var passengerCount = GetPassengerCount(dto.TransportMode, dto.PassengerCount);
+		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		var passengerCount = GetPassengerCount(dto.TransportMode);
 		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
 		// 5. 转换为预览DTO
@@ -665,16 +665,10 @@ public class TravelService : ITravelService
 	}
 
 	/// <summary>
-	/// 获取乘客数量（如果用户未提供，使用默认值）
+	/// 获取乘客数量（使用默认值）
 	/// </summary>
-	private int GetPassengerCount(TransportMode transportMode, int? userProvidedCount)
+	private int GetPassengerCount(TransportMode transportMode)
 	{
-		// 如果用户提供了乘客数量，使用用户提供的值
-		if (userProvidedCount.HasValue && userProvidedCount.Value > 0)
-		{
-			return userProvidedCount.Value;
-		}
-
 		// 对于共享交通工具，使用默认乘客数量
 		return transportMode switch
 		{
