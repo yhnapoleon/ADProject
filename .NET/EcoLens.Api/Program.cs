@@ -260,12 +260,5 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// 启动时自动应用未执行的迁移（解决 Azure 数据库与代码结构不一致导致的 500）
-using (var scope = app.Services.CreateScope())
-{
-	var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-	context.Database.Migrate();
-}
-
 app.Run();
 

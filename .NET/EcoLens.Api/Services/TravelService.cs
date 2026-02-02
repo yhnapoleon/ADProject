@@ -519,20 +519,53 @@ public class TravelService : ITravelService
 			}
 
 			// 检查出发地和目的地附近是否有机场（使用 Google Places API）
-			// 对于飞机，必须严格检查，如果 API 调用失败，应该拒绝而不是允许
-			var originHasAirport = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "airport", 50000, ct, strict: true); // 50公里范围内
-			var destHasAirport = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "airport", 50000, ct, strict: true);
+			// 策略：
+			// 1. 超长途飞行（>1000公里，通常是跨洲/跨国家）：搜索半径200公里，API失败时允许（大城市通常都有国际机场）
+			// 2. 长途飞行（500-1000公里）：搜索半径150公里，API失败时允许（主要城市通常都有机场）
+			// 3. 中短途飞行（100-500公里）：搜索半径100公里，严格检查（必须找到机场）
+			var isVeryLongDistance = distanceKm > 1000;
+			var isLongDistance = distanceKm > 500;
+			var searchRadius = isVeryLongDistance ? 200000 : (isLongDistance ? 150000 : 100000);
+			var strictMode = !isLongDistance; // 只有中短途飞行使用严格模式
+			
+			var originHasAirport = await HasNearbyInfrastructureAsync(
+				origin.Latitude, origin.Longitude, "airport", searchRadius, ct, strict: strictMode);
+			var destHasAirport = await HasNearbyInfrastructureAsync(
+				destination.Latitude, destination.Longitude, "airport", searchRadius, ct, strict: strictMode);
 
+			// 对于长途/超长途飞行，如果API调用失败但距离足够长，允许继续（假设主要城市都有机场）
 			if (!originHasAirport)
 			{
-				throw new InvalidOperationException(
-					$"出发地附近（50公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+				if (isLongDistance)
+				{
+					_logger.LogWarning(
+						"Airport check failed for origin at {Lat}, {Lng} ({Country}), but allowing {DistanceType} flight ({Distance:F1}km). " +
+						"Assuming major cities have airports.", 
+						origin.Latitude, origin.Longitude, origin.Country ?? "Unknown",
+						isVeryLongDistance ? "very long-distance" : "long-distance", distanceKm);
+				}
+				else
+				{
+					throw new InvalidOperationException(
+						$"出发地附近（{searchRadius / 1000}公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+				}
 			}
 
 			if (!destHasAirport)
 			{
-				throw new InvalidOperationException(
-					$"目的地附近（50公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+				if (isLongDistance)
+				{
+					_logger.LogWarning(
+						"Airport check failed for destination at {Lat}, {Lng} ({Country}), but allowing {DistanceType} flight ({Distance:F1}km). " +
+						"Assuming major cities have airports.", 
+						destination.Latitude, destination.Longitude, destination.Country ?? "Unknown",
+						isVeryLongDistance ? "very long-distance" : "long-distance", distanceKm);
+				}
+				else
+				{
+					throw new InvalidOperationException(
+						$"目的地附近（{searchRadius / 1000}公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+				}
 			}
 		}
 

@@ -162,17 +162,38 @@ public class GoogleMapsService : IGoogleMapsService
 	{
 		try
 		{
+			// 对于机场和港口，使用 type 参数更精确；对于其他关键词，使用 keyword 参数
+			var isAirport = keyword.Equals("airport", StringComparison.OrdinalIgnoreCase);
+			var isPort = keyword.Equals("port", StringComparison.OrdinalIgnoreCase) || 
+			            keyword.Equals("ferry terminal", StringComparison.OrdinalIgnoreCase);
+			
 			var url = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
 				$"?location={latitude},{longitude}" +
-				$"&radius={radiusMeters}" +
-				$"&keyword={Uri.EscapeDataString(keyword)}" +
-				$"&key={_apiKey}";
+				$"&radius={radiusMeters}";
+			
+			if (isAirport)
+			{
+				// 使用 type=airport 更精确地搜索机场
+				url += $"&type=airport";
+			}
+			else if (isPort)
+			{
+				// 对于港口，使用 keyword 搜索（Google Places API 没有专门的 port type）
+				url += $"&keyword={Uri.EscapeDataString(keyword)}";
+			}
+			else
+			{
+				url += $"&keyword={Uri.EscapeDataString(keyword)}";
+			}
+			
+			url += $"&key={_apiKey}";
 
 			var response = await _httpClient.GetFromJsonAsync<GooglePlacesResponse>(url, ct);
 
 			if (response?.Status != "OK" || response.Results == null)
 			{
-				_logger.LogWarning("Places search failed: {Status}", response?.Status);
+				_logger.LogWarning("Places search failed: {Status}, Keyword: {Keyword}, Location: {Lat}, {Lng}", 
+					response?.Status, keyword, latitude, longitude);
 				return null;
 			}
 
