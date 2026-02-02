@@ -33,9 +33,9 @@ public class SimpleFoodController : ControllerBase
 	}
 
 	/// <summary>
-	/// 计算食物排放（不落库）。
-	/// - 入参：name, amount（kg）
-	/// - 出参：name, amount, emission_factor, emission
+	/// 计算食物排放（不落库）。前端 amount 为克（g），后端 /1000 转为 kg 再计算。
+	/// - 入参：name, amount（g）
+	/// - 出参：name, amount（kg）, emission_factor, emission
 	/// </summary>
 	[HttpPost("calculateFood")]
 	public async Task<ActionResult<FoodCalcResponse>> CalculateFood([FromBody] CalculateFoodRequest req, CancellationToken ct)
@@ -48,31 +48,30 @@ public class SimpleFoodController : ControllerBase
 			return NotFound($"未找到食物：{req.Name} 的排放因子。");
 		}
 
-		// 假设 Food 的因子为按 kg 计（kgCO2/kg），amount 单位为 kg
+		// 前端 amount 为克，/1000 转为 kg 再按 kgCO2/kg 计算
+		var amountKg = req.Amount / 1000.0;
 		var emissionFactor = food.Co2Factor;
-		var emission = (decimal)req.Amount * emissionFactor;
+		var emission = (decimal)amountKg * emissionFactor;
 
 		return Ok(new FoodCalcResponse
 		{
 			Name = food.LabelName,
-			Amount = req.Amount,
+			Amount = amountKg,
 			EmissionFactor = decimal.Round(emissionFactor, 6),
 			Emission = decimal.Round(emission, 6)
 		});
 	}
 
 	/// <summary>
-	/// 更新食物（计算逻辑与 calculateFood 一致，不落库）。
-	/// - 入参：name, amount（kg）
-	/// - 出参：name, amount, emission_factor, emission
+	/// 更新食物（计算逻辑与 calculateFood 一致，不落库）。amount 为克（g）。
 	/// </summary>
 	[HttpPost("updateFood")]
 	public Task<ActionResult<FoodCalcResponse>> UpdateFood([FromBody] CalculateFoodRequest req, CancellationToken ct)
 		=> CalculateFood(req, ct);
 
 	/// <summary>
-	/// 添加食物记录（落库）。
-	/// - 入参：name, amount（kg）, emission_factor, emission, note
+	/// 添加食物记录（落库）。前端 amount 统一为克（g），后端 /1000 转为 kg 再计算并存储。
+	/// - 入参：name, amount（g）, emission_factor, emission, note
 	/// - 出参：是否成功
 	/// </summary>
 	[HttpPost("addFood")]
@@ -90,14 +89,18 @@ public class SimpleFoodController : ControllerBase
 		var exists = await _db.CarbonReferences.AsNoTracking()
 			.AnyAsync(c => c.Category == CarbonCategory.Food && c.LabelName == req.Name, ct);
 
+		// 前端 amount 统一为克（g），/1000 转为 kg 再计算并存储
+		var amountKg = req.Amount / 1000.0;
+		var emission = (decimal)amountKg * req.EmissionFactor;
+
 		// 允许前端传自定义项；若不存在，依然保存
 		var record = new FoodRecord
 		{
 			UserId = userId.Value,
 			Name = req.Name,
-			Amount = req.Amount,
+			Amount = amountKg,
 			EmissionFactor = req.EmissionFactor,
-			Emission = req.Emission,
+			Emission = emission,
 			Note = req.Note
 		};
 
@@ -120,9 +123,9 @@ public class SimpleFoodController : ControllerBase
 				{
 					UserId = userId.Value,
 					Name = req.Name,
-					Amount = req.Amount,
+					Amount = amountKg,
 					EmissionFactor = req.EmissionFactor,
-					Emission = req.Emission,
+					Emission = emission,
 					Note = req.Note
 				};
 				await _db.FoodRecords.AddAsync(record, ct);

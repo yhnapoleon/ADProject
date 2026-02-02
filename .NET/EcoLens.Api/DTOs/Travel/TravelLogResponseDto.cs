@@ -92,4 +92,10 @@ public class TravelLogResponseDto
 	/// 备注
 	/// </summary>
 	public string? Notes { get; set; }
+
+	/// <summary>
+	/// 乘客数量（仅对共享交通工具有效：飞机、轮船、巴士、地铁）
+	/// 用于按比例分摊碳排放
+	/// </summary>
+	public int? PassengerCount { get; set; }
 }

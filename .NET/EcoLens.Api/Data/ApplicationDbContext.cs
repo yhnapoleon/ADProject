@@ -123,6 +123,10 @@ public class ApplicationDbContext : DbContext
 			.HasColumnType("decimal(18,2)");
 
 		modelBuilder.Entity<ApplicationUser>()
+			.Property(p => p.TotalCarbonEmission)
+			.HasColumnType("decimal(18,4)");
+
+		modelBuilder.Entity<ApplicationUser>()
 			.Property(p => p.IsActive)
 			.HasDefaultValue(true);
 

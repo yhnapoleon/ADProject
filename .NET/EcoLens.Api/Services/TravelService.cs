@@ -87,7 +87,11 @@ public class TravelService : ITravelService
 
 		// 4. 计算碳排放（使用导航距离）
 		var distanceKm = (decimal)navigationDistanceKm;
-		var carbonEmission = distanceKm * carbonFactor.Co2Factor;
+		var totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
+
+		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		var passengerCount = GetPassengerCount(dto.TransportMode);
+		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
 		// 5. 创建实体
 		var travelLog = new TravelLog
@@ -104,6 +108,7 @@ public class TravelService : ITravelService
 			DistanceKilometers = distanceKm,
 			DurationSeconds = route.DurationSeconds,
 			CarbonEmission = carbonEmission,
+			PassengerCount = passengerCount,
 			RoutePolyline = route.Polyline,
 			Notes = dto.Notes
 		};
@@ -112,9 +117,12 @@ public class TravelService : ITravelService
 		await _db.TravelLogs.AddAsync(travelLog, ct);
 		await _db.SaveChangesAsync(ct);
 
+		// 7. 更新用户总碳排放
+		await UpdateUserTotalCarbonEmissionAsync(userId, ct);
+
 		_logger.LogInformation("Travel log created successfully: UserId={UserId}, TravelLogId={TravelLogId}", userId, travelLog.Id);
 
-		// 7. 转换为DTO返回
+		// 8. 转换为DTO返回
 		return ToResponseDto(travelLog);
 	}
 
@@ -176,7 +184,11 @@ public class TravelService : ITravelService
 
 		// 4. 计算碳排放（使用导航距离）
 		var distanceKm = (decimal)navigationDistanceKm;
-		var carbonEmission = distanceKm * carbonFactor.Co2Factor;
+		var totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
+
+		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		var passengerCount = GetPassengerCount(dto.TransportMode);
+		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
 		// 5. 转换为预览DTO
 		return new RoutePreviewDto
@@ -277,6 +289,9 @@ public class TravelService : ITravelService
 		_db.TravelLogs.Remove(travelLog);
 		await _db.SaveChangesAsync(ct);
 
+		// 更新用户总碳排放
+		await UpdateUserTotalCarbonEmissionAsync(userId, ct);
+
 		_logger.LogInformation("Travel log deleted successfully: UserId={UserId}, TravelLogId={TravelLogId}", userId, id);
 
 		return true;
@@ -359,6 +374,7 @@ public class TravelService : ITravelService
 			DurationSeconds = travelLog.DurationSeconds,
 			DurationText = FormatDuration(travelLog.DurationSeconds),
 			CarbonEmission = travelLog.CarbonEmission,
+			PassengerCount = travelLog.PassengerCount,
 			RoutePolyline = travelLog.RoutePolyline,
 			Notes = travelLog.Notes
 		};
@@ -646,6 +662,77 @@ public class TravelService : ITravelService
 		if (minutes > 0)
 			return $"{minutes}m";
 		return $"{secs}s";
+	}
+
+	/// <summary>
+	/// 获取乘客数量（使用默认值）
+	/// </summary>
+	private int GetPassengerCount(TransportMode transportMode)
+	{
+		// 对于共享交通工具，使用默认乘客数量
+		return transportMode switch
+		{
+			TransportMode.Plane => 150,   // 飞机平均载客量
+			TransportMode.Ship => 200,    // 轮船平均载客量
+			TransportMode.Bus => 40,      // 巴士平均载客量
+			TransportMode.Subway => 200,  // 地铁平均载客量
+			_ => 1  // 其他交通工具（步行、自行车、私家车等）按1人计算
+		};
+	}
+
+	/// <summary>
+	/// 计算每人分摊的碳排放量
+	/// 对于共享交通工具（飞机、轮船、巴士、地铁），按乘客数量分摊
+	/// 对于其他交通工具，直接返回总碳排放
+	/// </summary>
+	private decimal CalculatePerPersonCarbonEmission(TransportMode transportMode, decimal totalCarbonEmission, int passengerCount)
+	{
+		// 共享交通工具需要按乘客数量分摊
+		var isSharedTransport = transportMode == TransportMode.Plane ||
+		                         transportMode == TransportMode.Ship ||
+		                         transportMode == TransportMode.Bus ||
+		                         transportMode == TransportMode.Subway;
+
+		if (isSharedTransport && passengerCount > 0)
+		{
+			// 按乘客数量分摊：总碳排放 / 乘客数量
+			return totalCarbonEmission / passengerCount;
+		}
+
+		// 其他交通工具（步行、自行车、私家车等）不需要分摊，直接返回总碳排放
+		return totalCarbonEmission;
+	}
+
+	/// <summary>
+	/// 更新用户总碳排放（从 ActivityLogs、TravelLogs、UtilityBills 汇总）
+	/// </summary>
+	private async Task UpdateUserTotalCarbonEmissionAsync(int userId, CancellationToken ct)
+	{
+		try
+		{
+			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+			if (user == null) return;
+
+			var activityEmission = await _db.ActivityLogs
+				.Where(a => a.UserId == userId)
+				.SumAsync(a => (decimal?)a.TotalEmission, ct) ?? 0m;
+
+			var travelEmission = await _db.TravelLogs
+				.Where(t => t.UserId == userId)
+				.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
+
+			var utilityEmission = await _db.UtilityBills
+				.Where(u => u.UserId == userId)
+				.SumAsync(u => (decimal?)u.TotalCarbonEmission, ct) ?? 0m;
+
+			user.TotalCarbonEmission = activityEmission + travelEmission + utilityEmission;
+			await _db.SaveChangesAsync(ct);
+		}
+		catch (Exception ex)
+		{
+			// 记录错误但不影响主流程
+			_logger.LogError(ex, "Failed to update TotalCarbonEmission for user {UserId}", userId);
+		}
 	}
 
 	#endregion
