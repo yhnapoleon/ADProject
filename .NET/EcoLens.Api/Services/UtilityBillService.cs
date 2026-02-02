@@ -196,15 +196,14 @@ public class UtilityBillService : IUtilityBillService
 				ct);
 
 			// 4. 创建实体
-			var periodLabel = dto.BillPeriodStart.ToString("yyyy-MM");
+			var periodLabel = dto.BillPeriodEnd.ToString("yyyy-MM"); // 用于 ActivityLog 的标签
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
-				YearMonth = periodLabel,
 				BillType = dto.BillType,
 				BillPeriodStart = dto.BillPeriodStart,
 				BillPeriodEnd = dto.BillPeriodEnd,
-				YearMonth = dto.BillPeriodEnd.ToString("yyyy-MM"), // 基于结束日期计算年月（格式：YYYY-MM）
+				YearMonth = periodLabel, // 基于结束日期计算年月（格式：YYYY-MM）
 				ElectricityUsage = dto.ElectricityUsage,
 				WaterUsage = dto.WaterUsage,
 				GasUsage = dto.GasUsage,
