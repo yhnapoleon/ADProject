@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { message } from 'antd';
 import request from '../utils/request';
 import './AdminUserList.css';
 
@@ -126,6 +127,12 @@ const AdminUserList: React.FC = () => {
           points: editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points,
           status: editingStatus[user.id] !== undefined ? editingStatus[user.id] : user.status,
         })));
+        const hasBanned = updates.some(u => u.status === 'Banned');
+        if (hasBanned) {
+          message.success('用户封禁成功');
+        } else {
+          message.success('保存成功');
+        }
       }
 
       setIsEditMode(false);
