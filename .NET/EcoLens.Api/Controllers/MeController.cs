@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+using System.Linq;
 using System.Security.Claims;
 using EcoLens.Api.Data;
 using EcoLens.Api.Models;
@@ -141,43 +144,50 @@ public class MeController : ControllerBase
     if (u is null) return NotFound();
     if (file is null || file.Length == 0) return BadRequest("No file uploaded.");
 
-    var oldPublicUrl = u.AvatarUrl;
-
-    // 简易落盘到 wwwroot/uploads/avatars
-    var uploadsDir = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads", "avatars");
-    Directory.CreateDirectory(uploadsDir);
-    var ext = Path.GetExtension(file.FileName);
-    var name = $"{Guid.NewGuid()}{ext}";
-    var path = Path.Combine(uploadsDir, name);
-    await using (var fs = System.IO.File.Create(path))
+    // 验证文件大小（限制在 500KB 以内）
+    const long maxFileSize = 500 * 1024; // 500KB
+    if (file.Length > maxFileSize)
     {
-      await file.CopyToAsync(fs, ct);
+      return BadRequest("File size exceeds the maximum limit of 500KB. Please upload a smaller image.");
     }
-    var publicUrl = $"/uploads/avatars/{name}";
-    u.AvatarUrl = publicUrl;
+
+    // 验证文件类型
+    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+    var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
+    if (string.IsNullOrEmpty(ext) || !allowedExtensions.Contains(ext))
+    {
+      return BadRequest("Invalid file type. Only JPG, PNG, GIF, and WebP images are allowed.");
+    }
+
+    // 读取文件字节数组
+    byte[] fileBytes;
+    await using (var memoryStream = new MemoryStream())
+    {
+      await file.CopyToAsync(memoryStream, ct);
+      fileBytes = memoryStream.ToArray();
+    }
+
+    // 转换为 Base64 字符串
+    var base64String = Convert.ToBase64String(fileBytes);
+
+    // 根据文件扩展名确定 MIME 类型
+    var mimeType = ext switch
+    {
+      ".jpg" or ".jpeg" => "image/jpeg",
+      ".png" => "image/png",
+      ".gif" => "image/gif",
+      ".webp" => "image/webp",
+      _ => "image/jpeg"
+    };
+
+    // 拼接完整的 data URI 格式：data:image/{type};base64,{base64字符串}
+    var dataUri = $"data:{mimeType};base64,{base64String}";
+
+    // 保存到数据库
+    u.AvatarUrl = dataUri;
     await _db.SaveChangesAsync(ct);
 
-    // 尝试删除旧头像文件（仅限当前 avatars 目录内）
-    if (!string.IsNullOrWhiteSpace(oldPublicUrl))
-    {
-      try
-      {
-        var oldFileName = Path.GetFileName(oldPublicUrl);
-        if (!string.IsNullOrWhiteSpace(oldFileName))
-        {
-          var oldPath = Path.Combine(uploadsDir, oldFileName);
-          if (System.IO.File.Exists(oldPath))
-          {
-            System.IO.File.Delete(oldPath);
-          }
-        }
-      }
-      catch
-      {
-        // 忽略删除失败（例如文件被占用或不存在）
-      }
-    }
-    return Ok(new { avatar = publicUrl, avatarUrl = publicUrl });
+    return Ok(new { avatar = dataUri, avatarUrl = dataUri });
   }
 }
 

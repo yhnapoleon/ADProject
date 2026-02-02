@@ -27,7 +27,8 @@ public class ApplicationUser : BaseEntity
 	[Required]
 	public UserRole Role { get; set; } = UserRole.User;
 
-	[MaxLength(1024)]
+	// AvatarUrl 存储 Base64 编码的图片数据，格式：data:image/{type};base64,{base64字符串}
+	// 使用 nvarchar(max) 以支持大图片
 	public string? AvatarUrl { get; set; }
 
 	[Column(TypeName = "decimal(18,2)")]
