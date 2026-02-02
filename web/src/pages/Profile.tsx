@@ -77,7 +77,11 @@ const Profile = () => {
         const baseUrl = import.meta.env.VITE_API_URL || '';
         const normalizeUrl = (url: string | null) => {
           if (!url) return '';
+          // 如果是 Base64 字符串（data:image 开头），直接返回
+          if (url.startsWith('data:image')) return url;
+          // 如果是完整 URL（http/https 开头），直接返回
           if (url.startsWith('http')) return url;
+          // 否则拼接基础 URL（兼容旧格式）
           return `${baseUrl}${url}`;
         };
 
@@ -253,8 +257,10 @@ const Profile = () => {
 
       const newAvatarPath = response.avatarUrl || response.avatar;
       if (newAvatarPath) {
-        // 如果返回的是相对路径，补全基础 URL
-        const fullUrl = newAvatarPath.startsWith('http') 
+        // 如果是 Base64 字符串（data:image 开头），直接使用
+        // 如果是完整 URL（http/https 开头），直接使用
+        // 否则拼接基础 URL（兼容旧格式）
+        const fullUrl = newAvatarPath.startsWith('data:image') || newAvatarPath.startsWith('http')
           ? newAvatarPath 
           : `${import.meta.env.VITE_API_URL || ''}${newAvatarPath}`;
         
