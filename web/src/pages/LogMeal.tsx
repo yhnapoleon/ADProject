@@ -470,7 +470,7 @@ const LogMeal = () => {
         const barcodeInfo = await fetchBarcodeInfo(barcode);
         if (barcodeInfo) {
           setDetectedInfo({ type: 'barcode', data: barcodeInfo });
-          // 自动填充表单
+          // 识别结果覆盖当前 Food name（覆盖用户已输入的名称）
           form.setFieldsValue({
             foodName: barcodeInfo.productName || barcodeInfo.carbonReferenceLabel || '',
             co2Factor: barcodeInfo.co2Factor || undefined,
@@ -495,9 +495,8 @@ const LogMeal = () => {
           if (foodInfo) {
             setDetectionType('food');
             setDetectedInfo({ type: 'food', data: foodInfo });
-            form.setFieldsValue({
-              foodName: foodInfo.label,
-            });
+            // 识别出的食物名称覆盖当前 Food name（覆盖用户已输入的名称）
+            form.setFieldsValue({ foodName: foodInfo.label });
             const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
             if (factorResult) {
               form.setFieldsValue({ co2Factor: factorResult.co2Factor });
@@ -533,9 +532,8 @@ const LogMeal = () => {
         const foodInfo = await recognizeFood(file as unknown as File);
         if (foodInfo) {
           setDetectedInfo({ type: 'food', data: foodInfo });
-          form.setFieldsValue({
-            foodName: foodInfo.label,
-          });
+          // 识别出的食物名称覆盖当前 Food name（覆盖用户已输入的名称）
+          form.setFieldsValue({ foodName: foodInfo.label });
           const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
           if (factorResult) {
             form.setFieldsValue({ co2Factor: factorResult.co2Factor });

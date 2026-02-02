@@ -31,7 +31,7 @@ const Records = () => {
         request.get('/api/UtilityBill/my-bills').catch(() => ({ items: [] })),
       ]);
 
-      // 处理食物记录（FoodRecords 接口返回 emission、name）
+      // 食物记录：Notes 使用 /api/FoodRecords/my-records 返回的 notes（即 Log Meal 页面用户输入的 note）
       const foodList = (Array.isArray(foodRes) ? foodRes : foodRes?.items || []).map((item: any) => ({
         id: `food_${item.id}`,
         _source: 'food' as const,
@@ -57,7 +57,7 @@ const Records = () => {
         notes: item.notes ?? item.Notes ?? '',
       }));
 
-      // 处理水电账单记录
+      // 水电账单记录：Notes 使用 /api/UtilityBill/my-bills 返回的 notes
       const utilityList = (Array.isArray(utilityRes) ? utilityRes : utilityRes?.items || []).map((item: any) => ({
         id: `utility_${item.id}`,
         _source: 'utility' as const,
@@ -180,12 +180,25 @@ const Records = () => {
       width: '15%',
     },
     {
+      title: 'Description',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+      render: (_: unknown, record: InternalRecord) => record.description || '—',
+      width: '25%',
+    },
+    {
       title: 'Notes',
       dataIndex: 'notes',
       key: 'notes',
       ellipsis: true,
-      width: '40%',
-      render: (_: unknown, record: InternalRecord) => record.notes?.trim() || record.description || '—',
+      width: '20%',
+      render: (_: unknown, record: InternalRecord) =>
+        record.notes?.trim() ? (
+          record.notes
+        ) : (
+          <span style={{ color: '#bfbfbf' }}>no notes</span>
+        ),
     },
     {
       title: 'Action',

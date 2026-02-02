@@ -139,6 +139,7 @@ const LogUtility = () => {
               electricityUsage: values.electricityUsage ?? null,
               waterUsage: values.waterUsage ?? null,
               gasUsage: values.gasUsage ?? null,
+              notes: values.note?.trim() || null,
             });
             message.success('Utility bill saved.');
             navigate('/dashboard');
