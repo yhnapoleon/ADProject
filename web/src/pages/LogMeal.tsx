@@ -1,4 +1,4 @@
-import { Button, Card, Form, Input, InputNumber, message, Space, Typography, Upload, Spin } from 'antd';
+import { Button, Card, Form, Input, InputNumber, message, Select, Space, Typography, Upload, Spin } from 'antd';
 import type { UploadProps } from 'antd';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +38,17 @@ type BarcodeResponse = {
 
 const inputBg = { background: '#F3F0FF' } as const;
 
+/** Amount 下拉：0–1000 g，步长 50，选项为区间，表单存区间中值（如 0–50 → 25） */
+const AMOUNT_OPTIONS = (() => {
+  const items: { label: string; value: number }[] = [];
+  for (let low = 0; low < 1000; low += 50) {
+    const high = low + 50;
+    const mid = (low + high) / 2;
+    items.push({ label: `${low}–${high} g`, value: mid });
+  }
+  return items;
+})();
+
 const LogMeal = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm<FormValues>();
@@ -47,6 +58,7 @@ const LogMeal = () => {
   const [detectedInfo, setDetectedInfo] = useState<{ type: 'barcode' | 'food'; data: BarcodeResponse | VisionResponse } | null>(null);
   const [manualBarcode, setManualBarcode] = useState('');
   const [manualBarcodeLoading, setManualBarcodeLoading] = useState(false);
+  const [foodNameFactorLoading, setFoodNameFactorLoading] = useState(false);
 
   // 注意：路由保护已经在 App.tsx 中通过 RequireUserAuth 处理
   // 这里不需要再次检查，避免与路由保护冲突导致循环跳转
@@ -59,8 +71,8 @@ const LogMeal = () => {
 
   const emissions = useMemo(() => {
     const a = typeof amount === 'number' ? amount : Number(amount);
-    if (!a || Number.isNaN(a) || !co2Factor) return null;
-    return a * co2Factor;
+    if (a == null || Number.isNaN(a) || a <= 0 || !co2Factor) return null;
+    return (a / 1000) * co2Factor;
   }, [amount, co2Factor]);
 
   const fileToBase64 = (file: File) =>
@@ -347,27 +359,49 @@ const LogMeal = () => {
     }
   };
 
-  /** 根据食物名称从后端获取碳排放因子（用于食物识别后自动填充） */
+  /** 根据食物名称调用 /api/calculateFood 获取碳排放因子（用于食物识别与手动输入） */
   const fetchEmissionFactorByFoodName = async (foodName: string): Promise<{ co2Factor: number; factorUnit: string } | null> => {
+    const trimmed = (foodName || '').trim();
+    if (!trimmed) return null;
     try {
-      const response: any = await request.post('/food/calculate', {
-        FoodName: foodName,
-        Quantity: 1,
-        Unit: 'kg',
+      const response: any = await request.post('/api/calculateFood', {
+        name: trimmed,
+        amount: 1000,
       });
-      if (response?.co2Factor != null) {
+      if (response?.emission_factor != null) {
         return {
-          co2Factor: Number(response.co2Factor),
-          factorUnit: response.factorUnit || 'kg',
+          co2Factor: Number(response.emission_factor),
+          factorUnit: 'kg',
         };
       }
       return null;
     } catch (error: any) {
       if (error.response?.status === 404) {
-        return null; // 未找到该食物的碳因子，保持不填充
+        return null;
       }
       console.error('Fetch emission factor by food name:', error);
       return null;
+    }
+  };
+
+  const handleFoodNameLookupFactor = async () => {
+    const name = form.getFieldValue('foodName');
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      message.warning('Please enter a food name first');
+      return;
+    }
+    setFoodNameFactorLoading(true);
+    try {
+      const result = await fetchEmissionFactorByFoodName(trimmed);
+      if (result) {
+        form.setFieldValue('co2Factor', result.co2Factor);
+        message.success(`Emission factor: ${result.co2Factor} kg CO2e/kg`);
+      } else {
+        message.warning('No emission factor found for this food');
+      }
+    } finally {
+      setFoodNameFactorLoading(false);
     }
   };
 
@@ -553,15 +587,15 @@ const LogMeal = () => {
       const values = await form.validateFields();
       const amount = typeof values.amount === 'number' ? values.amount : Number(values.amount);
       const factor = values.co2Factor ?? formCo2Factor ?? (detectedInfo?.type === 'barcode' ? (detectedInfo.data as BarcodeResponse).co2Factor : null);
-      if (factor == null || amount <= 0) {
+      if (factor == null || amount == null || amount <= 0) {
         message.error('请填写完整的数量和碳排放因子');
         return;
       }
-      const emission = amount * (typeof factor === 'number' ? factor : Number(factor));
+      const emission = (amount / 1000) * (typeof factor === 'number' ? factor : Number(factor));
       setSaveLoading(true);
       await request.post('/api/addFood', {
         name: values.foodName?.trim() || '',
-        amount: amount,
+        amount,
         emission_factor: factor,
         emission: Number(emission.toFixed(4)),
         note: values.note || null,
@@ -768,20 +802,33 @@ const LogMeal = () => {
               name="foodName"
               rules={[{ required: true, message: 'Please enter food name' }]}
             >
-              <Input placeholder="e.g., Beef burger / Rice / Salad" style={inputBg} />
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  placeholder="e.g., Beef burger / Rice / Salad"
+                  style={inputBg}
+                  onBlur={() => handleFoodNameLookupFactor()}
+                />
+                <Button
+                  type="default"
+                  loading={foodNameFactorLoading}
+                  onClick={handleFoodNameLookupFactor}
+                  style={inputBg}
+                >
+                  Get factor
+                </Button>
+              </Space.Compact>
             </Form.Item>
 
             <Form.Item
-              label="Amount"
+              label="Amount (g)"
               name="amount"
-              rules={[{ required: true, message: 'Please enter amount' }]}
+              rules={[{ required: true, message: 'Please select amount' }]}
             >
-              <InputNumber
+              <Select
+                placeholder="Select amount range (g)"
+                options={AMOUNT_OPTIONS}
                 style={{ width: '100%', ...inputBg }}
-                min={0}
-                step={0.1}
-                placeholder="e.g., 0.25"
-                addonAfter="kg"
+                allowClear
               />
             </Form.Item>
 
