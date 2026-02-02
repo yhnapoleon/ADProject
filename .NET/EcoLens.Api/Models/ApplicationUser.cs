@@ -34,6 +34,13 @@ public class ApplicationUser : BaseEntity
 	[Column(TypeName = "decimal(18,2)")]
 	public decimal TotalCarbonSaved { get; set; }
 
+	/// <summary>
+	/// 用户总碳排放量（kg CO2e）
+	/// 包括：ActivityLogs 的 TotalEmission + TravelLogs 的 CarbonEmission + UtilityBills 的 TotalCarbonEmission
+	/// </summary>
+	[Column(TypeName = "decimal(18,4)")]
+	public decimal TotalCarbonEmission { get; set; }
+
 	public int CurrentPoints { get; set; }
 
 	[MaxLength(100)]
