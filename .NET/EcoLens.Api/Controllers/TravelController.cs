@@ -15,11 +15,13 @@ namespace EcoLens.Api.Controllers;
 public class TravelController : ControllerBase
 {
 	private readonly ITravelService _travelService;
+	private readonly IPointService _pointService;
 	private readonly ILogger<TravelController> _logger;
 
-	public TravelController(ITravelService travelService, ILogger<TravelController> logger)
+	public TravelController(ITravelService travelService, IPointService pointService, ILogger<TravelController> logger)
 	{
 		_travelService = travelService;
+		_pointService = pointService;
 		_logger = logger;
 	}
 
@@ -84,6 +86,14 @@ public class TravelController : ControllerBase
 		try
 		{
 			var result = await _travelService.CreateTravelLogAsync(userId.Value, dto, ct);
+			try
+			{
+				await _pointService.CheckAndAwardPointsAsync(userId.Value, result.CreatedAt.Date);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "CheckAndAwardPoints failed after travel creation for UserId={UserId}", userId);
+			}
 			return Ok(result);
 		}
 		catch (InvalidOperationException ex)
@@ -114,6 +124,14 @@ public class TravelController : ControllerBase
 			return BadRequest(new { error = "Request validation failed", errors = ModelState });
 		}
 		var result = await _travelService.CreateTravelLogAsync(userId.Value, dto, ct);
+		try
+		{
+			await _pointService.CheckAndAwardPointsAsync(userId.Value, result.CreatedAt.Date);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogWarning(ex, "CheckAndAwardPoints failed after travel creation(alias) for UserId={UserId}", userId);
+		}
 		return Ok(new
 		{
 			id = result.Id.ToString(),

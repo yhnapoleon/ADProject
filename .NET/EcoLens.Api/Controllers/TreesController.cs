@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Security.Claims;
 using EcoLens.Api.Data;
+using EcoLens.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,11 +14,14 @@ namespace EcoLens.Api.Controllers;
 public class TreesController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
+	private readonly IPointService _pointService;
 	private const int StepsPerTree = 15000; // 与移动端交互契合：约 150 步=1% -> 15000 步=100%
+		private const int StepsPerProgressPoint = StepsPerTree / 100; // 150 步 == 1 进度点
 
-	public TreesController(ApplicationDbContext db)
+	public TreesController(ApplicationDbContext db, IPointService pointService)
 	{
 		_db = db;
+		_pointService = pointService;
 	}
 
 		// 兼容别名：/api/getTree 与 /api/postTree（与前端约定）
@@ -41,15 +45,17 @@ public class TreesController : ControllerBase
 			return UpdateState(dto, ct);
 		}
 
-		private static object BuildState(int totalTrees, int currentProgress)
+		private static object BuildState(int totalTrees, int currentProgress, int? pointsTotal = null)
 		{
 			var status = currentProgress >= 100 ? "completed" : (currentProgress > 0 ? "growing" : "idle");
-			return new
+			var payload = new
 			{
 				totalTrees,
 				currentProgress, // 0-100
-				status
+				status,
+				pointsTotal
 			};
+			return payload;
 		}
 
 	private int? GetUserId()
@@ -100,12 +106,12 @@ public class TreesController : ControllerBase
 
 			var user = await _db.ApplicationUsers
 				.Where(u => u.Id == userId.Value)
-				.Select(u => new { u.TreesTotalCount, u.CurrentTreeProgress })
+				.Select(u => new { u.TreesTotalCount, u.CurrentTreeProgress, u.CurrentPoints })
 				.FirstOrDefaultAsync(ct);
 
 			if (user is null) return NotFound();
 
-			return Ok(BuildState(user.TreesTotalCount, user.CurrentTreeProgress));
+			return Ok(BuildState(user.TreesTotalCount, user.CurrentTreeProgress, user.CurrentPoints));
 		}
 
 		public sealed class UpdateTreeStateRequest
@@ -141,12 +147,29 @@ public class TreesController : ControllerBase
 			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 			if (user is null) return NotFound();
 
+			var oldTotal = user.TreesTotalCount;
+
 			if (req.TotalTrees.HasValue) user.TreesTotalCount = req.TotalTrees.Value;
 			if (req.CurrentProgress.HasValue) user.CurrentTreeProgress = req.CurrentProgress.Value;
 
 			await _db.SaveChangesAsync(ct);
 
-			return Ok(BuildState(user.TreesTotalCount, user.CurrentTreeProgress));
+			// 新增树奖励：当总树数增加时，发放积分（每棵树 +30）
+			var plantedDelta = user.TreesTotalCount - oldTotal;
+			if (plantedDelta > 0)
+			{
+				try
+				{
+					await _pointService.AwardTreePlantingPointsAsync(userId.Value, plantedDelta);
+				}
+				catch (Exception)
+				{
+					// 忽略积分发放异常，避免影响树状态更新主流程
+				}
+			}
+
+			// 返回最新积分
+			return Ok(BuildState(user.TreesTotalCount, user.CurrentTreeProgress, user.CurrentPoints));
 		}
 
 	public sealed class ConvertStepsRequest
@@ -187,6 +210,77 @@ public class TreesController : ControllerBase
 			.LongSumAsync(r => (long)r.StepCount, ct);
 
 		return Ok(BuildStats(record.StepCount, totalSteps));
+	}
+
+	/// <summary>
+	/// 消耗“可用步数”用于树木生长：按 150 步 = 1 进度点；累计到达或超过 100 时结算为种下一棵树。
+	/// </summary>
+	[HttpPost("grow")]
+	public async Task<ActionResult<object>> Grow(CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		var today = DateTime.UtcNow.Date;
+
+		// 读取用户与当日步数
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+		if (user is null) return NotFound();
+
+		var record = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == today, ct);
+		var totalStepsToday = record?.StepCount ?? 0;
+
+		// 每日重置：若最后消耗日期不是今天，则清零已用步数并刷新日期
+		if (!user.LastStepUsageDate.HasValue || user.LastStepUsageDate.Value.Date != today)
+		{
+			user.StepsUsedToday = 0;
+			user.LastStepUsageDate = today;
+		}
+
+		var availableSteps = Math.Max(0, totalStepsToday - Math.Max(0, user.StepsUsedToday));
+		if (availableSteps <= 0)
+		{
+			return BadRequest(new { message = "No steps available", availableSteps });
+		}
+
+		// 消耗全部可用步数
+		user.StepsUsedToday += availableSteps;
+
+		// 按步数换算树进度（向下取整）
+		var progressDelta = availableSteps / StepsPerProgressPoint;
+		if (progressDelta > 0)
+		{
+			user.CurrentTreeProgress += progressDelta;
+
+			// 结算成树（可能一次性跨越多个 100 档位）
+			if (user.CurrentTreeProgress >= 100)
+			{
+				var planted = user.CurrentTreeProgress / 100;
+				user.TreesTotalCount += planted;
+				user.CurrentTreeProgress = user.CurrentTreeProgress % 100;
+
+				// 积分奖励：每棵树 +30
+				try
+				{
+					await _pointService.AwardTreePlantingPointsAsync(userId.Value, planted);
+				}
+				catch (Exception)
+				{
+					// 忽略积分发放异常，避免影响主流程
+				}
+			}
+		}
+
+		await _db.SaveChangesAsync(ct);
+
+		// 保存后，可用步数应为 0（针对今天）
+		var availableAfter = Math.Max(0, (record?.StepCount ?? 0) - Math.Max(0, user.StepsUsedToday));
+		return Ok(new
+		{
+			TreesTotalCount = user.TreesTotalCount,
+			CurrentTreeProgress = user.CurrentTreeProgress,
+			AvailableSteps = availableAfter
+		});
 	}
 }
 
