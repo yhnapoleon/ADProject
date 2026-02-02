@@ -31,14 +31,14 @@ const Records = () => {
         request.get('/api/UtilityBill/my-bills').catch(() => ({ items: [] })),
       ]);
 
-      // 处理食物记录
+      // 处理食物记录（FoodRecords 接口返回 emission、name）
       const foodList = (Array.isArray(foodRes) ? foodRes : foodRes?.items || []).map((item: any) => ({
         id: `food_${item.id}`,
         _source: 'food' as const,
         _originalId: item.id,
         date: item.createdAt || item.date,
         type: 'Food' as EmissionType,
-        amount: item.totalEmission ?? item.carbonEmission ?? 0,
+        amount: item.emission ?? item.totalEmission ?? item.carbonEmission ?? 0,
         unit: 'kg CO₂e',
         description: item.foodName || item.name || item.detectedLabel || 'Food record',
         notes: item.notes ?? item.note ?? '',

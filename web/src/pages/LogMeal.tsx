@@ -546,10 +546,35 @@ const LogMeal = () => {
     return false;
   };
 
+  const [saveLoading, setSaveLoading] = useState(false);
+
   const handleSave = async () => {
-    await form.validateFields();
-    message.success('Meal logged successfully!');
-    navigate('/dashboard');
+    try {
+      const values = await form.validateFields();
+      const amount = typeof values.amount === 'number' ? values.amount : Number(values.amount);
+      const factor = values.co2Factor ?? formCo2Factor ?? (detectedInfo?.type === 'barcode' ? (detectedInfo.data as BarcodeResponse).co2Factor : null);
+      if (factor == null || amount <= 0) {
+        message.error('请填写完整的数量和碳排放因子');
+        return;
+      }
+      const emission = amount * (typeof factor === 'number' ? factor : Number(factor));
+      setSaveLoading(true);
+      await request.post('/api/addFood', {
+        name: values.foodName?.trim() || '',
+        amount: amount,
+        emission_factor: factor,
+        emission: Number(emission.toFixed(4)),
+        note: values.note || null,
+      });
+      message.success('Meal logged successfully!');
+      navigate('/dashboard');
+    } catch (err: any) {
+      if (err.errorFields) return; // 表单验证失败
+      console.error('[LogMeal] Save failed:', err);
+      message.error(err?.response?.data?.error ?? err?.message ?? '保存失败，请重试');
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   return (
@@ -792,6 +817,7 @@ const LogMeal = () => {
                 block
                 type="primary"
                 size="large"
+                loading={saveLoading}
                 onClick={handleSave}
                 style={{ background: '#674fa3', borderColor: '#674fa3', borderRadius: 12, fontWeight: 700 }}
               >

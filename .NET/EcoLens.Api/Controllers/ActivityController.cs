@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using EcoLens.Api.Services;
+using Microsoft.Extensions.Logging;
 
 namespace EcoLens.Api.Controllers;
 
@@ -17,11 +18,13 @@ public class ActivityController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
 	private readonly IClimatiqService _climatiqService;
+	private readonly ILogger<ActivityController>? _logger;
 
-	public ActivityController(ApplicationDbContext db, IClimatiqService climatiqService)
+	public ActivityController(ApplicationDbContext db, IClimatiqService climatiqService, ILogger<ActivityController>? logger = null)
 	{
 		_db = db;
 		_climatiqService = climatiqService;
+		_logger = logger;
 	}
 
 	private int? GetUserId()
@@ -118,6 +121,9 @@ public class ActivityController : ControllerBase
 		await _db.ActivityLogs.AddAsync(log, ct);
 		await _db.SaveChangesAsync(ct);
 
+		// 更新用户总碳排放
+		await UpdateUserTotalCarbonEmissionAsync(userId.Value, ct);
+
 		var result = new ActivityLogResponseDto
 		{
 			Id = log.Id,
@@ -133,6 +139,46 @@ public class ActivityController : ControllerBase
 		};
 
 		return Ok(result);
+	}
+
+	/// <summary>
+	/// 更新用户总碳排放（从 ActivityLogs、TravelLogs、UtilityBills 汇总）
+	/// </summary>
+	private async Task UpdateUserTotalCarbonEmissionAsync(int userId, CancellationToken ct)
+	{
+		try
+		{
+			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+			if (user == null) return;
+
+			var activityEmission = await _db.ActivityLogs
+				.Where(a => a.UserId == userId)
+				.SumAsync(a => (decimal?)a.TotalEmission, ct) ?? 0m;
+
+			var travelEmission = await _db.TravelLogs
+				.Where(t => t.UserId == userId)
+				.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
+
+			var utilityEmission = await _db.UtilityBills
+				.Where(u => u.UserId == userId)
+				.SumAsync(u => (decimal?)u.TotalCarbonEmission, ct) ?? 0m;
+
+			user.TotalCarbonEmission = activityEmission + travelEmission + utilityEmission;
+			await _db.SaveChangesAsync(ct);
+		}
+		catch (Exception ex)
+		{
+			// 记录错误但不影响主流程
+			// 注意：如果 logger 未注入，这里会静默失败，但不影响主流程
+			try
+			{
+				_logger?.LogError(ex, "Failed to update TotalCarbonEmission for user {UserId}", userId);
+			}
+			catch
+			{
+				// 忽略 logger 错误
+			}
+		}
 	}
 
 	/// <summary>

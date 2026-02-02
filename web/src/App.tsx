@@ -20,6 +20,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminUserList from './pages/AdminUserList';
 import AdminEmissionFactors from './pages/AdminEmissionFactors';
 import AdminCommunityAnalytics from './pages/AdminCommunityAnalytics';
+import AdminUserEmissions from './pages/AdminUserEmissions';
 import AdminSettings from './pages/AdminSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
@@ -90,6 +91,7 @@ const App: React.FC = () => {
                       <Route path="users" element={<AdminUserList />} />
                       <Route path="emission-factors" element={<AdminEmissionFactors />} />
                       <Route path="community-analytics" element={<AdminCommunityAnalytics />} />
+                      <Route path="user-emissions" element={<AdminUserEmissions />} />
                       <Route path="settings" element={<AdminSettings />} />
                     </Routes>
                   </div>

@@ -1,6 +1,7 @@
 package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -14,12 +15,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import iss.nus.edu.sg.sharedprefs.admobile.R
 import iss.nus.edu.sg.sharedprefs.admobile.utils.NavigationUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.asRequestBody
+import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -161,7 +173,99 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun uploadAvatar(uri: Uri) {
-        // 后续逻辑：将本地图片上传至 Azure 后端
-        Toast.makeText(this, "Avatar locally updated!", Toast.LENGTH_SHORT).show()
+        val token = getToken()
+        if (token == null) {
+            Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 将 Uri 转换为 File
+                val inputStream = contentResolver.openInputStream(uri)
+                val tempFile = File(cacheDir, "avatar_${System.currentTimeMillis()}.jpg")
+                val outputStream = FileOutputStream(tempFile)
+                
+                inputStream?.use { input ->
+                    outputStream.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+
+                // 创建 OkHttpClient（使用长超时）
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .build()
+
+                // 创建请求体
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart(
+                        "file",
+                        tempFile.name,
+                        tempFile.asRequestBody("image/jpeg".toMediaType())
+                    )
+                    .build()
+
+                // 创建请求
+                val request = Request.Builder()
+                    .url("https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net/api/user/avatar")
+                    .put(requestBody)
+                    .addHeader("Authorization", "Bearer $token")
+                    .build()
+
+                // 执行请求
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
+
+                withContext(Dispatchers.Main) {
+                    if (response.isSuccessful && responseBody != null) {
+                        try {
+                            val jsonResponse = JSONObject(responseBody)
+                            val avatarUrl = jsonResponse.optString("avatarUrl", "")
+                                .ifEmpty { jsonResponse.optString("avatar", "") }
+                            
+                            if (avatarUrl.isNotEmpty()) {
+                                // 使用 Glide 加载头像（支持 Base64 字符串）
+                                if (!isDestroyed && !isFinishing) {
+                                    Glide.with(this@ProfileActivity)
+                                        .load(avatarUrl)
+                                        .circleCrop()
+                                        .into(profileAvatar)
+                                }
+                                Toast.makeText(this@ProfileActivity, "Avatar uploaded successfully!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this@ProfileActivity, "Failed to get avatar URL", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("ProfileActivity", "Failed to parse avatar response", e)
+                            Toast.makeText(this@ProfileActivity, "Failed to parse response", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        val errorMsg = responseBody?.let {
+                            try {
+                                JSONObject(it).optString("message", "Failed to upload avatar")
+                            } catch (_: Exception) {
+                                "Failed to upload avatar: ${response.code}"
+                            }
+                        } ?: "Failed to upload avatar: ${response.code}"
+                        Toast.makeText(this@ProfileActivity, errorMsg, Toast.LENGTH_LONG).show()
+                        android.util.Log.e("ProfileActivity", "Upload failed: $errorMsg (Code: ${response.code})")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@ProfileActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                    android.util.Log.e("ProfileActivity", "Upload error", e)
+                }
+            }
+        }
+    }
+
+    private fun getToken(): String? {
+        val prefs: SharedPreferences = getSharedPreferences("EcoLensPrefs", MODE_PRIVATE)
+        return prefs.getString("token", null)
     }
 }

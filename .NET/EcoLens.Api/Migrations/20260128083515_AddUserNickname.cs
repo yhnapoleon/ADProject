@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -11,12 +11,13 @@ namespace EcoLens.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Nickname",
-                table: "ApplicationUsers",
-                type: "nvarchar(100)",
-                maxLength: 100,
-                nullable: true);
+            // 若 Nickname 列已存在则跳过（兼容数据库与迁移历史不同步的情况）
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'[ApplicationUsers]') AND name = N'Nickname')
+BEGIN
+    ALTER TABLE [ApplicationUsers] ADD [Nickname] nvarchar(100) NULL;
+END
+");
 
             // 兼容历史数据：默认将 Nickname 回填为 Username
             migrationBuilder.Sql(@"

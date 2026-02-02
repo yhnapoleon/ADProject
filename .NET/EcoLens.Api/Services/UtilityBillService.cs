@@ -280,7 +280,10 @@ public class UtilityBillService : IUtilityBillService
 				_logger.LogError(exLog, "Failed to create ActivityLogs for UtilityBill UserId={UserId} BillId={BillId}", userId, utilityBill.Id);
 			}
 
-			// 7. 转换为DTO返回
+			// 7. 更新用户总碳排放
+			await UpdateUserTotalCarbonEmissionAsync(userId, ct);
+
+			// 8. 转换为DTO返回
 			return ToResponseDto(utilityBill);
 		}
 		catch (Exception ex)
@@ -390,6 +393,9 @@ public class UtilityBillService : IUtilityBillService
 
 		_db.UtilityBills.Remove(bill);
 		await _db.SaveChangesAsync(ct);
+
+		// 更新用户总碳排放
+		await UpdateUserTotalCarbonEmissionAsync(userId, ct);
 
 		_logger.LogInformation("Utility bill deleted: UserId={UserId}, BillId={BillId}, YearMonth={YearMonth}", userId, id, yearMonth);
 
@@ -542,5 +548,37 @@ public class UtilityBillService : IUtilityBillService
 			InputMethod.Manual => "手动输入",
 			_ => inputMethod.ToString()
 		};
+	}
+
+	/// <summary>
+	/// 更新用户总碳排放（从 ActivityLogs、TravelLogs、UtilityBills 汇总）
+	/// </summary>
+	private async Task UpdateUserTotalCarbonEmissionAsync(int userId, CancellationToken ct)
+	{
+		try
+		{
+			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+			if (user == null) return;
+
+			var activityEmission = await _db.ActivityLogs
+				.Where(a => a.UserId == userId)
+				.SumAsync(a => (decimal?)a.TotalEmission, ct) ?? 0m;
+
+			var travelEmission = await _db.TravelLogs
+				.Where(t => t.UserId == userId)
+				.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
+
+			var utilityEmission = await _db.UtilityBills
+				.Where(u => u.UserId == userId)
+				.SumAsync(u => (decimal?)u.TotalCarbonEmission, ct) ?? 0m;
+
+			user.TotalCarbonEmission = activityEmission + travelEmission + utilityEmission;
+			await _db.SaveChangesAsync(ct);
+		}
+		catch (Exception ex)
+		{
+			// 记录错误但不影响主流程
+			_logger.LogError(ex, "Failed to update TotalCarbonEmission for user {UserId}", userId);
+		}
 	}
 }
