@@ -15,11 +15,13 @@ public class AuthController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
 	private readonly Services.IAuthService _authService;
+	private readonly Services.ISensitiveWordService _sensitiveWordService;
 
-	public AuthController(ApplicationDbContext db, Services.IAuthService authService)
+	public AuthController(ApplicationDbContext db, Services.IAuthService authService, Services.ISensitiveWordService sensitiveWordService)
 	{
 		_db = db;
 		_authService = authService;
+		_sensitiveWordService = sensitiveWordService;
 	}
 
 	/// <summary>
@@ -29,6 +31,13 @@ public class AuthController : ControllerBase
 	[AllowAnonymous]
 	public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterRequestDto dto, CancellationToken ct)
 	{
+		// 检测用户名是否包含敏感词
+		var sensitiveWord = _sensitiveWordService.ContainsSensitiveWord(dto.Username);
+		if (sensitiveWord != null)
+		{
+			return BadRequest($"用户名包含不当内容，无法注册。");
+		}
+
 		var exists = await _db.ApplicationUsers.AnyAsync(u => u.Email == dto.Email || u.Username == dto.Username, ct);
 		if (exists)
 		{

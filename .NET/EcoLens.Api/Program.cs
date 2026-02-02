@@ -184,6 +184,7 @@ builder.Services.Configure<FormOptions>(options =>
 
 // DI registrations
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<ISensitiveWordService, SensitiveWordService>();
 builder.Services.AddScoped<ITravelService, TravelService>();
 builder.Services.AddScoped<IOcrService, OcrService>();
 builder.Services.AddScoped<IDocumentTypeClassifier, DocumentTypeClassifier>();
