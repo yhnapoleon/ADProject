@@ -129,7 +129,8 @@ public class FoodRecordsController : ControllerBase
 			Name = r.Name,
 			Amount = r.Amount,
 			EmissionFactor = r.EmissionFactor,
-			Emission = r.Emission
+			Emission = r.Emission,
+			Notes = r.Note
 		};
 }
 
