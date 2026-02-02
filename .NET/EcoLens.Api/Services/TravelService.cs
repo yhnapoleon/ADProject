@@ -519,8 +519,9 @@ public class TravelService : ITravelService
 			}
 
 			// 检查出发地和目的地附近是否有机场（使用 Google Places API）
-			var originHasAirport = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "airport", 50000, ct); // 50公里范围内
-			var destHasAirport = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "airport", 50000, ct);
+			// 对于飞机，必须严格检查，如果 API 调用失败，应该拒绝而不是允许
+			var originHasAirport = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "airport", 50000, ct, strict: true); // 50公里范围内
+			var destHasAirport = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "airport", 50000, ct, strict: true);
 
 			if (!originHasAirport)
 			{
@@ -560,21 +561,73 @@ public class TravelService : ITravelService
 			}
 
 			// 检查出发地和目的地附近是否有港口/码头（使用 Google Places API）
-			var originHasPort = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "port", 30000, ct) ||
-			                    await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "ferry terminal", 30000, ct);
-			var destHasPort = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "port", 30000, ct) ||
-			                  await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "ferry terminal", 30000, ct);
+			// 对于轮船，必须严格检查，如果 API 调用失败，应该拒绝而不是允许
+			var originHasPort = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "port", 30000, ct, strict: true) ||
+			                    await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "ferry terminal", 30000, ct, strict: true);
+			var destHasPort = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "port", 30000, ct, strict: true) ||
+			                  await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "ferry terminal", 30000, ct, strict: true);
 
 			if (!originHasPort)
 			{
 				throw new InvalidOperationException(
-					$"出发地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。请选择其他出行方式。");
+					$"出发地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。轮船只能用于有港口或码头的沿海城市或岛屿。请选择其他出行方式。");
 			}
 
 			if (!destHasPort)
 			{
 				throw new InvalidOperationException(
-					$"目的地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。请选择其他出行方式。");
+					$"目的地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。轮船只能用于有港口或码头的沿海城市或岛屿。请选择其他出行方式。");
+			}
+		}
+
+		// 验证地铁：地铁通常只在城市内部或相邻城市之间运行，不适合超长距离
+		if (transportMode == TransportMode.Subway)
+		{
+			// 地铁通常用于城市内部或相邻城市，超过 200 公里可能不合理
+			if (distanceKm > 200)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用地铁。地铁通常用于城市内部或相邻城市之间的短距离出行（200公里以内）。请选择其他出行方式，如飞机、火车或长途巴士。");
+			}
+
+			// 如果跨国家，地铁通常不可行
+			if (!sameCountry && !string.IsNullOrWhiteSpace(origin.Country) && !string.IsNullOrWhiteSpace(destination.Country))
+			{
+				throw new InvalidOperationException(
+					$"地铁不能用于跨国出行。从 {origin.Country} 到 {destination.Country} 请选择其他出行方式，如飞机或火车。");
+			}
+		}
+
+		// 验证巴士：巴士可以用于中短距离，但超长距离可能不合理
+		if (transportMode == TransportMode.Bus)
+		{
+			// 巴士通常用于中短距离，超过 500 公里可能不合理（虽然技术上可行，但通常有更好的选择）
+			if (distanceKm > 500)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用巴士。巴士通常用于中短距离出行（500公里以内）。对于超长距离，建议选择飞机或火车。请选择其他出行方式。");
+			}
+		}
+
+		// 验证步行：步行可以用于较长距离（支持背包客等长距离步行）
+		if (transportMode == TransportMode.Walking)
+		{
+			// 放宽限制以支持背包客等长距离步行，但超过 100 公里仍然不合理
+			if (distanceKm > 100)
+			{
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合步行。即使是长距离步行，通常也不会超过 100 公里。请选择其他出行方式。");
+			}
+		}
+
+		// 验证自行车：自行车适合短到中距离
+		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.ElectricBike)
+		{
+			if (distanceKm > 50)
+			{
+				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "电动车";
+				throw new InvalidOperationException(
+					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用{modeName}。{modeName}通常用于短到中距离出行（50公里以内）。请选择其他出行方式。");
 			}
 		}
 
@@ -586,12 +639,19 @@ public class TravelService : ITravelService
 	/// <summary>
 	/// 检查指定位置附近是否有特定类型的基础设施（如机场、港口）
 	/// </summary>
+	/// <param name="latitude">纬度</param>
+	/// <param name="longitude">经度</param>
+	/// <param name="keyword">搜索关键词（如 "airport", "port"）</param>
+	/// <param name="radiusMeters">搜索半径（米）</param>
+	/// <param name="ct">取消令牌</param>
+	/// <param name="strict">是否严格模式：如果为 true，API 调用失败时返回 false（拒绝）；如果为 false，API 调用失败时返回 true（允许，避免阻塞用户）</param>
 	private async Task<bool> HasNearbyInfrastructureAsync(
 		double latitude, 
 		double longitude, 
 		string keyword, 
 		int radiusMeters,
-		CancellationToken ct)
+		CancellationToken ct,
+		bool strict = false)
 	{
 		try
 		{
@@ -611,7 +671,16 @@ public class TravelService : ITravelService
 		catch (Exception ex)
 		{
 			_logger.LogWarning(ex, "Error checking for {Infrastructure} near {Lat}, {Lng}", keyword, latitude, longitude);
-			// 如果检查失败，为了不阻塞用户，返回 true（允许使用该交通工具）
+			
+			// 严格模式：对于飞机和轮船，如果 API 调用失败，应该拒绝（返回 false）
+			// 这样可以避免在没有基础设施的情况下错误地允许使用这些交通工具
+			if (strict)
+			{
+				_logger.LogError(ex, "Strict mode: Infrastructure check failed for {Infrastructure} near {Lat}, {Lng}, rejecting transport mode", keyword, latitude, longitude);
+				return false;
+			}
+			
+			// 非严格模式：对于其他交通工具，如果 API 调用失败，返回 true（允许使用）
 			// 这样可以避免因为 API 调用失败而阻止合理的出行方式
 			return true;
 		}

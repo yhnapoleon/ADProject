@@ -62,6 +62,9 @@ public class UtilityBill : BaseEntity
 	[Column(TypeName = "nvarchar(max)")]
 	public string? OcrRawText { get; set; }
 
+	[MaxLength(1000)]
+	public string? Notes { get; set; }
+
 	public ApplicationUser? User { get; set; }
 }
 

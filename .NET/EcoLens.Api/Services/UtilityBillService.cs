@@ -518,6 +518,7 @@ public class UtilityBillService : IUtilityBillService
 			InputMethodName = GetInputMethodName(bill.InputMethod),
 			OcrConfidence = bill.OcrConfidence,
 			OcrRawText = bill.OcrRawText, // Include OCR text for debugging
+			Notes = bill.Notes,
 			CreatedAt = bill.CreatedAt
 		};
 	}

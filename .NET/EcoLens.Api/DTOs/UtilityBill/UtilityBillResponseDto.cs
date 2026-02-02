@@ -89,6 +89,11 @@ public class UtilityBillResponseDto
 	public string? OcrRawText { get; set; }
 
 	/// <summary>
+	/// 备注
+	/// </summary>
+	public string? Notes { get; set; }
+
+	/// <summary>
 	/// 创建时间
 	/// </summary>
 	public DateTime CreatedAt { get; set; }
