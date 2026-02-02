@@ -4,6 +4,7 @@ using EcoLens.Api.DTOs.Steps;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using EcoLens.Api.Services;
 
 namespace EcoLens.Api.Controllers;
 
@@ -13,10 +14,12 @@ namespace EcoLens.Api.Controllers;
 public class StepController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
+	private readonly IPointService _pointService;
 
-	public StepController(ApplicationDbContext db)
+	public StepController(ApplicationDbContext db, IPointService pointService)
 	{
 		_db = db;
+		_pointService = pointService;
 	}
 
 	private int? GetUserId()
@@ -85,6 +88,16 @@ public class StepController : ControllerBase
 		await _db.SaveChangesAsync(ct);
 
 		var total = record.StepCount;
+
+		// 重算总碳减排（基于每日净碳值）
+		try
+		{
+			await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
+		}
+		catch
+		{
+			// 忽略错误，不影响步数同步主流程
+		}
 		var used = Math.Max(0, user.StepsUsedToday);
 		var available = Math.Max(0, total - used);
 

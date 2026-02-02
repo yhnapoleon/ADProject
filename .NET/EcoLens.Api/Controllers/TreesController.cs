@@ -205,6 +205,16 @@ public class TreesController : ControllerBase
 
 		await _db.SaveChangesAsync(ct);
 
+		// 步数更新后，重算总碳减排（基于每日净碳值）
+		try
+		{
+			await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
+		}
+		catch
+		{
+			// 忽略重算异常，避免影响前端交互流程
+		}
+
 		var totalSteps = await _db.StepRecords
 			.Where(r => r.UserId == userId.Value)
 			.LongSumAsync(r => (long)r.StepCount, ct);

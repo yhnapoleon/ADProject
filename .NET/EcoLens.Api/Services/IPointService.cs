@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 namespace EcoLens.Api.Services;
@@ -25,6 +26,23 @@ public interface IPointService
 	/// <param name="userId">用户ID</param>
 	/// <param name="treesPlantedCount">本次新增的树数量（正整数）</param>
 	Task AwardTreePlantingPointsAsync(int userId, int treesPlantedCount);
+
+	/// <summary>
+	/// 计算“当日净碳值”指标：
+	/// DailyNetValue = (Steps * StepToCarbonFactor) + (CarbonNeutralBenchmark - DailyTotalEmission)。
+	/// 若当日缺少 FoodRecord、TravelLog 或步数（Steps &gt; 0）任一项，则严格返回 0。
+	/// </summary>
+	/// <param name="userId">用户ID</param>
+	/// <param name="date">UTC 日期（仅取 date 部分）</param>
+	/// <returns>当日净碳值（kg CO2e）</returns>
+	Task<decimal> CalculateDailyNetValueAsync(int userId, DateTime date);
+
+	/// <summary>
+	/// 重算并更新用户的“总碳减排值”（TotalCarbonSaved）。
+	/// 当前策略：按所有有记录的日期累加当日净碳值（不满足三要素则当日记 0）。
+	/// </summary>
+	/// <param name="userId">用户ID</param>
+	Task RecalculateTotalCarbonSavedAsync(int userId);
 }
 
 

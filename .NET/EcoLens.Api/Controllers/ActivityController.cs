@@ -19,11 +19,13 @@ public class ActivityController : ControllerBase
 	private readonly ApplicationDbContext _db;
 	private readonly IClimatiqService _climatiqService;
 	private readonly ILogger<ActivityController>? _logger;
+	private readonly IPointService _pointService;
 
-	public ActivityController(ApplicationDbContext db, IClimatiqService climatiqService, ILogger<ActivityController>? logger = null)
+	public ActivityController(ApplicationDbContext db, IClimatiqService climatiqService, IPointService pointService, ILogger<ActivityController>? logger = null)
 	{
 		_db = db;
 		_climatiqService = climatiqService;
+		_pointService = pointService;
 		_logger = logger;
 	}
 
@@ -123,6 +125,16 @@ public class ActivityController : ControllerBase
 
 		// 更新用户总碳排放
 		await UpdateUserTotalCarbonEmissionAsync(userId.Value, ct);
+
+		// 重算总碳减排（基于每日净碳值）
+		try
+		{
+			await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
+		}
+		catch
+		{
+			// 不影响主流程
+		}
 
 		var result = new ActivityLogResponseDto
 		{
@@ -288,6 +300,59 @@ public class ActivityController : ControllerBase
 			TotalItems = totalItems,
 			TreesSaved = treesSaved,
 			Rank = rank
+		};
+
+		return Ok(dto);
+	}
+
+	/// <summary>
+	/// 当日净碳值：若当日缺少（食物记录、出行记录、步数>0）任一项，则严格返回 0。
+	/// 公式：DailyNetValue = (Steps * 0.0001) + (Benchmark - DailyTotalEmission)。
+	/// </summary>
+	[HttpGet("daily-net-value")]
+	public async Task<ActionResult<DailyNetValueResponseDto>> DailyNetValue(CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		var today = DateTime.UtcNow.Date;
+		var dayStart = today;
+		var dayEnd = today.AddDays(1);
+
+		// 检查当日三项是否齐全
+		var hasFood = await _db.FoodRecords.AnyAsync(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd, ct);
+		var hasTravel = await _db.TravelLogs.AnyAsync(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd, ct);
+		var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == dayStart, ct);
+		var steps = stepRecord?.StepCount ?? 0;
+		var isQualified = hasFood && hasTravel && steps > 0;
+
+		// 组成分解数据
+		var foodEmission = await _db.FoodRecords
+			.Where(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd)
+			.SumAsync(r => (decimal?)r.Emission, ct) ?? 0m;
+		var travelEmission = await _db.TravelLogs
+			.Where(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd)
+			.SumAsync(r => (decimal?)r.CarbonEmission, ct) ?? 0m;
+		var emission = foodEmission + travelEmission;
+
+		const decimal stepFactor = 0.0001m;
+		var stepSaving = (decimal)steps * stepFactor;
+
+		const decimal benchmark = 15.0m; // 与 PointService.DailyBenchmark 保持一致
+
+		// 值计算（调用服务实现）
+		var value = await _pointService.CalculateDailyNetValueAsync(userId.Value, today);
+
+		var dto = new DailyNetValueResponseDto
+		{
+			Value = value,
+			IsQualified = isQualified,
+			Breakdown = new DailyNetValueBreakdownDto
+			{
+				StepSaving = stepSaving,
+				Benchmark = benchmark,
+				Emission = emission
+			}
 		};
 
 		return Ok(dto);
