@@ -200,7 +200,6 @@ public class UtilityBillService : IUtilityBillService
 			var utilityBill = new UtilityBill
 			{
 				UserId = userId,
-				YearMonth = periodLabel,
 				BillType = dto.BillType,
 				BillPeriodStart = dto.BillPeriodStart,
 				BillPeriodEnd = dto.BillPeriodEnd,

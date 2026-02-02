@@ -255,7 +255,7 @@ public class AdminController : ControllerBase
 				await _db.SaveChangesAsync(ct);
 				imported++;
 			}
-			catch (DbUpdateException ex)
+			catch (DbUpdateException)
 			{
 				// 回滚当前实体的跟踪，避免影响后续条目
 				_db.Entry(entity).State = EntityState.Detached;
@@ -545,6 +545,62 @@ public class AdminController : ControllerBase
 				status = u.IsActive ? "Active" : "Banned"
 			}).ToListAsync(ct);
 		return Ok(new { items, total });
+	}
+
+	/// <summary>
+	/// 获取指定用户在给定时间范围内的排放统计（按 ActivityLogs.TotalEmission 聚合）。
+	/// - 支持三种时间选择：
+	///   1) days（近 N 天，含今日）；
+	///   2) from/to（闭区间的日期，内部按 [from, to+1) 处理）；
+	///   3) 若均未提供，则统计用户全量活动日志。
+	/// </summary>
+	/// <param name="id">用户ID</param>
+	/// <param name="from">开始日期（UTC，按日期计算）</param>
+	/// <param name="to">结束日期（UTC，按日期计算）</param>
+	/// <param name="days">近 N 天（N>0）</param>
+	[HttpGet("users/{id:int}/emissions/stats")]
+	public async Task<ActionResult<object>> GetUserEmissionStats(
+		[FromRoute] int id,
+		[FromQuery] DateTime? from = null,
+		[FromQuery] DateTime? to = null,
+		[FromQuery] int? days = null,
+		CancellationToken ct = default)
+	{
+		// 校验用户是否存在
+		var userExists = await _db.ApplicationUsers.AnyAsync(u => u.Id == id, ct);
+		if (!userExists) return NotFound(new { error = "User not found" });
+
+		// 计算时间窗口（采用 [start, endExclusive)）
+		DateTime? start = null;
+		DateTime? endExclusive = null;
+
+		if (days.HasValue && days.Value > 0)
+		{
+			var today = DateTime.UtcNow.Date;
+			start = today.AddDays(-(days.Value - 1));
+			endExclusive = today.AddDays(1);
+		}
+
+		if (from.HasValue) start = from.Value.Date;
+		if (to.HasValue) endExclusive = to.Value.Date.AddDays(1);
+
+		// 构建查询
+		var logs = _db.ActivityLogs.AsQueryable().Where(l => l.UserId == id);
+		if (start.HasValue) logs = logs.Where(l => l.CreatedAt >= start.Value);
+		if (endExclusive.HasValue) logs = logs.Where(l => l.CreatedAt < endExclusive.Value);
+
+		var totalItems = await logs.CountAsync(ct);
+		var totalEmission = await logs.SumAsync(l => (decimal?)l.TotalEmission, ct) ?? 0m;
+
+		// 统一返回结构
+		return Ok(new
+		{
+			userId = id,
+			totalItems,
+			totalEmission,
+			from = start?.ToString("yyyy-MM-dd"),
+			to = endExclusive?.AddDays(-1).ToString("yyyy-MM-dd")
+		});
 	}
 
 	public class BatchUserUpdateItem

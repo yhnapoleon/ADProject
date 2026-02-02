@@ -52,6 +52,48 @@
     }
   },
   "endpoints": {
+    "admin": {
+      "module": "管理员模块",
+      "endpoints": [
+        {
+          "name": "获取单个用户排放统计（可选时间范围）",
+          "path": "/api/admin/users/{id}/emissions/stats",
+          "method": "GET",
+          "authRequired": true,
+          "description": "管理员按用户ID汇总其活动日志排放，支持 from/to 或 days 窗口",
+          "request": {
+            "pathParams": {
+              "id": "number (必填) - 用户ID"
+            },
+            "queryParams": {
+              "from": "string (可选) - 开始日期（yyyy-MM-dd，UTC）",
+              "to": "string (可选) - 结束日期（yyyy-MM-dd，UTC）",
+              "days": "number (可选) - 近N天（含今日，N>0）"
+            },
+            "notes": [
+              "时间窗口优先级：days > from/to；若均不提供则统计全量活动日志",
+              "内部按 [from, to+1) 进行整天聚合"
+            ]
+          },
+          "response": {
+            "200": {
+              "description": "获取成功",
+              "example": {
+                "userId": 123,
+                "totalItems": 42,
+                "totalEmission": 356.75,
+                "from": "2025-01-01",
+                "to": "2025-01-31"
+              }
+            },
+            "404": {
+              "description": "用户不存在",
+              "example": { "error": "User not found" }
+            }
+          }
+        }
+      ]
+    },
     "auth": {
       "module": "认证模块",
       "endpoints": [
