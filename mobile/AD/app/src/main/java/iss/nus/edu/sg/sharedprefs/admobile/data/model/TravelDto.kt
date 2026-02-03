@@ -24,3 +24,17 @@ data class TransportMode(
     val animationResId: Int,
     val emissionFactor: Double
 )
+
+data class TravelHistoryResponse(
+    val items: List<TravelHistoryItem>,
+    val totalCount: Int
+)
+
+data class TravelHistoryItem(
+    val id: Int,
+    val createdAt: String,
+    val transportModeName: String,
+    val originAddress: String,
+    val destinationAddress: String,
+    val carbonEmission: Double
+)

@@ -140,12 +140,12 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun setupViewPager() {
         val transportModes = listOf(
-            TransportMode(6, "Car (Gasoline)", R.raw.transport_sedan, 0.17),
+            TransportMode(6, "Car (Gasoline)", R.raw.transport_sedan, 0.2),
             TransportMode(7, "Car (Electric)", R.raw.transport_sedan2, 0.05),
-            TransportMode(4, "Bus", R.raw.transport_bus, 0.03),
-            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.08),
-            TransportMode(3, "Subway", R.raw.transport_train, 0.04),
-            TransportMode(5, "Ship", R.raw.transport_ship, 0.15)
+            TransportMode(4, "Bus", R.raw.transport_bus, 0.05),
+            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.02),
+            TransportMode(3, "Subway", R.raw.transport_train, 0.03),
+            TransportMode(5, "Ship", R.raw.transport_ship, 0.03)
         )
 
         transportViewPager.adapter = TransportModeAdapter(transportModes)

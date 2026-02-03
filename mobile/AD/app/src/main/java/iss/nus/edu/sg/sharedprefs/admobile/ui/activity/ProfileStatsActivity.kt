@@ -1,5 +1,6 @@
 package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -7,165 +8,223 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.PieChart
 import com.github.mikephil.charting.components.Legend
 import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.Entry
-import com.github.mikephil.charting.data.LineData
-import com.github.mikephil.charting.data.LineDataSet
-import com.github.mikephil.charting.data.PieData
-import com.github.mikephil.charting.data.PieDataSet
-import com.github.mikephil.charting.data.PieEntry
+import com.github.mikephil.charting.data.*
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
 import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.button.MaterialButton
 import iss.nus.edu.sg.sharedprefs.admobile.R
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.UserStatsResponse
+import iss.nus.edu.sg.sharedprefs.admobile.data.network.NetworkClient
+import kotlinx.coroutines.launch
 
 class ProfileStatsActivity : AppCompatActivity() {
 
-    // 将 timeRanges 定义为类成员，方便多处使用
-    private val timeRanges = arrayOf("All Time", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul")
+    private var statsData: List<UserStatsResponse> = emptyList()
+
+    private lateinit var tvTotalValue: TextView
+    private lateinit var tvCompValue: TextView
+    private lateinit var spinner: Spinner
+    private lateinit var lineChart: LineChart
+    private lateinit var pieChart: PieChart
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_statistics)
 
-        // 设置状态栏颜色
+        // 设置状态栏
         window.statusBarColor = Color.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
-        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
-        toolbar.setNavigationOnClickListener {
+        // 1. 初始化视图
+        tvTotalValue = findViewById(R.id.tv_total_emissions_value)
+        tvCompValue = findViewById(R.id.tv_comparison_value)
+        spinner = findViewById(R.id.spinner_time_range)
+        lineChart = findViewById(R.id.lineChart)
+        pieChart = findViewById(R.id.pieChart)
+
+        findViewById<MaterialToolbar>(R.id.toolbar).setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()
         }
 
-        setupLineChart()
-        setupPieChart()
-        setupTimeRangeSpinner() // 🌟 初始化选择器
+        // 2. 初始配置图表样式
+        initChartStyles()
 
+        // 3. 从后端获取真实数据
+        fetchStatsFromServer()
     }
 
-    private fun setupTimeRangeSpinner() {
-        val spinner = findViewById<Spinner>(R.id.spinner_time_range)
+    private fun initChartStyles() {
+        // LineChart 基础样式
+        lineChart.apply {
+            description.isEnabled = false
+            axisRight.isEnabled = false
+            xAxis.position = XAxis.XAxisPosition.BOTTOM
+            xAxis.setDrawGridLines(false)
+            animateY(1000)
+        }
 
-        // 设置适配器
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, timeRanges)
+        // PieChart 基础样式
+        pieChart.apply {
+            isDrawHoleEnabled = false
+            description.isEnabled = false
+            legend.verticalAlignment = Legend.LegendVerticalAlignment.BOTTOM
+            legend.horizontalAlignment = Legend.LegendHorizontalAlignment.CENTER
+            animateXY(800, 800)
+        }
+    }
+
+    private fun fetchStatsFromServer() {
+        lifecycleScope.launch {
+            try {
+                val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                val token = "Bearer ${prefs.getString("access_token", "")}"
+
+                val response = NetworkClient.apiService.getAboutMe(token)
+
+                if (response.isSuccessful && response.body() != null) {
+                    statsData = response.body()!!
+
+                    // 🌟 打印后端返回的完整数据列表
+                    android.util.Log.d("ECO_DEBUG", "About-Me Raw Data: $statsData")
+
+                    // 🌟 也可以循环打印每一个月的数据，看得更清楚
+                    statsData.forEach { data ->
+                        android.util.Log.d("ECO_DEBUG", "Month: ${data.month} | Total: ${data.emissionsTotal} | AvgAll: ${data.averageAllUsers}")
+                    }
+
+                    // 更新 UI
+                    updateTopCards()
+                    setupLineChart()
+                    setupTimeRangeSpinner()
+                } else {
+                    // 打印错误响应信息
+                    android.util.Log.e("ECO_DEBUG", "API Error: ${response.code()} - ${response.errorBody()?.string()}")
+                    Toast.makeText(this@ProfileStatsActivity, "Failed to load statistics", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                // 打印网络异常信息
+                android.util.Log.e("ECO_DEBUG", "Fetch Stats Exception: ${e.message}")
+                Toast.makeText(this@ProfileStatsActivity, "Network error", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * 更新顶部总排放量和对比卡片
+     */
+    private fun updateTopCards() {
+        if (statsData.isEmpty()) return
+
+        // 使用最近一个月的数据
+        val latest = statsData.last()
+        tvTotalValue.text = "${String.format("%.1f", latest.emissionsTotal)} kg"
+
+        // 计算与全站平均水平的差异
+        val avg = latest.averageAllUsers
+        if (avg > 0) {
+            val diffPercent = ((latest.emissionsTotal - avg) / avg) * 100
+            if (diffPercent > 0) {
+                tvCompValue.text = "↑ ${String.format("%.1f", diffPercent)}%"
+                tvCompValue.setTextColor(Color.RED)
+            } else {
+                tvCompValue.text = "↓ ${String.format("%.1f", Math.abs(diffPercent))}%"
+                tvCompValue.setTextColor(Color.parseColor("#4CAF50"))
+            }
+        }
+    }
+
+    /**
+     * 配置折线图：显示个人排放趋势
+     */
+    private fun setupLineChart() {
+        val entries = ArrayList<Entry>()
+        val labels = ArrayList<String>()
+
+        statsData.forEachIndexed { index, data ->
+            entries.add(Entry(index.toFloat(), data.emissionsTotal.toFloat()))
+            labels.add(data.month)
+        }
+
+        val dataSet = LineDataSet(entries, "Total Emissions (kg)").apply {
+            color = Color.parseColor("#674fa3")
+            setCircleColor(Color.parseColor("#674fa3"))
+            lineWidth = 3f
+            mode = LineDataSet.Mode.CUBIC_BEZIER
+            setDrawFilled(true)
+            fillColor = Color.parseColor("#674fa3")
+            fillAlpha = 30
+            setDrawValues(false)
+        }
+
+        lineChart.xAxis.valueFormatter = IndexAxisValueFormatter(labels)
+        lineChart.xAxis.granularity = 1f
+        lineChart.data = LineData(dataSet)
+        lineChart.invalidate()
+    }
+
+    /**
+     * 配置时间范围选择器
+     */
+    private fun setupTimeRangeSpinner() {
+        val options = mutableListOf("All Time")
+        options.addAll(statsData.map { it.month })
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, options)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
 
-        // 监听选择事件
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                updatePieChartData(timeRanges[position])
+                updatePieChart(options[position])
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
     }
 
-    private fun updatePieChartData(range: String) {
-        val pieChart = findViewById<PieChart>(R.id.pieChart)
+    /**
+     * 根据选择的月份更新饼图数据
+     */
+    private fun updatePieChart(selectedRange: String) {
         val entries = ArrayList<PieEntry>()
 
-        // 🌟 模拟不同时间范围的数据切换
-        if (range == "All Time") {
-            entries.add(PieEntry(1605f, "Food"))
-            entries.add(PieEntry(1083f, "Travel"))
-            entries.add(PieEntry(645f, "Utility"))
+        if (selectedRange == "All Time") {
+            // 计算所有月份的总和
+            val foodSum = statsData.sumOf { it.food }.toFloat()
+            val transportSum = statsData.sumOf { it.transport }.toFloat()
+            val utilitySum = statsData.sumOf { it.utility }.toFloat()
+
+            entries.add(PieEntry(foodSum, "Food"))
+            entries.add(PieEntry(transportSum, "Travel"))
+            entries.add(PieEntry(utilitySum, "Utility"))
         } else {
-            // 假设单月数据的比例有所不同
-            entries.add(PieEntry(150f, "Food"))
-            entries.add(PieEntry(90f, "Travel"))
-            entries.add(PieEntry(60f, "Utility"))
+            // 查找特定月份的数据
+            val data = statsData.find { it.month == selectedRange }
+            data?.let {
+                entries.add(PieEntry(it.food.toFloat(), "Food"))
+                entries.add(PieEntry(it.transport.toFloat(), "Travel"))
+                entries.add(PieEntry(it.utility.toFloat(), "Utility"))
+            }
         }
 
-        val dataSet = PieDataSet(entries, "")
-        dataSet.colors = arrayListOf(
-            Color.parseColor("#674fa3"),
-            Color.parseColor("#64B5F6"),
-            Color.parseColor("#FFEB3B")
-        )
-        dataSet.sliceSpace = 2f
-        dataSet.valueTextColor = Color.WHITE
-        dataSet.valueTextSize = 12f
+        val dataSet = PieDataSet(entries, "").apply {
+            colors = arrayListOf(
+                Color.parseColor("#674fa3"),
+                Color.parseColor("#64B5F6"),
+                Color.parseColor("#FFEB3B")
+            )
+            sliceSpace = 2f
+            valueTextColor = Color.BLACK
+            valueTextSize = 12f
+        }
 
         pieChart.data = PieData(dataSet)
-        pieChart.highlightValues(null) // 清除点击高亮
-        pieChart.animateY(800)        // 🌟 切换时的平滑动画
-        pieChart.invalidate()         // 刷新
-    }
-
-    private fun setupLineChart() {
-        val lineChart = findViewById<LineChart>(R.id.lineChart)
-
-        val entries = ArrayList<Entry>()
-        entries.add(Entry(0f, 250f))
-        entries.add(Entry(1f, 240f))
-        entries.add(Entry(2f, 275f))
-        entries.add(Entry(3f, 275f))
-        entries.add(Entry(4f, 290f))
-        entries.add(Entry(5f, 320f))
-        entries.add(Entry(6f, 340f))
-
-        val dataSet = LineDataSet(entries, "Total Emissions (kg)")
-
-        dataSet.color = Color.parseColor("#674fa3")
-        dataSet.setCircleColor(Color.parseColor("#674fa3"))
-        dataSet.lineWidth = 3f
-        dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
-        dataSet.setDrawFilled(true)
-        dataSet.fillColor = Color.parseColor("#674fa3")
-        dataSet.fillAlpha = 30
-        dataSet.setDrawValues(false)
-
-        lineChart.xAxis.apply {
-            position = XAxis.XAxisPosition.BOTTOM
-            valueFormatter =
-                IndexAxisValueFormatter(arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"))
-            setDrawGridLines(false)
-            granularity = 1f
-        }
-
-        lineChart.axisRight.isEnabled = false
-        lineChart.description.isEnabled = false
-        lineChart.data = LineData(dataSet)
-        lineChart.animateY(1000)
-    }
-
-    private fun setupPieChart() {
-        val pieChart = findViewById<PieChart>(R.id.pieChart)
-
-        // 初始配置样式
-        pieChart.apply {
-            isDrawHoleEnabled = false
-            description.isEnabled = false
-            legend.isEnabled = true
-            legend.verticalAlignment = Legend.LegendVerticalAlignment.BOTTOM
-            legend.horizontalAlignment = Legend.LegendHorizontalAlignment.CENTER
-        }
-
-        // 初始填充一次 All Time 数据
-        updatePieChartData("All Time")
-    }
-
-    private fun performLogout() {
-        // 1. 清除 SharedPreferences 中的登录状态
-        val prefs = getSharedPreferences("EcoLensPrefs", MODE_PRIVATE)
-        prefs.edit().clear().apply() // 🌟 清空所有数据，包括 Token 和用户名
-
-        // 2. 提示用户
-        Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show()
-
-        // 3. 跳转回登录页面
-        val intent = Intent(this, LoginActivity::class.java)
-
-        // 🌟 关键：清空 Activity 栈，防止用户按返回键又回到 Profile 页面
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-
-        // 4. 销毁当前页面
-        finish()
+        pieChart.invalidate()
     }
 }

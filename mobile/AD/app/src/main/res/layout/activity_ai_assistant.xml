@@ -40,6 +40,7 @@
             android:paddingHorizontal="16dp">
 
             <TextView
+                android:id="@+id/tip_food"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/quick_tip_bg_food"
@@ -49,6 +50,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tip_transport"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
@@ -59,6 +61,7 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tip_utilities"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"

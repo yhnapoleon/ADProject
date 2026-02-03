@@ -2,46 +2,66 @@ package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.Manifest
 import android.app.DatePickerDialog
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
+import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.card.MaterialCardView
 import iss.nus.edu.sg.sharedprefs.admobile.R
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.ManualUtilityRequest
+import iss.nus.edu.sg.sharedprefs.admobile.data.network.NetworkClient
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
 class AddUtilityActivity : AppCompatActivity() {
 
-    private val ELEC_FACTOR = 0.4085
-    private val WATER_FACTOR = 0.191
-    private var selectedDate = Calendar.getInstance()
+    // 后端要求的日期格式
+    private val apiDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault()).apply {
+        timeZone = TimeZone.getTimeZone("UTC")
+    }
+    // 本地显示的日期格式
+    private val displayFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
-    // 🌟 新增：图片预览和占位布局变量
+    private var startCalendar = Calendar.getInstance()
+    private var endCalendar = Calendar.getInstance()
+
+    private lateinit var etStartDate: EditText
+    private lateinit var etEndDate: EditText
+    private lateinit var etElectricity: EditText
+    private lateinit var etWater: EditText
     private lateinit var ivBillPreview: ImageView
     private lateinit var llPlaceholder: LinearLayout
 
-    // 🌟 启动器：从相册选择图片
+    // 🌟 相册选择回调 -> 触发上传识别
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             ivBillPreview.setImageURI(it)
-            showImagePreview()
+            showImagePreviewUI()
+            uploadAndRecognizeBill(it)
         }
     }
 
-    // 🌟 启动器：拍照获取缩略图
+    // 🌟 拍照回调 (注意：缩略图转文件比较麻烦，建议优先用相册或实现完整的拍照存文件逻辑)
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap: Bitmap? ->
         bitmap?.let {
             ivBillPreview.setImageBitmap(it)
-            showImagePreview()
+            showImagePreviewUI()
+            // 拍照后的处理建议转为 File 后再调用 uploadAndRecognizeBill
         }
     }
 
@@ -49,78 +69,150 @@ class AddUtilityActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.add_utility_activity)
 
-        // 视图绑定
-        val toolbar: MaterialToolbar = findViewById(R.id.toolbar)
-        val cardScan: MaterialCardView = findViewById(R.id.card_scan_bill)
-        val etMonth: EditText = findViewById(R.id.et_month)
-        val etElectricity: EditText = findViewById(R.id.et_electricity)
-        val etWater: EditText = findViewById(R.id.et_water)
-        val etNotes: EditText = findViewById(R.id.et_notes)
-        val tvElecCarbon: TextView = findViewById(R.id.tv_electricity_carbon)
-        val tvWaterCarbon: TextView = findViewById(R.id.tv_water_carbon)
-        val btnSave: Button = findViewById(R.id.save_button)
+        // 1. 视图绑定
+        initViews()
 
-        // 🌟 初始化新增的图片视图
-        ivBillPreview = findViewById(R.id.iv_bill_preview)
-        llPlaceholder = findViewById(R.id.ll_scan_placeholder)
+        // 2. 日期选择器逻辑
+        setupDatePickers()
 
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
-
-        // --- 1. 图片/扫码点击逻辑 ---
-        cardScan.setOnClickListener {
+        // 3. 上传与识别逻辑
+        findViewById<MaterialCardView>(R.id.card_scan_bill).setOnClickListener {
             showImageSourceDialog()
         }
 
-        // --- 2. 月份选择逻辑 (仅显示年月) ---
-        val sdf = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
-        etMonth.setText(sdf.format(selectedDate.time))
+        // 4. 保存到数据库逻辑
+        findViewById<Button>(R.id.save_button).setOnClickListener {
+            saveBillToDatabase()
+        }
+    }
 
-        etMonth.setOnClickListener {
-            val dpd = DatePickerDialog(this, { _, year, month, _ ->
-                selectedDate.set(Calendar.YEAR, year)
-                selectedDate.set(Calendar.MONTH, month)
-                etMonth.setText(sdf.format(selectedDate.time))
-            }, selectedDate.get(Calendar.YEAR), selectedDate.get(Calendar.MONTH), selectedDate.get(Calendar.DAY_OF_MONTH))
+    private fun initViews() {
+        val toolbar: MaterialToolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        toolbar.setNavigationOnClickListener { finish() }
 
+        etStartDate = findViewById(R.id.et_start_date) // 请确保 XML 中 ID 对应
+        etEndDate = findViewById(R.id.et_end_date)     // 请确保 XML 中 ID 对应
+        etElectricity = findViewById(R.id.et_electricity)
+        etWater = findViewById(R.id.et_water)
+        ivBillPreview = findViewById(R.id.iv_bill_preview)
+        llPlaceholder = findViewById(R.id.ll_scan_placeholder)
+
+        // 初始化默认日期显示
+        etStartDate.setText(displayFormat.format(startCalendar.time))
+        etEndDate.setText(displayFormat.format(endCalendar.time))
+    }
+
+    private fun setupDatePickers() {
+        etStartDate.setOnClickListener {
+            showDatePicker(startCalendar) { etStartDate.setText(displayFormat.format(it.time)) }
+        }
+        etEndDate.setOnClickListener {
+            showDatePicker(endCalendar) { etEndDate.setText(displayFormat.format(it.time)) }
+        }
+    }
+
+    private fun showDatePicker(calendar: Calendar, onDateSet: (Calendar) -> Unit) {
+        DatePickerDialog(this, { _, year, month, day ->
+            calendar.set(year, month, day)
+            onDateSet(calendar)
+        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+    }
+
+    /**
+     * 🌟 调用后端 /api/UtilityBill/upload 接口识别图片
+     */
+    private fun uploadAndRecognizeBill(uri: Uri) {
+        lifecycleScope.launch {
             try {
-                dpd.datePicker.calendarViewShown = false
-                val daySpinnerId = resources.getIdentifier("day", "id", "android")
-                if (daySpinnerId != 0) {
-                    val daySpinner = dpd.datePicker.findViewById<View>(daySpinnerId)
-                    daySpinner?.visibility = View.GONE
+                val file = uriToFile(uri) ?: return@launch
+                val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
+                val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
+
+                val token = getAuthToken()
+                val response = NetworkClient.apiService.uploadUtilityBill(token, body)
+
+                if (response.isSuccessful && response.body() != null) {
+                    val bill = response.body()!!
+                    // 自动填充识别到的数据
+                    etElectricity.setText(bill.electricityUsage.toString())
+                    etWater.setText(bill.waterUsage.toString())
+
+                    // 解析后端 ISO 日期并设置到本地变量和 UI
+                    parseApiDateToUI(bill.billPeriodStart, startCalendar, etStartDate)
+                    parseApiDateToUI(bill.billPeriodEnd, endCalendar, etEndDate)
+
+                    Toast.makeText(this@AddUtilityActivity, "Bill recognized!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@AddUtilityActivity, "Recognition failed", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            dpd.show()
-        }
-
-        // --- 3. 实时计算逻辑 ---
-        etElectricity.addTextChangedListener(createWatcher { s ->
-            calculateAndShowCarbon(s, ELEC_FACTOR, tvElecCarbon)
-        })
-
-        etWater.addTextChangedListener(createWatcher { s ->
-            calculateAndShowCarbon(s, WATER_FACTOR, tvWaterCarbon)
-        })
-
-        // --- 4. 保存逻辑 ---
-        btnSave.setOnClickListener {
-            val elecValue = etElectricity.text.toString()
-            val waterValue = etWater.text.toString()
-
-            if (elecValue.isNotEmpty() || waterValue.isNotEmpty()) {
-                Toast.makeText(this, "Record saved for ${etMonth.text}", Toast.LENGTH_SHORT).show()
-                finish()
-            } else {
-                Toast.makeText(this, "Please enter usage", Toast.LENGTH_SHORT).show()
+                Log.e("OCR_ERROR", e.message ?: "Error")
             }
         }
     }
 
-    // 🌟 弹出对话框选择图片来源
+    /**
+     * 🌟 调用后端 /api/UtilityBill/manual 接口保存到数据库
+     */
+    private fun saveBillToDatabase() {
+        val request = ManualUtilityRequest(
+            billType = 0, // 默认 0
+            billPeriodStart = apiDateFormat.format(startCalendar.time),
+            billPeriodEnd = apiDateFormat.format(endCalendar.time),
+            electricityUsage = etElectricity.text.toString().toDoubleOrNull() ?: 0.0,
+            waterUsage = etWater.text.toString().toDoubleOrNull() ?: 0.0,
+            gasUsage = 0.0 // 默认 0
+        )
+
+        lifecycleScope.launch {
+            try {
+                val token = getAuthToken()
+                val response = NetworkClient.apiService.saveUtilityManual(token, request)
+
+                if (response.isSuccessful) {
+                    Toast.makeText(this@AddUtilityActivity, "Record saved successfully!", Toast.LENGTH_SHORT).show()
+                    finish()
+                } else {
+                    Toast.makeText(this@AddUtilityActivity, "Save failed: ${response.code()}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@AddUtilityActivity, "Network Error", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // --- 辅助工具函数 ---
+
+    private fun getAuthToken(): String {
+        val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+        return "Bearer ${prefs.getString("access_token", "")}"
+    }
+
+    private fun parseApiDateToUI(dateStr: String, calendar: Calendar, editText: EditText) {
+        try {
+            val date = apiDateFormat.parse(dateStr)
+            if (date != null) {
+                calendar.time = date
+                editText.setText(displayFormat.format(date))
+            }
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun uriToFile(uri: Uri): File? {
+        val inputStream = contentResolver.openInputStream(uri) ?: return null
+        val tempFile = File(cacheDir, "upload_bill.jpg")
+        val outputStream = FileOutputStream(tempFile)
+        inputStream.use { input -> outputStream.use { output -> input.copyTo(output) } }
+        return tempFile
+    }
+
+    private fun showImagePreviewUI() {
+        ivBillPreview.visibility = View.VISIBLE
+        llPlaceholder.visibility = View.GONE
+    }
+
     private fun showImageSourceDialog() {
         val options = arrayOf("Take Photo", "Choose from Gallery")
         AlertDialog.Builder(this)
@@ -142,37 +234,7 @@ class AddUtilityActivity : AppCompatActivity() {
         }
     }
 
-    // 🌟 权限请求回调
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            takePictureLauncher.launch(null)
-        } else {
-            Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // 🌟 显示图片预览并隐藏占位符，模拟自动识别数据
-    private fun showImagePreview() {
-        ivBillPreview.visibility = View.VISIBLE
-        llPlaceholder.visibility = View.GONE
-
-        // 模拟 OCR 自动识别效果
-        Toast.makeText(this, "Bill uploaded! Auto-filling usage...", Toast.LENGTH_SHORT).show()
-        findViewById<EditText>(R.id.et_electricity).setText("145.2")
-        findViewById<EditText>(R.id.et_water).setText("12.5")
-    }
-
-    private fun createWatcher(onChanged: (String) -> Unit) = object : TextWatcher {
-        override fun afterTextChanged(s: Editable?) { onChanged(s.toString()) }
-        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-    }
-
-    private fun calculateAndShowCarbon(input: String, factor: Double, resultView: TextView) {
-        val usage = input.toDoubleOrNull() ?: 0.0
-        val carbon = usage * factor
-        resultView.text = String.format("Carbon: %.2f kg CO2e", carbon)
-    }
+    ) { if (it) takePictureLauncher.launch(null) }
 }

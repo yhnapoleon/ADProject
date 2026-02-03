@@ -44,10 +44,13 @@
             android:textColor="#674fa3"
             android:textSize="12sp"
             app:backgroundTint="#FFFFFF"
-            app:icon="@drawable/ic_launcher_foreground"
-            app:iconSize="16dp"
+            app:cornerRadius="20dp"
+
+            app:icon="@drawable/ic_arrow_drop_down"
+            app:iconGravity="end"
+            app:iconSize="20dp"
             app:iconTint="#674fa3"
-            app:cornerRadius="20dp" />
+            android:paddingEnd="12dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_filter_month"

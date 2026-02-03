@@ -37,3 +37,30 @@ data class AuthResponseDto(
     val accessToken: String,
     val user: UserSummaryDto
 )
+
+// 获取个人资料的响应
+data class UserProfileResponse(
+    val id: String,
+    val name: String,
+    val nickname: String?,
+    val email: String?,
+    val location: String?,
+    val birthDate: String?,
+    val avatar: String?,
+    val joinDays: Int,
+    val pointsTotal: Int
+)
+
+// 更新个人资料的请求
+data class UpdateProfileRequest(
+    val nickname: String?,
+    val avatar: String?,
+    val location: String?,
+    val email: String?,
+    val birthDate: String?
+)
+
+data class ChangePasswordRequest(
+    val oldPassword: String,
+    val newPassword: String
+)
