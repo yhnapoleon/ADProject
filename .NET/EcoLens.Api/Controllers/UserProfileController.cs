@@ -162,6 +162,43 @@ public class UserProfileController : ControllerBase
 
 		return Ok();
 	}
+
+	/// <summary>
+	/// 获取用户头像图片（支持 Base64 和 URL）
+	/// </summary>
+	[HttpGet("{userId}/avatar")]
+	[AllowAnonymous]
+	public async Task<IActionResult> GetAvatar([FromRoute] int userId, CancellationToken ct)
+	{
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+		if (user is null || string.IsNullOrWhiteSpace(user.AvatarUrl))
+		{
+			return NotFound();
+		}
+
+		// 如果 AvatarUrl 是 Base64 格式，解析并返回图片
+		if (user.AvatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		{
+			var base64Data = user.AvatarUrl.Split(',');
+			if (base64Data.Length != 2)
+			{
+				return BadRequest("Invalid avatar format.");
+			}
+
+			var mimeType = base64Data[0].Split(';')[0].Split(':')[1];
+			var imageBytes = Convert.FromBase64String(base64Data[1]);
+
+			return File(imageBytes, mimeType);
+		}
+
+		// 如果是 URL，重定向到该 URL
+		if (Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var uri))
+		{
+			return Redirect(user.AvatarUrl);
+		}
+
+		return NotFound();
+	}
 }
 
 
