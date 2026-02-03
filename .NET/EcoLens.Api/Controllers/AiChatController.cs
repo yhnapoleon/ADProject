@@ -5,6 +5,10 @@ using Microsoft.AspNetCore.Mvc;
 using EcoLens.Api.Services;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using EcoLens.Api.Data;
+using EcoLens.Api.Models;
 
 namespace EcoLens.Api.Controllers;
 
@@ -14,10 +18,12 @@ namespace EcoLens.Api.Controllers;
 public class AiChatController : ControllerBase
 {
 	private readonly IAiService _aiService;
+	private readonly ApplicationDbContext _context;
 
-	public AiChatController(IAiService aiService)
+	public AiChatController(IAiService aiService, ApplicationDbContext context)
 	{
 		_aiService = aiService;
+		_context = context;
 	}
 
 	public class ChatRequestDto
@@ -28,6 +34,11 @@ public class AiChatController : ControllerBase
 	public class ChatResponseDto
 	{
 		public string Reply { get; set; } = string.Empty;
+	}
+
+	public class AnalysisRequestDto
+	{
+		public string TimeRange { get; set; } = "month";
 	}
 
 	[AllowAnonymous]
@@ -84,6 +95,53 @@ public class AiChatController : ControllerBase
 		{
 			message = new { role = "assistant", content = reply }
 		});
+	}
+
+	[HttpPost("analysis")]
+	public async Task<ActionResult<ChatResponseDto>> Analysis([FromBody] AnalysisRequestDto? req, CancellationToken ct)
+	{
+		// 获取用户ID
+		var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		if (string.IsNullOrWhiteSpace(userIdStr) || !int.TryParse(userIdStr, out var userId))
+		{
+			return Unauthorized("Invalid user identity.");
+		}
+
+		// 时间范围
+		var range = (req?.TimeRange ?? "month").Trim().ToLowerInvariant();
+		var nowUtc = DateTime.UtcNow;
+		var startDate = range == "week" ? nowUtc.AddDays(-7) : nowUtc.AddDays(-30);
+
+		// 聚合数据（空集安全求和）
+		var foodEmission = await _context.FoodRecords
+			.AsNoTracking()
+			.Where(f => f.UserId == userId && f.CreatedAt >= startDate)
+			.SumAsync(f => (decimal?)f.Emission, ct) ?? 0m;
+
+		var travelEmission = await _context.TravelLogs
+			.AsNoTracking()
+			.Where(t => t.UserId == userId && t.CreatedAt >= startDate)
+			.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
+
+		var utilityEmission = await _context.UtilityBills
+			.AsNoTracking()
+			.Where(b => b.UserId == userId && b.BillPeriodEnd >= startDate)
+			.SumAsync(b => (decimal?)b.TotalCarbonEmission, ct) ?? 0m;
+
+		var total = foodEmission + travelEmission + utilityEmission;
+
+		// Build prompt (Markdown, <= 200 words, English)
+		var rangeLabel = range == "week" ? "Last 7 days" : "Last 30 days";
+		var prompt =
+			$"You are an environmental and low-carbon expert. Based on the user's emissions below, write a concise diagnostic in Markdown. " +
+			$"Include two sections: ### 📊 Current Analysis and ### 🌱 Recommendations. Keep the entire output under 200 words. " +
+			$"Respond in English with clear, actionable suggestions.\n" +
+			$"Time range: {rangeLabel}.\n" +
+			$"Total emissions: {total:F1} kg.\n" +
+			$"Breakdown: Food {foodEmission:F1} kg, Travel {travelEmission:F1} kg, Utilities {utilityEmission:F1} kg.";
+
+		var reply = await _aiService.GetAnswerAsync(prompt);
+		return Ok(new ChatResponseDto { Reply = reply ?? string.Empty });
 	}
 }
 
