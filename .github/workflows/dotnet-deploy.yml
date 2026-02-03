@@ -9,8 +9,86 @@ on:
       - '.github/workflows/dotnet-deploy.yml'
 
 jobs:
+  # 新增：在部署前进行构建、测试与安全扫描（DevSecOps）
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write # CodeQL 分析需要上传结果
+
+    steps:
+      # 1. 拉取代码
+      - uses: actions/checkout@v4
+
+      # 2. 设置 .NET 与 Python 环境
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x' # 与项目 TargetFramework 对齐，例如 net8.0；若不同请修改
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # 3. CodeQL 初始化（SAST，支持 csharp 和 python）
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: 'csharp, python'
+
+      # 4. 手动构建（让 CodeQL 捕获 C# 编译信息）
+      - name: Restore (.NET)
+        run: dotnet restore ".NET/EcoLens.Api/EcoLens.Api.csproj"
+
+      - name: Build (.NET)
+        run: dotnet build ".NET/EcoLens.Api/EcoLens.Api.csproj" --configuration Release --no-restore
+
+      # 5. CodeQL 分析并上传结果
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      # 6. 依赖安全检查（如 CodeQL 配置不足，至少执行依赖漏洞检查）
+      - name: Check vulnerable packages (.NET)
+        run: dotnet list ".NET/EcoLens.Api/EcoLens.Api.csproj" package --vulnerable
+
+      # 7. 运行 .NET 单元测试，生成 TRX 报告
+      - name: Test (.NET) - Generate TRX
+        run: dotnet test ".NET/EcoLens.Api/EcoLens.Api.csproj" --configuration Release --logger "trx"
+
+      # 8. 安装 Python 依赖并运行 pytest（JUnit 报告）
+      - name: Install Python dependencies
+        working-directory: VisionService
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Test (Python) - Pytest JUnit
+        working-directory: VisionService
+        run: |
+          pytest -q --maxfail=1 --disable-warnings --junitxml=python-test-results.xml
+
+      # 9. 上传测试报告到 GitHub Artifacts
+      - name: Upload .NET test report (TRX)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: |
+            **/*.trx
+          if-no-files-found: ignore
+
+      - name: Upload Python test report (JUnit XML)
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-test-results
+          path: VisionService/python-test-results.xml
+          if-no-files-found: ignore
+
   build-and-deploy:
     runs-on: ubuntu-latest
+    needs: build-and-test
 
     steps:
       # 1. 拉取代码
