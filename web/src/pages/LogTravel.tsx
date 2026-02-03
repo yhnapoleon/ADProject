@@ -151,7 +151,6 @@ const LogTravel = () => {
             });
 
             message.success('Travel logged successfully!');
-            console.log('Travel log created:', response);
             navigate('/dashboard');
           } catch (error: any) {
             console.error('Failed to log travel:', error);

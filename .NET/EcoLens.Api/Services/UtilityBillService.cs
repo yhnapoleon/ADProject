@@ -222,7 +222,8 @@ public class UtilityBillService : IUtilityBillService
 				WaterCarbonEmission = carbonResult.WaterCarbon,
 				GasCarbonEmission = carbonResult.GasCarbon,
 				TotalCarbonEmission = carbonResult.TotalCarbon,
-				InputMethod = InputMethod.Manual
+				InputMethod = InputMethod.Manual,
+				Notes = dto.Notes
 			};
 
 			// 5. 保存到数据库

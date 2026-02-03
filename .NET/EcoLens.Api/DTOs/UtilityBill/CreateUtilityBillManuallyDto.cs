@@ -50,4 +50,10 @@ public class CreateUtilityBillManuallyDto
 	/// </summary>
 	[Range(0, double.MaxValue, ErrorMessage = "Gas usage must be greater than or equal to 0")]
 	public decimal? GasUsage { get; set; }
+
+	/// <summary>
+	/// 备注，可选
+	/// </summary>
+	[MaxLength(1000, ErrorMessage = "Notes must not exceed 1000 characters")]
+	public string? Notes { get; set; }
 }
