@@ -2,10 +2,11 @@ fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.22
 pydantic==2.5.2
-pillow==10.3.0
+pillow>=11.0.0,<12
 
 # FIX 1: Pin numpy to avoid 2.0 conflicts
-numpy<2.0.0
+# For Python 3.13 compatibility, require NumPy 2.x
+numpy>=2.1.0,<3.0.0
 
 # FIX 2: Upgrade transformers to a stable recent version
 transformers==4.53.0
