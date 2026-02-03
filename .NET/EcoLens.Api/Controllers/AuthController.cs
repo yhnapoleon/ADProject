@@ -25,6 +25,30 @@ public class AuthController : ControllerBase
 	}
 
 	/// <summary>
+	/// 将 AvatarUrl 转换为 API URL（如果是 Base64，返回 /api/user/{userId}/avatar）
+	/// </summary>
+	private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId)
+	{
+		if (string.IsNullOrWhiteSpace(avatarUrl))
+		{
+			return null;
+		}
+
+		if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		{
+			// 使用 Url.Action 生成 API 端点 URL
+			return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
+		}
+
+		if (Uri.TryCreate(avatarUrl, UriKind.Absolute, out _))
+		{
+			return avatarUrl;
+		}
+
+		return null;
+	}
+
+	/// <summary>
 	/// 用户注册并返回认证 Token。
 	/// </summary>
 	[HttpPost("register")]
@@ -68,6 +92,7 @@ public class AuthController : ControllerBase
 		var token = await _authService.GenerateTokenAsync(user.Id.ToString(), claims);
 
 		var joinDaysReg = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
+		var avatarUrl = ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id);
 		var response = new AuthResponseDto
 		{
 			Token = token,
@@ -81,8 +106,8 @@ public class AuthController : ControllerBase
 				Location = user.Region,
 				BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
 				Role = user.Role,
-				Avatar = user.AvatarUrl,
-				AvatarUrl = user.AvatarUrl,
+				Avatar = avatarUrl,
+				AvatarUrl = avatarUrl,
 				TotalCarbonSaved = user.TotalCarbonSaved,
 				CurrentPoints = user.CurrentPoints,
 				PointsWeek = user.CurrentPoints,
@@ -130,6 +155,7 @@ public class AuthController : ControllerBase
 		var token = await _authService.GenerateTokenAsync(user.Id.ToString(), claims);
 
 		var joinDays = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
+		var avatarUrl = ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id);
 		var response = new AuthResponseDto
 		{
 			Token = token,
@@ -143,8 +169,8 @@ public class AuthController : ControllerBase
 				Location = user.Region,
 				BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
 				Role = user.Role,
-				Avatar = user.AvatarUrl,
-				AvatarUrl = user.AvatarUrl,
+				Avatar = avatarUrl,
+				AvatarUrl = avatarUrl,
 				TotalCarbonSaved = user.TotalCarbonSaved,
 				CurrentPoints = user.CurrentPoints,
 				PointsWeek = user.CurrentPoints,

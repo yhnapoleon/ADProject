@@ -27,6 +27,30 @@ public class UserProfileController : ControllerBase
 		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
+	/// <summary>
+	/// 将 AvatarUrl 转换为 API URL（如果是 Base64，返回 /api/user/{userId}/avatar）
+	/// </summary>
+	private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId)
+	{
+		if (string.IsNullOrWhiteSpace(avatarUrl))
+		{
+			return null;
+		}
+
+		if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		{
+			// 使用 Url.Action 生成 API 端点 URL
+			return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
+		}
+
+		if (Uri.TryCreate(avatarUrl, UriKind.Absolute, out _))
+		{
+			return avatarUrl;
+		}
+
+		return null;
+	}
+
 	public class UserProfileResponseDto
 	{
 		public string Id { get; set; } = string.Empty;          // string
@@ -62,7 +86,7 @@ public class UserProfileController : ControllerBase
 			Email = user.Email,
 			Location = user.Region,
 			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
-			Avatar = user.AvatarUrl,
+			Avatar = ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id),
 			JoinDays = joinDays,
 			PointsTotal = user.CurrentPoints
 		};
@@ -126,7 +150,7 @@ public class UserProfileController : ControllerBase
 			Email = user.Email,
 			Location = user.Region,
 			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
-			Avatar = user.AvatarUrl,
+			Avatar = ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id),
 			JoinDays = joinDays,
 			PointsTotal = user.CurrentPoints
 		};
