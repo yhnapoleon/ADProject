@@ -5,15 +5,17 @@ import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import './AboutMe.module.css';
 import request from '../utils/request';
 
-/** Backend returns array of { Month, EmissionsTotal, Food, Transport, Utility, AverageAllUsers } */
+/** Backend may return PascalCase (Month, EmissionsTotal...) or camelCase (month, emissionsTotal...).
+ * Normalize on the client to always work with camelCase fields.
+ */
 interface MonthlyEmissionDto {
-  Month: string;
-  EmissionsTotal: number;
-  Food: number;
-  Transport: number;
-  Utility: number;
-  AverageAllUsers: number;
-}
+  month: string;
+  emissionsTotal: number;
+  food: number;
+  transport: number;
+  utility: number;
+  averageAllUsers: number;
+} 
 
 const AboutMe = () => {
   const [loading, setLoading] = useState(true);
@@ -23,51 +25,50 @@ const AboutMe = () => {
   const [latestEmissions, setLatestEmissions] = useState<number>(0);
   const [totalTrees, setTotalTrees] = useState<number>(0);
 
+  // Normalize DTOs coming from backend (support both PascalCase and camelCase)
+  const normalizeMonthly = (raw: any): MonthlyEmissionDto => ({
+    month: raw?.Month ?? raw?.month ?? '',
+    emissionsTotal: Number(raw?.EmissionsTotal ?? raw?.emissionsTotal ?? 0),
+    food: Number(raw?.Food ?? raw?.food ?? 0),
+    transport: Number(raw?.Transport ?? raw?.transport ?? raw?.Travel ?? 0),
+    utility: Number(raw?.Utility ?? raw?.utility ?? 0),
+    averageAllUsers: Number(raw?.AverageAllUsers ?? raw?.averageAllUsers ?? 0),
+  });
+
   useEffect(() => {
     const fetchAboutMeData = async () => {
       setLoading(true);
       try {
-        const res = await request.get<MonthlyEmissionDto[] | { monthlyData: MonthlyEmissionDto[]; comparisonPercent?: number; comparisonStatus?: string }>('/api/about-me');
-        if (Array.isArray(res) && res.length > 0) {
-          const dtoList = res as MonthlyEmissionDto[];
-          // store raw DTOs
-          setMonthlyEmissions(dtoList);
+        const res = await request.get<MonthlyEmissionDto[] | { monthlyData: any[]; comparisonPercent?: number; comparisonStatus?: string }>('/api/about-me');
+        const rawList = Array.isArray(res) ? (res as any[]) : (res && (res as any).monthlyData ? (res as any).monthlyData : []);
 
-          const last = dtoList[dtoList.length - 1];
-          const avg = Number(last.AverageAllUsers);
-          const userTotal = Number(last.EmissionsTotal);
+        if (rawList && rawList.length > 0) {
+          const normalized = rawList.map(normalizeMonthly);
+          // store normalized DTOs (camelCase)
+          setMonthlyEmissions(normalized);
 
-          // Use backend-provided EmissionsTotal for the top metric
-          setLatestEmissions(userTotal);
+          // Total emissions = sum over available months (past 12 months)
+          const total12 = normalized.reduce((s: number, d: MonthlyEmissionDto) => s + (Number(d.emissionsTotal) || 0), 0);
+          setLatestEmissions(total12);
 
-          if (avg > 0) {
-            const percent = Math.round(((userTotal - avg) / avg) * 100);
+          // Comparison: compare average monthly user emissions vs averageAllUsers (monthly)
+          const userAvgPerMonth = total12;
+          const avgAvg = normalized.reduce((s: number, d: MonthlyEmissionDto) => s + (Number(d.averageAllUsers) || 0), 0);
+
+          if (avgAvg > 0) {
+            const percent = Math.round(((userAvgPerMonth - avgAvg) / avgAvg) * 100);
             setComparison({
               percent: Math.abs(percent),
-              status: userTotal < avg ? 'lower' : 'higher',
-              available: true,
-            });
-          } else {
-            // no comparison available
-            setComparison((c) => ({ ...c, available: false }));
-          }
-        } else if (res && (res as any).monthlyData?.length > 0) {
-          const monthly = (res as any).monthlyData as MonthlyEmissionDto[];
-          setMonthlyEmissions(monthly);
-
-          // fallback: use last monthly total if DTO format differs
-          const last = monthly[monthly.length - 1];
-          setLatestEmissions(Number(last?.EmissionsTotal ?? 0));
-
-          if ((res as any).comparisonPercent !== undefined) {
-            setComparison({
-              percent: (res as any).comparisonPercent,
-              status: (res as any).comparisonStatus || 'lower',
+              status: userAvgPerMonth < avgAvg ? 'lower' : 'higher',
               available: true,
             });
           } else {
             setComparison((c) => ({ ...c, available: false }));
           }
+        } else {
+          setMonthlyEmissions([]);
+          setLatestEmissions(0);
+          setComparison((c) => ({ ...c, available: false }));
         }
 
         // Also fetch total trees from tree service (used in TreePlanting page)
@@ -88,8 +89,8 @@ const AboutMe = () => {
     fetchAboutMeData();
   }, []);
 
-  // Use latest month's EmissionsTotal from backend
-  const totalEmissions = latestEmissions;
+  // Total emissions shown = sum of past months (normalized to kg)
+  const totalEmissions = latestEmissions; 
 
   // Trees planted count comes from tree service (TreePlanting page)
   const treesPlanted = totalTrees;
@@ -97,21 +98,21 @@ const AboutMe = () => {
   // Get pie chart data
   const getPieData = () => {
     if (selectedMonth === 'all') {
-      const foodTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.Food) || 0), 0);
-      const travelTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.Transport) || 0), 0);
-      const utilityTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.Utility) || 0), 0);
+      const foodTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.food) || 0), 0);
+      const travelTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.transport) || 0), 0);
+      const utilityTotal = monthlyEmissions.reduce((sum, data) => sum + (Number(data.utility) || 0), 0);
       return [
         { name: 'Food', value: foodTotal },
         { name: 'Travel', value: travelTotal },
         { name: 'Utility', value: utilityTotal },
       ];
     } else {
-      const monthData = monthlyEmissions.find(d => d.Month === selectedMonth);
+      const monthData = monthlyEmissions.find(d => d.month === selectedMonth);
       if (monthData) {
         return [
-          { name: 'Food', value: Number(monthData.Food) || 0 },
-          { name: 'Travel', value: Number(monthData.Transport) || 0 },
-          { name: 'Utility', value: Number(monthData.Utility) || 0 },
+          { name: 'Food', value: Number(monthData.food) || 0 },
+          { name: 'Travel', value: Number(monthData.transport) || 0 },
+          { name: 'Utility', value: Number(monthData.utility) || 0 },
         ];
       }
       return [];
@@ -127,10 +128,10 @@ const AboutMe = () => {
 
   const monthOptions = [
     { label: 'All Time', value: 'all' },
-    ...monthlyEmissions.map(d => ({ label: d.Month, value: d.Month })),
+    ...monthlyEmissions.map(d => ({ label: d.month, value: d.month })),
   ];
 
-  const chartData = monthlyEmissions.map(m => ({ month: m.Month, total: Number(m.EmissionsTotal) }));
+  const chartData = monthlyEmissions.map(m => ({ month: m.month, total: Number(m.emissionsTotal) }));
 
   if (loading) {
     return (
@@ -150,9 +151,9 @@ const AboutMe = () => {
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '14px', color: '#999', marginBottom: '8px' }}>Total Emissions</div>
               <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#674fa3', marginBottom: '8px' }}>
-                {totalEmissions.toFixed(0)} kg
+                {totalEmissions.toFixed(1)} kg
               </div>
-              <div style={{ fontSize: '12px', color: '#666' }}>since you joined</div>
+              <div style={{ fontSize: '12px', color: '#666' }}>last 12 months</div>
             </div>
           </Card>
         </Col>
