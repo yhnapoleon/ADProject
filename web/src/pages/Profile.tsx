@@ -64,14 +64,6 @@ const Profile = () => {
   const [passwordForm] = Form.useForm();
   const watchedNewPassword: string = Form.useWatch('newPassword', passwordForm) ?? '';
 
-  // 🔍 调试：监听 avatarUrl 和 user.avatar 的变化
-  useEffect(() => {
-    console.log('=== Avatar State Change Debug ===');
-    console.log('avatarUrl:', avatarUrl?.substring(0, 50));
-    console.log('user.avatar:', user.avatar?.substring(0, 50));
-    console.log('Final src (avatarUrl || user.avatar):', (avatarUrl || user.avatar)?.substring(0, 50));
-  }, [avatarUrl, user.avatar]);
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -96,11 +88,6 @@ const Profile = () => {
 
         if (me) {
           const avatar = normalizeUrl(me.avatar);
-          console.log('=== Initial Load Avatar Debug ===');
-          console.log('1. me.avatar (raw):', me.avatar?.substring(0, 50));
-          console.log('2. Normalized avatar:', avatar?.substring(0, 50));
-          console.log('3. Avatar length:', avatar?.length);
-          console.log('4. Is Base64?', avatar?.startsWith('data:image'));
           setUser({
             id: me.id,
             name: me.name,
@@ -278,20 +265,7 @@ const Profile = () => {
       // 移除手动设置的 Content-Type，让浏览器和 axios 自动处理 boundary
       const response: any = await request.put('/api/user/avatar', formData);
 
-      // 🔍 调试日志：查看原始响应
-      console.log('=== Avatar Upload Response Debug ===');
-      console.log('1. Raw response:', response);
-      console.log('2. Response type:', typeof response);
-      console.log('3. Response keys:', Object.keys(response || {}));
-      console.log('4. response.avatarUrl:', response?.avatarUrl);
-      console.log('5. response.avatar:', response?.avatar);
-
       const newAvatarPath = response?.avatarUrl || response?.avatar;
-      console.log('6. Extracted newAvatarPath:', newAvatarPath);
-      console.log('7. newAvatarPath type:', typeof newAvatarPath);
-      console.log('8. newAvatarPath length:', newAvatarPath?.length);
-      console.log('9. Starts with data:image?', newAvatarPath?.startsWith('data:image'));
-      console.log('10. Starts with http?', newAvatarPath?.startsWith('http'));
 
       if (newAvatarPath) {
         // 如果是 Base64 字符串（data:image 开头），直接使用
@@ -300,34 +274,15 @@ const Profile = () => {
         const fullUrl = newAvatarPath.startsWith('data:image') || newAvatarPath.startsWith('http')
           ? newAvatarPath 
           : `${import.meta.env.VITE_API_URL || ''}${newAvatarPath}`;
-        
-        console.log('11. Final fullUrl:', fullUrl?.substring(0, 100) + '...'); // 只显示前100个字符
-        console.log('12. fullUrl length:', fullUrl?.length);
-        console.log('13. VITE_API_URL:', import.meta.env.VITE_API_URL);
-        
+
         setAvatarUrl(fullUrl);
-        setUser((prev) => {
-          console.log('14. Previous user.avatar:', prev.avatar?.substring(0, 50));
-          const updated = { ...prev, avatar: fullUrl };
-          console.log('15. Updated user.avatar:', updated.avatar?.substring(0, 50));
-          return updated;
-        });
-        
-        // 验证状态是否更新
-        setTimeout(() => {
-          console.log('16. Current avatarUrl state:', avatarUrl?.substring(0, 50));
-          console.log('17. Current user.avatar state:', user.avatar?.substring(0, 50));
-        }, 100);
-        
+        setUser((prev) => ({ ...prev, avatar: fullUrl }));
+
         message.success({ content: 'Avatar uploaded and saved!', key: 'avatarUpload' });
       } else {
-        console.error('❌ No avatar path found in response!');
-        console.error('Response structure:', JSON.stringify(response, null, 2));
+        message.error({ content: 'Upload succeeded but no avatar URL returned', key: 'avatarUpload' });
       }
     } catch (e: any) {
-      console.error('❌ Avatar upload failed:', e);
-      console.error('Error response:', e.response);
-      console.error('Error data:', e.response?.data);
       message.error({ content: 'Failed to upload avatar', key: 'avatarUpload' });
     }
     return false;

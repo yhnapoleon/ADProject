@@ -69,9 +69,30 @@ public class TravelService : ITravelService
 			travelMode,
 			ct);
 
+		// 飞机/轮船：Google 无驾车路线时（如跨国）用大圆距离作为航程
+		if (route == null && (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship))
+		{
+			var greatCircleMeters = GetGreatCircleDistanceMeters(
+				originGeocode.Latitude, originGeocode.Longitude,
+				destGeocode.Latitude, destGeocode.Longitude);
+			route = new RouteResult
+			{
+				DistanceMeters = greatCircleMeters,
+				DurationSeconds = 0,
+				DistanceText = $"{greatCircleMeters / 1000.0:F0} km",
+				DurationText = null,
+				Polyline = null
+			};
+			_logger.LogInformation("Using great-circle distance for {Mode}: {DistanceKm:F1} km",
+				dto.TransportMode, greatCircleMeters / 1000.0);
+		}
+
 		if (route == null)
 		{
-			throw new InvalidOperationException("Unable to get route information");
+			_logger.LogWarning("GetRouteAsync returned null for Origin={Origin}, Dest={Dest}, Mode={Mode}",
+				dto.OriginAddress, dto.DestinationAddress, travelMode);
+			throw new InvalidOperationException(
+				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
 
 		// 2.5. 验证出行方式的合理性（在获取导航距离之后，使用实际导航距离进行验证）
@@ -166,9 +187,28 @@ public class TravelService : ITravelService
 			travelMode,
 			ct);
 
+		// 飞机/轮船：无驾车路线时用大圆距离
+		if (route == null && (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship))
+		{
+			var greatCircleMeters = GetGreatCircleDistanceMeters(
+				originGeocode.Latitude, originGeocode.Longitude,
+				destGeocode.Latitude, destGeocode.Longitude);
+			route = new RouteResult
+			{
+				DistanceMeters = greatCircleMeters,
+				DurationSeconds = 0,
+				DistanceText = $"{greatCircleMeters / 1000.0:F0} km",
+				DurationText = null,
+				Polyline = null
+			};
+		}
+
 		if (route == null)
 		{
-			throw new InvalidOperationException("Unable to get route information");
+			_logger.LogWarning("GetRouteAsync returned null (preview) for Origin={Origin}, Dest={Dest}, Mode={Mode}",
+				dto.OriginAddress, dto.DestinationAddress, travelMode);
+			throw new InvalidOperationException(
+				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
 
 		// 2.5. 验证出行方式的合理性（在获取导航距离之后，使用实际导航距离进行验证）
@@ -399,6 +439,21 @@ public class TravelService : ITravelService
 			TransportMode.Plane => "Plane",
 			_ => mode.ToString()
 		};
+	}
+
+	/// <summary>
+	/// 计算两点间大圆距离（米），用于飞机/轮船在无驾车路线时估算航程
+	/// </summary>
+	private static int GetGreatCircleDistanceMeters(double lat1, double lon1, double lat2, double lon2)
+	{
+		const double R = 6_371_000; // 地球半径（米）
+		var dLat = (lat2 - lat1) * Math.PI / 180;
+		var dLon = (lon2 - lon1) * Math.PI / 180;
+		var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+		        Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) *
+		        Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+		var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+		return (int)(R * c);
 	}
 
 	/// <summary>

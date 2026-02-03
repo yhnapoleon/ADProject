@@ -30,10 +30,15 @@ public class GoogleMapsService : IGoogleMapsService
 	{
 		try
 		{
-			// 支持新加坡邮编直接输入（6位数字，如160149）
-			var normalizedAddress = NormalizeSingaporePostalCode(address);
-			
-			var url = $"https://maps.googleapis.com/maps/api/geocode/json?address={Uri.EscapeDataString(normalizedAddress)}&key={_apiKey}";
+			// 仅对明确为新加坡的输入（邮编、本地简称）追加 Singapore；其余地名保持原样以支持全球识别
+			var normalizedAddress = NormalizeAddressForSingapore(address);
+			var isSingaporeTarget = normalizedAddress.Contains("Singapore", StringComparison.OrdinalIgnoreCase) ||
+			                       normalizedAddress.Contains("新加坡", StringComparison.OrdinalIgnoreCase);
+
+			var url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + Uri.EscapeDataString(normalizedAddress);
+			if (isSingaporeTarget)
+				url += "&region=sg";
+			url += "&key=" + _apiKey;
 			var response = await _httpClient.GetFromJsonAsync<GoogleGeocodingResponse>(url, ct);
 
 			if (response?.Status != "OK" || response.Results == null || response.Results.Count == 0)
@@ -234,11 +239,12 @@ public class GoogleMapsService : IGoogleMapsService
 
 			var response = await _httpClient.GetFromJsonAsync<GoogleDirectionsResponse>(url, ct);
 
-			if (response?.Status != "OK" || 
-			    response.Routes == null || 
+			if (response?.Status != "OK" ||
+			    response.Routes == null ||
 			    response.Routes.Count == 0)
 			{
-				_logger.LogWarning("Route retrieval failed: {Status}", response?.Status);
+				_logger.LogWarning("Route retrieval failed: Status={Status}, Origin=({OriginLat},{OriginLng}), Dest=({DestLat},{DestLng}), Mode={Mode}",
+					response?.Status, originLat, originLng, destLat, destLng, travelMode);
 				return null;
 			}
 
@@ -416,22 +422,42 @@ public class GoogleMapsService : IGoogleMapsService
 	#endregion
 
 	/// <summary>
-	/// 标准化新加坡邮编输入
-	/// 如果输入是6位数字，自动添加"Singapore"后缀以提高识别率
+	/// 仅对明确为新加坡的输入做标准化，其余地名原样返回以支持全球识别：
+	/// - 6位数字视为新加坡邮编，自动添加 "Singapore"
+	/// - 仅当为已知新加坡简称（如 NUS、NTU、SMU）时追加 " Singapore"，其他地名不修改
 	/// </summary>
-	private string NormalizeSingaporePostalCode(string address)
+	private string NormalizeAddressForSingapore(string address)
 	{
 		if (string.IsNullOrWhiteSpace(address))
 			return address;
 
-		// 检查是否为6位数字（新加坡邮编格式）
-		var trimmedAddress = address.Trim();
-		if (System.Text.RegularExpressions.Regex.IsMatch(trimmedAddress, @"^\d{6}$"))
+		var trimmed = address.Trim();
+
+		// 已包含 Singapore/新加坡 的地址不再修改
+		if (trimmed.Contains("Singapore", StringComparison.OrdinalIgnoreCase) ||
+		    trimmed.Contains("新加坡", StringComparison.OrdinalIgnoreCase))
+			return trimmed;
+
+		// 新加坡邮编：6位数字
+		if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\d{6}$"))
 		{
-			_logger.LogDebug("Detected Singapore postal code: {PostalCode}, adding 'Singapore' suffix", trimmedAddress);
-			return $"{trimmedAddress} Singapore";
+			_logger.LogDebug("Detected Singapore postal code: {PostalCode}, adding 'Singapore' suffix", trimmed);
+			return $"{trimmed} Singapore";
 		}
 
-		return address;
+		// 仅对已知新加坡本地简称追加 " Singapore"，避免把北京、东京等误判为新加坡
+		var singaporeShortNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		{
+			"NUS", "NTU", "SMU", "SUTD", "SIT", "SUSS", "SIM",
+			"Orchard", "Marina Bay", "Changi", "Sentosa", "Jurong", "Woodlands",
+			"CBD", "Raffles", "Bugis", "Tampines", "Bishan", "Ang Mo Kio"
+		};
+		if (singaporeShortNames.Contains(trimmed))
+		{
+			_logger.LogDebug("Singapore short name detected: {Address}, adding 'Singapore'", trimmed);
+			return $"{trimmed} Singapore";
+		}
+
+		return trimmed;
 	}
 }
