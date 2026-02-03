@@ -381,22 +381,22 @@ public class TravelService : ITravelService
 	}
 
 	/// <summary>
-	/// 获取出行方式的中文名称
+	/// 获取出行方式的英文名称
 	/// </summary>
 	private string GetTransportModeName(TransportMode mode)
 	{
 		return mode switch
 		{
-			TransportMode.Walking => "步行",
-			TransportMode.Bicycle => "自行车",
-			TransportMode.ElectricBike => "电动车",
-			TransportMode.Subway => "地铁",
-			TransportMode.Bus => "公交车",
-			TransportMode.Taxi => "出租车/网约车",
-			TransportMode.CarGasoline => "私家车（汽油）",
-			TransportMode.CarElectric => "私家车（电动车）",
-			TransportMode.Ship => "轮船",
-			TransportMode.Plane => "飞机",
+			TransportMode.Walking => "Walking",
+			TransportMode.Bicycle => "Bicycle",
+			TransportMode.ElectricBike => "Electric Bike",
+			TransportMode.Subway => "Subway",
+			TransportMode.Bus => "Bus",
+			TransportMode.Taxi => "Taxi/Rideshare",
+			TransportMode.CarGasoline => "Private Car (Gasoline)",
+			TransportMode.CarElectric => "Private Car (Electric)",
+			TransportMode.Ship => "Ship",
+			TransportMode.Plane => "Plane",
 			_ => mode.ToString()
 		};
 	}
