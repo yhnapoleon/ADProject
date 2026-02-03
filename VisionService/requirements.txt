@@ -2,7 +2,7 @@ fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.22
 pydantic==2.5.2
-pillow==10.2.0
+pillow==10.3.0
 
 # FIX 1: Pin numpy to avoid 2.0 conflicts
 numpy<2.0.0
@@ -12,4 +12,4 @@ transformers==4.53.0
 
 # FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0
+torch==2.7.1+cpu
