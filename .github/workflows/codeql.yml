@@ -20,22 +20,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'csharp', 'python' ]
+        include:
+          - language: csharp
+            build-mode: manual
+          - language: python
+            build-mode: none
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    # 初始化 CodeQL
+    # 初始化 CodeQL v3
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
 
-    # --- C# 手动编译步骤 (解决找不到 .sln 问题) ---
+    # --- C# 手动编译 (仅在语言为 csharp 时运行) ---
     - name: Setup .NET
       if: matrix.language == 'csharp'
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
@@ -45,10 +50,10 @@ jobs:
         dotnet build .NET/EcoLens.sln
     # ---------------------------
 
-    # --- Python 依赖安装步骤 ---
+    # --- Python 依赖安装 (仅在语言为 python 时运行) ---
     - name: Setup Python
       if: matrix.language == 'python'
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.13' 
 
@@ -59,6 +64,6 @@ jobs:
     # ---------------------------
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
