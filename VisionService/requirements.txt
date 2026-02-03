@@ -12,4 +12,4 @@ transformers==4.53.0
 
 # FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0
+torch==2.7.1+cpu
