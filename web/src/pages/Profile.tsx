@@ -369,11 +369,12 @@ const Profile = () => {
                       src={avatarUrl || user.avatar}
                       size={120}
                       style={{ border: '3px solid #674fa3' }}
-                      onError={(e) => {
-                        console.error('❌ Avatar image load error:', e);
+                      onError={() => {
+                        console.error('❌ Avatar image load error');
                         console.error('Failed src:', avatarUrl || user.avatar);
                         console.error('src length:', (avatarUrl || user.avatar)?.length);
                         console.error('src starts with data:image?', (avatarUrl || user.avatar)?.startsWith('data:image'));
+                        return false;
                       }}
                     />
                     <div className={styles.avatarOverlay}>

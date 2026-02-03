@@ -24,7 +24,7 @@ public class TravelLogResponseDto
 	public TransportMode TransportMode { get; set; }
 
 	/// <summary>
-	/// 出行方式名称（中文）
+	/// 出行方式名称（英文）
 	/// </summary>
 	public string TransportModeName { get; set; } = string.Empty;
 
