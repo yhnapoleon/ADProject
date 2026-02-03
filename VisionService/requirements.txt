@@ -8,7 +8,7 @@ pillow==10.2.0
 numpy<2.0.0
 
 # FIX 2: Upgrade transformers to a stable recent version
-transformers==4.48.0
+transformers==4.53.0
 
 # FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
 --extra-index-url https://download.pytorch.org/whl/cpu
