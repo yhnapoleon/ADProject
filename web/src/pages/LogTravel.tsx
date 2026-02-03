@@ -1,6 +1,6 @@
 import { Button, Card, Input, Space, Typography, Form, message } from 'antd';
 import { EnvironmentOutlined } from '@ant-design/icons';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import request from '../utils/request';
 
@@ -33,16 +33,16 @@ const TRANSPORT_META: Record<string, { displayLabel: string; icon: string }> = {
   CarGasolineExtra: { displayLabel: 'Car (gasoline)', icon: '⛽' },
 };
 
-/** Fallback emission factors (kg CO₂e/km); Motorcycle uses ElectricBike factor */
-const FALLBACK_FACTORS: Record<string, number> = {
-  Plane: 0.255,
-  Bus: 0.089,
+/** Hardcoded emission factors (kg CO₂e/km) for display in Select transport mode */
+const EMISSION_FACTORS: Record<string, number> = {
+  Plane: 0.25,
+  Bus: 0.05,
   Bicycle: 0,
-  ElectricBike: 0.02,
-  CarGasoline: 0.171,
-  Ship: 0.019,
-  Subway: 0.041,
+  Ship: 0.03,
+  Subway: 0.03,
+  Motorcycle: 0.02,
   CarElectric: 0.05,
+  CarGasolineExtra: 0.2,
 };
 
 /** Display order (Car option removed); 4 per row */
@@ -68,55 +68,20 @@ type TransportOption = {
 
 const LogTravel = () => {
   const navigate = useNavigate();
-  const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
   const [selectedMode, setSelectedMode] = useState<TransportOption | null>(null);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [optionsLoading, setOptionsLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setOptionsLoading(true);
-      try {
-        const res: any = await request.get('/api/carbon/factors?category=Transport');
-        const list = Array.isArray(res) ? res : res?.data ?? [];
-        const factorByLabel: Record<string, number> = {};
-        for (const item of list) {
-          const name = item.labelName ?? item.LabelName ?? '';
-          if (name) factorByLabel[name] = Number(item.co2Factor ?? item.Co2Factor ?? 0);
-        }
-        const options: TransportOption[] = DISPLAY_ORDER.map(({ labelName, key }) => {
-          const metaKey = (key === 'Motorcycle' || key === 'CarGasolineExtra') ? key : labelName;
-          const meta = TRANSPORT_META[metaKey] ?? { displayLabel: labelName, icon: '🚗' };
-          const co2Factor = factorByLabel[labelName] ?? FALLBACK_FACTORS[labelName] ?? FALLBACK_FACTORS[metaKey] ?? 0;
-          const transportMode = TRANSPORT_MODE_IDS[labelName] ?? (key === 'CarGasolineExtra' ? 6 : 0);
-          return { labelName: key, displayLabel: meta.displayLabel, co2Factor, transportMode, icon: meta.icon, key };
-        });
-        if (!cancelled) setTransportOptions(options);
-      } catch (e) {
-        if (!cancelled) {
-          const options: TransportOption[] = DISPLAY_ORDER.map(({ labelName, key }) => {
-            const metaKey = (key === 'Motorcycle' || key === 'CarGasolineExtra') ? key : labelName;
-            const meta = TRANSPORT_META[metaKey] ?? { displayLabel: labelName, icon: '🚗' };
-            const transportMode = TRANSPORT_MODE_IDS[labelName] ?? (key === 'CarGasolineExtra' ? 6 : 0);
-            return {
-              labelName: key,
-              displayLabel: meta.displayLabel,
-              co2Factor: FALLBACK_FACTORS[labelName] ?? FALLBACK_FACTORS[metaKey] ?? 0,
-              transportMode,
-              icon: meta.icon,
-              key,
-            };
-          });
-          setTransportOptions(options);
-        }
-      } finally {
-        if (!cancelled) setOptionsLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const transportOptions = useMemo<TransportOption[]>(() =>
+    DISPLAY_ORDER.map(({ labelName, key }) => {
+      const metaKey = (key === 'Motorcycle' || key === 'CarGasolineExtra') ? key : labelName;
+      const meta = TRANSPORT_META[metaKey] ?? { displayLabel: labelName, icon: '🚗' };
+      const co2Factor = EMISSION_FACTORS[key] ?? 0;
+      const transportMode = TRANSPORT_MODE_IDS[labelName] ?? (key === 'CarGasolineExtra' ? 6 : 0);
+      return { labelName: key, displayLabel: meta.displayLabel, co2Factor, transportMode, icon: meta.icon, key };
+    }),
+    []
+  );
 
   const currentFactor = selectedMode ? selectedMode.co2Factor : 0;
 
@@ -136,10 +101,7 @@ const LogTravel = () => {
               </Text>
             )}
           </div>
-          {optionsLoading ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#666' }}>Loading transport modes...</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {transportOptions.map((m) => {
                 const active = selectedMode?.key === m.key;
                 return (
@@ -166,7 +128,6 @@ const LogTravel = () => {
                 );
               })}
             </div>
-          )}
         </div>
 
         <Form form={form} layout="vertical" onFinish={async (values) => {

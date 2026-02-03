@@ -84,15 +84,25 @@ const Leaderboard = () => {
       dataIndex: 'nickname',
       key: 'user',
       render: (_: string, row: any) => {
-        const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-        const avatarUrl = row.avatarUrl ?? row.avatar;
-        const avatarSrc = avatarUrl
-          ? (String(avatarUrl).startsWith('http') ? String(avatarUrl) : `${baseUrl}/${String(avatarUrl).replace(/^\//, '')}`)
+        const normalizeUrl = (url?: string | null) => {
+          if (!url) return '';
+          const s = String(url);
+          if (s.startsWith('data:image')) return s;
+          if (s.startsWith('http')) return s;
+          return `${import.meta.env.VITE_API_URL || ''}${s}`;
+        };
+        const avatarRaw = row.avatarUrl ?? row.avatar;
+        const avatarSrc = normalizeUrl(avatarRaw) || undefined;
+        const name = row.nickname ?? row.username ?? '';
+        const initials = name && name.trim().length > 0
+          ? (name.trim().split(/\s+/).length === 1
+              ? name.trim().slice(0, 2).toUpperCase()
+              : (name.trim().split(/\s+/)[0][0] + name.trim().split(/\s+/).slice(-1)[0][0]).toUpperCase())
           : undefined;
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Avatar src={avatarSrc} />
-            <span>{row.nickname ?? row.username ?? '-'}</span>
+            <Avatar src={avatarSrc}>{initials}</Avatar>
+            <span>{name || '-'}</span>
           </div>
         );
       },

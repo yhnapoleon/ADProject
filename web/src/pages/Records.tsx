@@ -157,7 +157,7 @@ const Records = () => {
         record._source === 'utility'
           ? new Date(text).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
           : new Date(text).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-      width: '15%',
+      width: '10%',
     },
     {
       title: 'Type',
@@ -183,9 +183,13 @@ const Records = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
-      render: (_: unknown, record: InternalRecord) => record.description || '—',
-      width: '25%',
+      ellipsis: false,
+      render: (_: unknown, record: InternalRecord) => (
+        <span style={{ whiteSpace: 'normal', wordBreak: 'break-word', display: 'block' }}>
+          {record.description || '—'}
+        </span>
+      ),
+      width: '32%',
     },
     {
       title: 'Notes',
