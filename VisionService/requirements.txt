@@ -1,7 +1,8 @@
 fastapi==0.104.1
 uvicorn==0.24.0
 python-multipart==0.0.22
-pydantic==2.5.2
+# Upgrade to a Python 3.13 compatible version (prebuilt pydantic-core wheels)
+pydantic>=2.9.2,<3.0.0
 pillow>=11.0.0,<12
 
 # FIX 1: Pin numpy to avoid 2.0 conflicts
