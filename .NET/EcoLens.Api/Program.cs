@@ -33,7 +33,7 @@ builder.Services.AddCors(options =>
 	});
 });
 
-// EF Core - SQL Server
+// EF Core - SQL Server (with retry for Azure SQL transient failures, e.g. SSL/TLS handshake)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 	options.UseSqlServer(
 		configuration.GetConnectionString("DefaultConnection"),
