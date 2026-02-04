@@ -105,7 +105,7 @@ public class ApplicationDbContext : DbContext
 
 		// DietRecord -> ApplicationUser
 		modelBuilder.Entity<DietRecord>()
-			.HasOne<ApplicationUser>()
+			.HasOne(d => d.User)
 			.WithMany()
 			.HasForeignKey(d => d.UserId)
 			.OnDelete(DeleteBehavior.Cascade);
@@ -258,6 +258,19 @@ public class ApplicationDbContext : DbContext
 			.WithOne(i => i.DietTemplate!)
 			.HasForeignKey(i => i.DietTemplateId)
 			.OnDelete(DeleteBehavior.Cascade);
+
+		// === Performance Indexes (Added to fix slow queries) ===
+		modelBuilder.Entity<FoodRecord>()
+			.HasIndex(f => new { f.UserId, f.CreatedAt });
+
+		modelBuilder.Entity<TravelLog>()
+			.HasIndex(t => new { t.UserId, t.CreatedAt });
+
+		modelBuilder.Entity<ActivityLog>()
+			.HasIndex(a => new { a.UserId, a.CreatedAt });
+
+		modelBuilder.Entity<UtilityBill>()
+			.HasIndex(u => new { u.UserId, u.YearMonth });
 
 		// Seed data for CarbonReferences
 		modelBuilder.Entity<CarbonReference>().HasData(
