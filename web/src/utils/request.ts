@@ -3,9 +3,10 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosRequ
 const rawBase = import.meta.env.VITE_API_URL;
 const baseURL = rawBase ? rawBase.replace(/\/$/, '') : '/api';
 
+// Cloud backend (e.g. Azure) can be slow on cold start; use 60s to avoid false timeouts
 const service: AxiosInstance = axios.create({
   baseURL,
-  timeout: 30000,
+  timeout: 60000,
 });
 
 service.interceptors.request.use(

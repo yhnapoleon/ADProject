@@ -98,19 +98,22 @@ const TreePlanting = () => {
   useEffect(() => {
     const fetchTree = async () => {
       setTreeLoading(true);
+      type TreeRes = { totalTrees?: number; currentProgress?: number; todaySteps?: number; availableSteps?: number };
+      const fetchOnce = () => request.get('/api/getTree') as Promise<TreeRes>;
       try {
-        // GET /api/getTree：返回 totalTrees, currentProgress, todaySteps（总步数）, availableSteps（可用步数）
-        const stateRes = await request.get('/api/getTree') as {
-          totalTrees?: number;
-          currentProgress?: number;
-          todaySteps?: number;
-          availableSteps?: number;
-        };
+        let stateRes: TreeRes | undefined;
+        try {
+          stateRes = await fetchOnce();
+        } catch (e: any) {
+          if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout')) {
+            await new Promise((r) => setTimeout(r, 3000));
+            stateRes = await fetchOnce();
+          } else throw e;
+        }
         const totalTrees = Number(stateRes?.totalTrees ?? 0);
         const progress = Number(stateRes?.currentProgress ?? 0);
         setTotalPlantedTrees(totalTrees);
         setCurrentTreeGrowth(Math.min(100, Math.max(0, progress)));
-        // 优先使用路由传递的步数，否则使用接口返回的 availableSteps（可投步数）
         const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
           ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
         const serverAvailable = Number(stateRes?.availableSteps ?? 0);

@@ -51,9 +51,17 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchStepSync = async () => {
       setStepsLoading(true);
+      const fetchOnce = () => request.get<{ todaySteps?: number; availableSteps?: number }>('/api/getTree');
       try {
-        // GET /api/getTree：返回 todaySteps（总步数）、availableSteps（可用步数）
-        const res = await request.get<{ todaySteps?: number; availableSteps?: number }>('/api/getTree');
+        let res: { todaySteps?: number; availableSteps?: number } | undefined;
+        try {
+          res = await fetchOnce();
+        } catch (e: any) {
+          if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout')) {
+            await new Promise((r) => setTimeout(r, 3000));
+            res = await fetchOnce();
+          } else throw e;
+        }
         setStepCount(Number(res?.todaySteps ?? 0));
       } catch (_e) {
         setStepCount(0);
