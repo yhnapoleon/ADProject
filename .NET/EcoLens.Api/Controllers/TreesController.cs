@@ -39,7 +39,6 @@ public class TreesController : ControllerBase
 		/// GET: 返回当前状态（包括步数信息）
 		/// POST: 更新状态并返回完整信息（包括步数信息）
 		/// </summary>
-		[HttpGet("/api/postTree")]
 		[HttpPost("/api/postTree")]
 		public async Task<ActionResult<object>> PostTreeAlias([FromBody] PostTreeRequest? req, CancellationToken ct)
 		{

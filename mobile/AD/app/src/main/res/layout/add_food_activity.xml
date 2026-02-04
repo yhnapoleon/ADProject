@@ -74,6 +74,7 @@
                 android:textStyle="bold"/>
 
             <EditText
+                android:id="@+id/et_food_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
@@ -95,7 +96,7 @@
                     android:textStyle="bold"/>
 
                 <EditText
-                    android:id="@+id/editAmount"
+                    android:id="@+id/et_amount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
@@ -123,6 +124,7 @@
                         android:text="Emission factor"
                         android:textStyle="bold"/>
                     <EditText
+                        android:id="@+id/et_emission_factor"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -142,6 +144,7 @@
                         android:text="Emissions"
                         android:textStyle="bold"/>
                     <EditText
+                        android:id="@+id/et_emissions"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -161,12 +164,20 @@
                 android:textStyle="bold"/>
 
             <EditText
+                android:id="@+id/et_note"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bottom_nav_background"
                 android:hint="e.g., dinner / canteen / brand"
                 android:padding="12dp" />
+
+            <Spinner
+                android:id="@+id/spinner_unit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="48dp" />
 
             <Button
                 android:id="@+id/save_button"

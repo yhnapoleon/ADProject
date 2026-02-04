@@ -548,16 +548,17 @@ public class AdminController : ControllerBase
 	}
 
 	/// <summary>
-	/// 获取指定用户在给定时间范围内的排放统计（按 ActivityLogs.TotalEmission 聚合）。
+	/// 获取指定用户在给定时间范围内的排放统计（聚合 ActivityLogs、FoodRecords、TravelLogs、UtilityBills）。
 	/// - 支持三种时间选择：
 	///   1) days（近 N 天，含今日）；
 	///   2) from/to（闭区间的日期，内部按 [from, to+1) 处理）；
-	///   3) 若均未提供，则统计用户全量活动日志。
+	///   3) 若均未提供，则统计用户全量记录。
 	/// </summary>
 	/// <param name="id">用户ID</param>
 	/// <param name="from">开始日期（UTC，按日期计算）</param>
 	/// <param name="to">结束日期（UTC，按日期计算）</param>
 	/// <param name="days">近 N 天（N>0）</param>
+	/// <param name="ct">取消令牌</param>
 	[HttpGet("users/{id:int}/emissions/stats")]
 	public async Task<ActionResult<object>> GetUserEmissionStats(
 		[FromRoute] int id,
@@ -584,15 +585,43 @@ public class AdminController : ControllerBase
 		if (from.HasValue) start = from.Value.Date;
 		if (to.HasValue) endExclusive = to.Value.Date.AddDays(1);
 
-		// 构建查询
-		var logs = _db.ActivityLogs.AsQueryable().Where(l => l.UserId == id);
-		if (start.HasValue) logs = logs.Where(l => l.CreatedAt >= start.Value);
-		if (endExclusive.HasValue) logs = logs.Where(l => l.CreatedAt < endExclusive.Value);
+		// 1) ActivityLogs
+		var logsQuery = _db.ActivityLogs.Where(l => l.UserId == id);
+		if (start.HasValue) logsQuery = logsQuery.Where(l => l.CreatedAt >= start.Value);
+		if (endExclusive.HasValue) logsQuery = logsQuery.Where(l => l.CreatedAt < endExclusive.Value);
+		var logsCount = await logsQuery.CountAsync(ct);
+		var logsEmission = await logsQuery.SumAsync(l => (decimal?)l.TotalEmission, ct) ?? 0m;
 
-		var totalItems = await logs.CountAsync(ct);
-		var totalEmission = await logs.SumAsync(l => (decimal?)l.TotalEmission, ct) ?? 0m;
+		// 2) FoodRecords（表可能不存在则忽略）
+		var foodCount = 0;
+		var foodEmission = 0m;
+		try
+		{
+			var foodQuery = _db.FoodRecords.Where(r => r.UserId == id);
+			if (start.HasValue) foodQuery = foodQuery.Where(r => r.CreatedAt >= start.Value);
+			if (endExclusive.HasValue) foodQuery = foodQuery.Where(r => r.CreatedAt < endExclusive.Value);
+			foodCount = await foodQuery.CountAsync(ct);
+			foodEmission = await foodQuery.SumAsync(r => (decimal?)r.Emission, ct) ?? 0m;
+		}
+		catch (Exception) { /* FoodRecords 表可能不存在 */ }
 
-		// 统一返回结构
+		// 3) TravelLogs
+		var travelQuery = _db.TravelLogs.Where(t => t.UserId == id);
+		if (start.HasValue) travelQuery = travelQuery.Where(t => t.CreatedAt >= start.Value);
+		if (endExclusive.HasValue) travelQuery = travelQuery.Where(t => t.CreatedAt < endExclusive.Value);
+		var travelCount = await travelQuery.CountAsync(ct);
+		var travelEmission = await travelQuery.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
+
+		// 4) UtilityBills
+		var utilityQuery = _db.UtilityBills.Where(b => b.UserId == id);
+		if (start.HasValue) utilityQuery = utilityQuery.Where(b => b.CreatedAt >= start.Value);
+		if (endExclusive.HasValue) utilityQuery = utilityQuery.Where(b => b.CreatedAt < endExclusive.Value);
+		var utilityCount = await utilityQuery.CountAsync(ct);
+		var utilityEmission = await utilityQuery.SumAsync(b => (decimal?)b.TotalCarbonEmission, ct) ?? 0m;
+
+		var totalItems = logsCount + foodCount + travelCount + utilityCount;
+		var totalEmission = logsEmission + foodEmission + travelEmission + utilityEmission;
+
 		return Ok(new
 		{
 			userId = id,
@@ -720,12 +749,13 @@ public class AdminController : ControllerBase
 	#region Analytics
 
 	/// <summary>
-	/// 类目占比（按 ActivityLog 的 CarbonReference.Category 汇总）。
+	/// 类目占比（按 ActivityLog 的 CarbonReference.Category 汇总，并包含 TravelLogs 的碳排放）。
 	/// </summary>
 	[HttpGet("analytics/category-share")]
 	public async Task<ActionResult<IEnumerable<object>>> CategoryShare(CancellationToken ct)
 	{
 		// 在数据库端完成聚合，避免将整表加载到内存
+		// 1. 从 ActivityLogs 按 Category 汇总
 		var grouped = await _db.ActivityLogs
 			.Join(_db.CarbonReferences,
 				l => l.CarbonReferenceId,
@@ -735,13 +765,23 @@ public class AdminController : ControllerBase
 			.Select(g => new { Category = g.Key, Total = g.Sum(x => x.TotalEmission) })
 			.ToListAsync(ct);
 
-		var total = grouped.Sum(x => x.Total);
-		decimal AsPercent(decimal part) => total > 0 ? Math.Round(part * 100m / total, 2) : 0m;
+		// 2. 从 TravelLogs 汇总所有出行碳排放（计入 Transport 类别）
+		var travelEmission = await _db.TravelLogs
+			.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
 
+		// 3. 从 UtilityBills 汇总所有水电账单碳排放（计入 Utility 类别）
+		var utilityBillsEmission = await _db.UtilityBills
+			.SumAsync(b => (decimal?)b.TotalCarbonEmission, ct) ?? 0m;
+
+		// 4. 计算各类别的总碳排放
 		decimal GetTotal(CarbonCategory cat) => grouped.FirstOrDefault(x => x.Category == cat)?.Total ?? 0m;
 		var food = GetTotal(CarbonCategory.Food);
-		var transport = GetTotal(CarbonCategory.Transport);
-		var utility = GetTotal(CarbonCategory.Utility);
+		var transport = GetTotal(CarbonCategory.Transport) + travelEmission; // Transport = ActivityLogs 中的 Transport + TravelLogs
+		var utility = GetTotal(CarbonCategory.Utility) + utilityBillsEmission; // Utility = ActivityLogs 中的 Utility + UtilityBills
+
+		// 5. 计算总碳排放和百分比
+		var total = food + transport + utility;
+		decimal AsPercent(decimal part) => total > 0 ? Math.Round(part * 100m / total, 2) : 0m;
 
 		return Ok(new[]
 		{

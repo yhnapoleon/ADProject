@@ -67,9 +67,10 @@ public class MainPageController : ControllerBase
 			.Where(t => t.UserId == userId.Value && t.CreatedAt >= monthStart && t.CreatedAt < nextMonth)
 			.ToListAsync(ct);
 
-		// 查询 UtilityBills（水电账单，按 BillPeriodEnd 所属本月）
+		// 查询 UtilityBills（水电账单，按 YearMonth 匹配当前年月，与创建账单时一致，避免时区/DateTime 边界问题）
+		var currentYearMonth = $"{now.Year:D4}-{now.Month:D2}";
 		var utilityBillsEmission = await _db.UtilityBills
-			.Where(b => b.UserId == userId.Value && b.BillPeriodEnd >= monthStart && b.BillPeriodEnd < nextMonth)
+			.Where(b => b.UserId == userId.Value && b.YearMonth == currentYearMonth)
 			.SumAsync(b => b.TotalCarbonEmission, ct);
 
 		// 计算各类别的碳排放

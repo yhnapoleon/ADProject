@@ -247,13 +247,14 @@ const AdminUserList: React.FC = () => {
                       {isEditMode ? (
                         <input
                           type="number"
+                          step="1"
+                          min="0"
                           value={editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points}
                           onChange={(e) => handlePointsChange(user.id, Number(e.target.value))}
                           className="points-input"
-                          min="0"
                         />
                       ) : (
-                        <span className="points-value">{user.points}</span>
+                        <span className="points-value">{Math.round(Number(user.points))}</span>
                       )}
                     </td>
                     <td className="status-cell" onClick={(e) => e.stopPropagation()}>
@@ -318,7 +319,7 @@ const AdminUserList: React.FC = () => {
             </div>
             <div className="user-detail-row">
               <span className="user-detail-label">Points</span>
-              <span className="user-detail-value">{detailUser.points}</span>
+              <span className="user-detail-value">{Math.round(Number(detailUser.points))}</span>
             </div>
             <div className="user-detail-row">
               <span className="user-detail-label">Status</span>

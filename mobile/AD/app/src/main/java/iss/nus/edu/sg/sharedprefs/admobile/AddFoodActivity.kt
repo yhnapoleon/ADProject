@@ -12,7 +12,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -20,10 +19,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.appbar.MaterialToolbar
+import iss.nus.edu.sg.sharedprefs.admobile.utils.ApiHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -39,8 +40,7 @@ class AddFoodActivity : AppCompatActivity() {
     private lateinit var etEmissions: EditText
     private lateinit var etNote: EditText
     private lateinit var saveButton: Button
-    private lateinit var progressBar: ProgressBar
-    
+
     private var selectedImageUri: Uri? = null
     private var selectedImageFile: File? = null
     private var recognizedLabel: String? = null
@@ -249,7 +249,7 @@ class AddFoodActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful && responseBody != null) {
                         try {
-                            val jsonArray = org.json.JSONArray(responseBody)
+                            val jsonArray = JSONArray(responseBody)
                             // 查找匹配的食物因子（不区分大小写，部分匹配）
                             for (i in 0 until jsonArray.length()) {
                                 val item = jsonArray.getJSONObject(i)
@@ -334,9 +334,9 @@ class AddFoodActivity : AppCompatActivity() {
                         Toast.makeText(this@AddFoodActivity, "Food record saved successfully!", Toast.LENGTH_SHORT).show()
                         finish()
                     } else {
-                        val errorMsg = responseBody?.let {
+                        val errorMsg = responseBody?.let { body ->
                             try {
-                                JSONObject(it).optString("message", "Failed to save")
+                                org.json.JSONObject(body).optString("message", "Failed to save")
                             } catch (e: Exception) {
                                 "Failed to save: ${response.code}"
                             }
