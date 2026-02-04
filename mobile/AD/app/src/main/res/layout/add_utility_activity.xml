@@ -72,15 +72,66 @@
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:text="Usage Details" android:textSize="18sp" android:textStyle="bold" />
 
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Billing Month" android:textStyle="bold"/>
-            <EditText
-                android:id="@+id/et_month"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@android:drawable/editbox_background"
-                android:drawableEnd="@android:drawable/ic_menu_my_calendar"
-                android:focusable="false"
-                android:padding="12dp" />
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginEnd="8dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Start Date"
+                        android:textStyle="bold"
+                        android:textColor="#333333"/>
+
+                    <EditText
+                        android:id="@+id/et_start_date"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@android:drawable/editbox_background"
+                        android:drawableEnd="@android:drawable/ic_menu_my_calendar"
+                        android:focusable="false"
+                        android:hint="YYYY-MM-DD"
+                        android:padding="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="8dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="End Date"
+                        android:textStyle="bold"
+                        android:textColor="#333333"/>
+
+                    <EditText
+                        android:id="@+id/et_end_date"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@android:drawable/editbox_background"
+                        android:drawableEnd="@android:drawable/ic_menu_my_calendar"
+                        android:focusable="false"
+                        android:hint="YYYY-MM-DD"
+                        android:padding="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
 
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Electricity (kWh)" android:textStyle="bold"/>
             <EditText

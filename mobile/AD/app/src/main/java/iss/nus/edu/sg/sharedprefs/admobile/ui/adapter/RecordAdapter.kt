@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -11,39 +12,79 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import iss.nus.edu.sg.sharedprefs.admobile.R
 
-// 数据类
-data class EmissionRecord(val id: Int = 0, val date: String, val type: String, val amount: String, val desc: String)
+data class EmissionRecord(
+    val id: Int = 0,
+    val date: String,
+    val type: String,
+    val amount: String,
+    val desc: String,
+    val originalObject: Any? = null
+)
 
 class RecordAdapter(private var records: MutableList<EmissionRecord>) : RecyclerView.Adapter<RecordAdapter.ViewHolder>() {
 
-    // 🌟 定义一个回调，方便 Activity 处理真实的删除逻辑（如调用 API）
     var onDeleteClickListener: ((Int) -> Unit)? = null
+    var onItemClickListener: ((EmissionRecord) -> Unit)? = null
+
+    // 🌟 核心修复：通过注解更改属性自动生成的 Setter 名称，避免与下面的函数冲突
+    @get:JvmName("getEditModeState")
+    @set:JvmName("setEditModeState")
+    var isEditMode = false
+
+    val selectedItems = mutableSetOf<EmissionRecord>()
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        // 🌟 新增：层级视图引用
         val cardView: MaterialCardView = view.findViewById(R.id.card_view)
         val deleteMenu: LinearLayout = view.findViewById(R.id.delete_menu)
-
-        // 原有引用
         val tvDate: TextView = view.findViewById(R.id.tv_record_date)
         val tvType: TextView = view.findViewById(R.id.tv_record_type)
         val tvDesc: TextView = view.findViewById(R.id.tv_record_desc)
         val tvAmount: TextView = view.findViewById(R.id.tv_record_amount)
         val badgeContainer: LinearLayout = view.findViewById(R.id.badge_container)
         val ivType: ImageView = view.findViewById(R.id.iv_record_type)
+        val checkBox: CheckBox = view.findViewById(R.id.item_checkbox)
     }
 
-    // 🌟 删除逻辑
+    /**
+     * 🌟 状态切换方法：现在它与属性 Setter 不再冲突
+     */
+    fun setEditMode(enabled: Boolean) {
+        this.isEditMode = enabled
+        if (!enabled) {
+            selectedItems.clear()
+        }
+        notifyDataSetChanged()
+    }
+
+    /**
+     * 🌟 切换单项选中状态
+     */
+    fun toggleSelection(record: EmissionRecord) {
+        if (selectedItems.contains(record)) {
+            selectedItems.remove(record)
+        } else {
+            selectedItems.add(record)
+        }
+        val index = records.indexOf(record)
+        if (index != -1) {
+            notifyItemChanged(index)
+        }
+    }
+
+    /**
+     * 🌟 获取选中的项用于 API 请求
+     */
+    fun getSelectedItems(): List<EmissionRecord> = selectedItems.toList()
+
     fun removeItem(position: Int) {
-        if (position >= 0 && position < records.size) {
+        if (position in records.indices) {
             records.removeAt(position)
             notifyItemRemoved(position)
-            notifyItemRangeChanged(position, records.size)
+            notifyItemRangeChanged(position, records.size - position)
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-        // 🌟 注意：这里 inflate 的是包含 FrameLayout 层级的那个 item 布局
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_emission_record, parent, false)
         return ViewHolder(view)
     }
@@ -51,20 +92,42 @@ class RecordAdapter(private var records: MutableList<EmissionRecord>) : Recycler
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val record = records[position]
 
-        // 🌟 每次绑定重置位移，防止复用导致错位
-        holder.cardView.translationX = 0f
+        // --- 1. 编辑模式与多选逻辑 ---
+        holder.checkBox.visibility = if (isEditMode) View.VISIBLE else View.GONE
 
+        holder.checkBox.setOnCheckedChangeListener(null)
+        holder.checkBox.isChecked = selectedItems.contains(record)
+
+        holder.checkBox.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) selectedItems.add(record) else selectedItems.remove(record)
+        }
+
+        holder.cardView.setOnClickListener {
+            if (isEditMode) {
+                toggleSelection(record)
+            } else {
+                onItemClickListener?.invoke(record)
+            }
+        }
+
+        // --- 2. 侧滑删除按钮逻辑 ---
+        holder.deleteMenu.setOnClickListener {
+            if (!isEditMode) {
+                val currentPos = holder.bindingAdapterPosition
+                if (currentPos != RecyclerView.NO_POSITION) {
+                    onDeleteClickListener?.invoke(currentPos)
+                }
+            }
+        }
+
+        // --- 3. 基础 UI 绑定 ---
+        holder.cardView.translationX = 0f
         holder.tvDate.text = record.date
         holder.tvType.text = record.type
         holder.tvDesc.text = record.desc
         holder.tvAmount.text = "${record.amount} kg CO₂e"
 
-        // 🌟 设置底座删除按钮的点击监听
-        holder.deleteMenu.setOnClickListener {
-            onDeleteClickListener?.invoke(holder.adapterPosition)
-        }
-
-        // 标签样式逻辑
+        // --- 4. 样式处理 ---
         when (record.type) {
             "Food" -> {
                 holder.badgeContainer.setBackgroundResource(R.drawable.shape_badge_food)
@@ -72,12 +135,12 @@ class RecordAdapter(private var records: MutableList<EmissionRecord>) : Recycler
                 holder.ivType.setImageResource(R.drawable.main_eat_purple)
             }
             "Transport" -> {
-                holder.badgeContainer.setBackgroundColor(Color.parseColor("#E3F2FD"))
+                holder.badgeContainer.setBackgroundResource(R.drawable.shape_badge_transport)
                 holder.tvType.setTextColor(Color.parseColor("#1976D2"))
                 holder.ivType.setImageResource(R.drawable.main_travel_purple)
             }
             "Utilities" -> {
-                holder.badgeContainer.setBackgroundColor(Color.parseColor("#FFFDE7"))
+                holder.badgeContainer.setBackgroundResource(R.drawable.shape_badge_utility)
                 holder.tvType.setTextColor(Color.parseColor("#FBC02D"))
                 holder.ivType.setImageResource(R.drawable.main_water_purple)
             }

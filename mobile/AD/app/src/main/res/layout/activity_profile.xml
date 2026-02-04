@@ -171,7 +171,6 @@
                 <include android:id="@+id/item_username" layout="@layout/item_profile_info" />
                 <include android:id="@+id/item_nickname" layout="@layout/item_profile_info" />
                 <include android:id="@+id/item_email" layout="@layout/item_profile_info" />
-                <include android:id="@+id/item_password" layout="@layout/item_profile_info" />
                 <include android:id="@+id/item_birth" layout="@layout/item_profile_info" />
                 <include android:id="@+id/item_location" layout="@layout/item_profile_info" />
                 <include android:id="@+id/item_join_date" layout="@layout/item_profile_info" />
@@ -201,6 +200,14 @@
             android:textAllCaps="false"
             app:backgroundTint="#674fa3"
             app:cornerRadius="25dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_change_password"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Change Password"
+            android:textColor="#674fa3" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_logout"

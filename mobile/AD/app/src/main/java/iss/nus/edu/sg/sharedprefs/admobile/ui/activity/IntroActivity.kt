@@ -11,7 +11,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
-import iss.nus.edu.sg.sharedprefs.admobile.ui.activity.LoginActivity
 import iss.nus.edu.sg.sharedprefs.admobile.R
 
 data class IntroItem(val title: String, val description: String, val imageResId: Int)
@@ -20,6 +19,7 @@ class IntroActivity : AppCompatActivity() {
 
     private lateinit var viewPager: ViewPager2
     private lateinit var btnNext: Button
+    private lateinit var tvSkip: TextView // 🌟 新增
 
     private val introItems = listOf(
         IntroItem("Track Your Carbon Footprint", "Understand the environmental impact of your daily activities.", R.drawable.intro1),
@@ -33,16 +33,24 @@ class IntroActivity : AppCompatActivity() {
 
         viewPager = findViewById(R.id.viewPager)
         btnNext = findViewById(R.id.btnNext)
+        tvSkip = findViewById(R.id.tvSkip) // 🌟 初始化
 
         viewPager.adapter = IntroAdapter(introItems)
+
+        // 🌟 Skip 按钮点击事件：直接跳转到登录页
+        tvSkip.setOnClickListener {
+            navigateToLogin()
+        }
 
         viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
                 if (position == introItems.size - 1) {
                     btnNext.text = "Finish"
+                    tvSkip.visibility = View.GONE // 🌟 最后一页隐藏 Skip 按钮
                 } else {
                     btnNext.text = "Next"
+                    tvSkip.visibility = View.VISIBLE // 🌟 非最后一页显示 Skip 按钮
                 }
             }
         })
@@ -51,10 +59,15 @@ class IntroActivity : AppCompatActivity() {
             if (viewPager.currentItem < introItems.size - 1) {
                 viewPager.currentItem += 1
             } else {
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
+                navigateToLogin()
             }
         }
+    }
+
+    // 🌟 封装跳转方法
+    private fun navigateToLogin() {
+        startActivity(Intent(this, LoginActivity::class.java))
+        finish()
     }
 
     inner class IntroAdapter(private val items: List<IntroItem>) : RecyclerView.Adapter<IntroAdapter.IntroViewHolder>() {

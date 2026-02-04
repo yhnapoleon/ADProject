@@ -3,10 +3,8 @@ package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.TextView
-import android.widget.Toast
+import android.view.View
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import iss.nus.edu.sg.sharedprefs.admobile.R
@@ -25,35 +23,10 @@ class LoginActivity : AppCompatActivity() {
         val editEmail = findViewById<EditText>(R.id.editEmail)
         val editPassword = findViewById<EditText>(R.id.editPassword)
         val btnLogin = findViewById<Button>(R.id.btnLogin)
+        val progressBar = findViewById<ProgressBar>(R.id.loginProgressBar)
         val textSignUp = findViewById<TextView>(R.id.textSignUp)
         val textForgotPassword = findViewById<TextView>(R.id.textForgotPassword)
-/*
-        // ============================================================
-        // 🚀 当前激活：直接登录跳转逻辑 (Offline / Debug Mode)
-        // ============================================================
-        btnLogin.setOnClickListener {
-            // 模拟保存本地登录状态，以便后续页面读取
-            val prefs = getSharedPreferences("EcoLensPrefs", MODE_PRIVATE)
-            prefs.edit().apply {
-                putString("token", "debug_token_123")
-                putString("username", "DebugUser")
-                apply()
-            }
 
-            Toast.makeText(this, "Debug Mode: Skipping Authentication...", Toast.LENGTH_SHORT).show()
-
-            // 执行跳转
-            val intent = Intent(this, MainActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-            finish()
-        }
-        // ============================================================
-*/
-
-        // ============================================================
-        // 🔒 已注释：原始后端 API 登录逻辑 (Production Mode)
-        // ============================================================
         btnLogin.setOnClickListener {
             val email = editEmail.text.toString().trim()
             val password = editPassword.text.toString().trim()
@@ -63,15 +36,18 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            // 🌟 1. 进入加载状态：禁用按钮，隐藏文字，显示进度条
+            setLoading(true, btnLogin, progressBar)
+
             lifecycleScope.launch {
                 val loginRequest = LoginRequestDto(email, password)
                 val result = authRepository.login(loginRequest)
 
                 result.onSuccess { authResponse ->
-                    // 🌟 1. 必须添加：保存 Token，否则 MainActivity 会把你踢出来
+                    // 保存 Token
                     val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                     prefs.edit().apply {
-                        putString("access_token", authResponse.token) // 确保字段名是 access_token
+                        putString("access_token", authResponse.token)
                         apply()
                     }
 
@@ -82,22 +58,38 @@ class LoginActivity : AppCompatActivity() {
                     startActivity(intent)
                     finish()
                 }.onFailure { exception ->
+                    // 🌟 2. 登录失败：恢复 UI 状态，允许用户再次尝试
+                    setLoading(false, btnLogin, progressBar)
                     Toast.makeText(this@LoginActivity, "Login failed: ${exception.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
-        // ============================================================
 
-
-
-        // 注册跳转保持可用，方便你查看注册页 UI
         textSignUp.setOnClickListener {
             val intent = Intent(this, RegisterActivity::class.java)
             startActivity(intent)
         }
 
         textForgotPassword.setOnClickListener {
-            Toast.makeText(this, "Forgot password is disabled in Debug Mode.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Forgot password function coming soon.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /**
+     * 🌟 切换 UI 的加载状态
+     * @param isLoading 是否正在加载
+     * @param button 登录按钮
+     * @param progressBar 进度条
+     */
+    private fun setLoading(isLoading: Boolean, button: Button, progressBar: ProgressBar) {
+        if (isLoading) {
+            button.isEnabled = false
+            button.text = "" // 清空文字，给进度条留出位置
+            progressBar.visibility = View.VISIBLE
+        } else {
+            button.isEnabled = true
+            button.text = "Login"
+            progressBar.visibility = View.GONE
         }
     }
 }

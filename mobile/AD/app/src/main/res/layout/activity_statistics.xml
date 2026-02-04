@@ -51,8 +51,8 @@
                             android:layout_height="match_parent"
                             android:gravity="center"
                             android:orientation="vertical">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Emissions" android:textSize="12sp" android:textColor="#757575"/>
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3333 kg" android:textSize="22sp" android:textStyle="bold" android:textColor="#674fa3" android:layout_marginTop="8dp"/>
+                            <TextView android:id="@+id/tv_total_emissions_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Emissions" android:textSize="12sp" android:textColor="#757575"/>
+                            <TextView android:id="@+id/tv_comparison_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3333 kg" android:textSize="22sp" android:textStyle="bold" android:textColor="#674fa3" android:layout_marginTop="8dp"/>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 

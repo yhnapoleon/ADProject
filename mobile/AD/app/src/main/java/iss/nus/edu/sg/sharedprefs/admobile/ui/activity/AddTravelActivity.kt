@@ -109,14 +109,35 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
                 val latLng = place.latLng
                 if (isOrigin) {
                     originAddress = address
-                    latLng?.let { mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, 14f)) }
+                    // 🌟 修改：如果是全球模式，缩放稍微远一点
+                    val zoomLevel = if (currentModeId == 9 || currentModeId == 5) 10f else 14f
+                    latLng?.let { mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, zoomLevel)) }
                 } else {
                     destinationAddress = address
+                    val zoomLevel = if (currentModeId == 9 || currentModeId == 5) 10f else 14f
+                    latLng?.let { mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, zoomLevel)) }
                 }
                 updateRouteInfoSimple()
             }
             override fun onError(status: Status) { Log.e("Places", "Error: $status") }
         })
+    }
+
+    // 🌟 核心功能：动态更新搜索范围和地图视野
+    private fun updateAutocompleteConstraints(isGlobal: Boolean) {
+        val countries = if (isGlobal) emptyList() else listOf("SG")
+        originFragment.setCountries(countries)
+        destFragment.setCountries(countries)
+
+        if (::mMap.isInitialized) {
+            if (isGlobal) {
+                // 如果是飞机/船，地图视角拉远到全球
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(1.3521, 103.8198), 1f))
+            } else {
+                // 如果是市内交通，聚焦新加坡
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(1.3521, 103.8198), 11f))
+            }
+        }
     }
 
     private fun swapLocations() {
@@ -140,12 +161,13 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun setupViewPager() {
         val transportModes = listOf(
-            TransportMode(6, "Car (Gasoline)", R.raw.transport_sedan, 0.17),
+            TransportMode(6, "Car (Gasoline)", R.raw.transport_sedan, 0.2),
             TransportMode(7, "Car (Electric)", R.raw.transport_sedan2, 0.05),
-            TransportMode(4, "Bus", R.raw.transport_bus, 0.03),
-            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.08),
-            TransportMode(3, "Subway", R.raw.transport_train, 0.04),
-            TransportMode(5, "Ship", R.raw.transport_ship, 0.15)
+            TransportMode(4, "Bus", R.raw.transport_bus, 0.05),
+            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.02),
+            TransportMode(3, "Subway", R.raw.transport_train, 0.03),
+            TransportMode(5, "Ship", R.raw.transport_ship, 0.03),
+            TransportMode(9, "Airplane", R.raw.transport_airplane, 0.25)
         )
 
         transportViewPager.adapter = TransportModeAdapter(transportModes)
@@ -171,17 +193,17 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
         }
         transportViewPager.setPageTransformer(compositePageTransformer)
 
-        // 🌟 核心修改：滑动时实时显示每公里碳排放因子
         transportViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 val mode = transportModes[position]
                 currentModeId = mode.id
 
-                // 1. 显示因子信息
                 emissionFactorText.text = "Emission Factor: ${mode.emissionFactor} kgCO2e/km"
-
-                // 2. 更新底部文字
                 selectedModeEditText.setText(mode.name)
+
+                // 🌟 修改：当选中 飞机(9) 或 轮船(5) 时，启用全球搜索
+                val isGlobalMode = (currentModeId == 9 || currentModeId == 5)
+                updateAutocompleteConstraints(isGlobalMode)
             }
         })
     }
@@ -207,7 +229,6 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
 
         lifecycleScope.launch {
             try {
-                // 🌟 修正 1：使用与 MainActivity 一致的存储路径
                 val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                 val token = prefs.getString("access_token", "") ?: ""
 
@@ -216,22 +237,18 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
                     return@launch
                 }
 
-                // 🌟 修正 2：Bearer 拼接
                 val fullToken = "Bearer $token"
 
-                // 发送请求
                 val response = NetworkClient.apiService.addTravelRecord(fullToken, request)
 
                 if (response.isSuccessful) {
                     val body = response.body()
-                    // 打印日志方便调试
                     Log.d("TRAVEL_DEBUG", "Saved: ${body?.distanceKilometers} km, ${body?.carbonEmission} kg")
 
                     Toast.makeText(this@AddTravelActivity,
                         "Saved! ${body?.distanceKilometers}km recorded",
                         Toast.LENGTH_LONG).show()
 
-                    // 🌟 成功后关闭页面，回到主页会自动触发 MainActivity 的 onResume 刷新
                     finish()
                 } else {
                     Log.e("TRAVEL_DEBUG", "Error Code: ${response.code()} Body: ${response.errorBody()?.string()}")

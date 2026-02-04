@@ -36,7 +36,8 @@
         app:layout_constraintTop_toBottomOf="@id/toolbar">
 
         <TextView
-            android:id="@+id/tv_daily"  android:layout_width="80dp"
+            android:id="@+id/tv_daily"
+            android:layout_width="80dp"
             android:layout_height="32dp"
             android:background="@drawable/shape_tab_selected"
             android:gravity="center"
@@ -45,10 +46,19 @@
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/tv_monthly" android:layout_width="80dp"
+            android:id="@+id/tv_monthly"
+            android:layout_width="80dp"
             android:layout_height="32dp"
             android:gravity="center"
             android:text="Monthly"
+            android:textColor="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/tv_all_time"
+            android:layout_width="80dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:text="Total"
             android:textColor="#FFFFFF" />
     </LinearLayout>
 
@@ -102,8 +112,10 @@
         android:layout_height="0dp"
         android:layout_marginTop="-20dp"
         android:background="@drawable/shape_list_corner"
-        android:padding="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="80dp"  android:clipToPadding="false" app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintTop_toBottomOf="@id/header_background"
         tools:listitem="@layout/item_ranking_row" />
 

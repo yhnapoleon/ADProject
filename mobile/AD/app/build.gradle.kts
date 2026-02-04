@@ -61,5 +61,10 @@ dependencies {
     // 在 ViewModel 里用协程
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("com.github.bumptech.glide:glide:4.16.0")
+    // 🌟 添加 Glide 依赖
+    implementation("com.github.bumptech.glide:glide:4.15.1")
+    // 如果你使用的是 Kotlin，建议使用 ksp 或 kapt 替代 annotationProcessor
+    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+    implementation("com.google.zxing:core:3.5.3")
+
 }

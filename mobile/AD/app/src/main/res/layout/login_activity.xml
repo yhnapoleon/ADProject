@@ -54,12 +54,25 @@
             android:layout_marginTop="16dp"
             android:text="Forgot Password?" />
 
-        <Button
-            android:id="@+id/btnLogin"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="60dp"
-            android:layout_marginTop="32dp"
-            android:text="Login" />
+            android:layout_marginTop="32dp">
+
+            <Button
+                android:id="@+id/btnLogin"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:text="Login" />
+
+            <ProgressBar
+                android:id="@+id/loginProgressBar"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="@android:color/white"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"

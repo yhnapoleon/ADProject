@@ -8,21 +8,18 @@
     android:background="#F4F4F6"
     tools:context=".ui.activity.AddFoodActivity">
 
-    <!-- Header -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
         app:elevation="0dp">
-
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:navigationIcon="@drawable/ic_arrow_back" 
+            app:navigationIcon="@drawable/ic_arrow_back"
             app:title="Add Food Emissions"
             app:titleCentered="true"/>
-
     </com.google.android.material.appbar.AppBarLayout>
 
     <ScrollView
@@ -35,20 +32,24 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Add Photo Section -->
             <FrameLayout
                 android:id="@+id/photo_container"
                 android:layout_width="match_parent"
                 android:layout_height="250dp"
                 android:background="@drawable/dashed_border">
-
                 <ImageView
                     android:id="@+id/image_preview"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:scaleType="centerCrop"
                     android:visibility="gone" />
-
+                <ProgressBar
+                    android:id="@+id/analyze_progress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:indeterminateTint="#674fa3"
+                    android:visibility="gone" />
                 <LinearLayout
                     android:id="@+id/add_photo_placeholder"
                     android:layout_width="wrap_content"
@@ -65,23 +66,20 @@
                 </LinearLayout>
             </FrameLayout>
 
-            <!-- Form Fields -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:text="Food name"
                 android:textStyle="bold"/>
-
             <EditText
-                android:id="@+id/et_food_name"
+                android:id="@+id/editFoodName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bottom_nav_background"
                 android:hint="e.g., Beef burger / Rice / Salad"
                 android:padding="12dp" />
-
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -92,26 +90,47 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Amount (kg)"
+                    android:text="Amount (g)"
                     android:textStyle="bold"/>
 
-                <EditText
-                    android:id="@+id/et_amount"
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/amountInputLayout"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/bottom_nav_background"
-                    android:hint="e.g., 0.25"
-                    android:inputType="numberDecimal"
-                    android:padding="12dp" />
+                    app:boxBackgroundColor="#FFFFFF"
+                    app:suffixText="g"
+                    app:hintEnabled="false">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/editAmount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
+                        android:hint="Select range or type weight"
+                        android:inputType="numberDecimal"
+                        android:padding="12dp" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <Button
+                    android:id="@+id/btn_calculate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Confirm and Calculate"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    app:icon="@drawable/ic_calculate" />
+
+
             </LinearLayout>
-            
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:orientation="horizontal">
-
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -124,7 +143,7 @@
                         android:text="Emission factor"
                         android:textStyle="bold"/>
                     <EditText
-                        android:id="@+id/et_emission_factor"
+                        android:id="@+id/editEmissionFactor"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -132,19 +151,18 @@
                         android:hint="27.00"
                         android:padding="12dp" />
                 </LinearLayout>
-
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:orientation="vertical">
-                     <TextView
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Emissions"
                         android:textStyle="bold"/>
                     <EditText
-                        android:id="@+id/et_emissions"
+                        android:id="@+id/editEmissions"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -153,7 +171,6 @@
                         android:enabled="false"
                         android:padding="12dp" />
                 </LinearLayout>
-
             </LinearLayout>
 
             <TextView
@@ -162,22 +179,14 @@
                 android:layout_marginTop="16dp"
                 android:text="Note (optional)"
                 android:textStyle="bold"/>
-
             <EditText
-                android:id="@+id/et_note"
+                android:id="@+id/editNote"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bottom_nav_background"
                 android:hint="e.g., dinner / canteen / brand"
                 android:padding="12dp" />
-
-            <Spinner
-                android:id="@+id/spinner_unit"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minHeight="48dp" />
 
             <Button
                 android:id="@+id/save_button"
@@ -196,5 +205,4 @@
 
         </LinearLayout>
     </ScrollView>
-
 </LinearLayout>
