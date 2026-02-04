@@ -232,54 +232,7 @@ public class UtilityBillService : IUtilityBillService
 
 			_logger.LogInformation("Utility bill created manually: UserId={UserId}, BillId={BillId}", userId, utilityBill.Id);
 
-			// 6. 生成 ActivityLog，使仪表盘与 Records 能显示水电账单数据
-			try
-			{
-				// 只按 LabelName + Category 查，不依赖 Region，确保能命中种子数据（Electricity/Water/Gas, Utility）
-				async Task<CarbonReference?> FindUtilityFactorAsync(string label)
-				{
-					return await _db.CarbonReferences
-						.AsNoTracking()
-						.FirstOrDefaultAsync(
-							c => c.LabelName == label && c.Category == CarbonCategory.Utility,
-							ct);
-				}
-
-				var now = DateTime.UtcNow;
-				async Task AddActivityLogAsync(string label, decimal usage, decimal emission)
-				{
-					if (usage <= 0 && emission <= 0) return;
-					var factor = await FindUtilityFactorAsync(label);
-					if (factor is null)
-					{
-						_logger.LogWarning("CarbonReference not found for Utility label={Label}, skip ActivityLog", label);
-						return;
-					}
-
-					var log = new ActivityLog
-					{
-						UserId = userId,
-						CarbonReferenceId = factor.Id,
-						Quantity = usage,
-						TotalEmission = emission,
-						DetectedLabel = $"{label} ({periodLabel})",
-						CreatedAt = now,
-						UpdatedAt = now
-					};
-					_db.ActivityLogs.Add(log);
-				}
-
-				await AddActivityLogAsync("Electricity", utilityBill.ElectricityUsage ?? 0m, utilityBill.ElectricityCarbonEmission);
-				await AddActivityLogAsync("Water", utilityBill.WaterUsage ?? 0m, utilityBill.WaterCarbonEmission);
-				await AddActivityLogAsync("Gas", utilityBill.GasUsage ?? 0m, utilityBill.GasCarbonEmission);
-
-				await _db.SaveChangesAsync(ct);
-			}
-			catch (Exception exLog)
-			{
-				// 账单已保存，ActivityLog 失败时仅记录日志、不抛错，用户仍得到 200 与保存成功
-				_logger.LogError(exLog, "Failed to create ActivityLogs for UtilityBill UserId={UserId} BillId={BillId}", userId, utilityBill.Id);
-			}
+			// 6. 不再创建 ActivityLog，避免与 UtilityBills 重复。Dashboard/Leaderboard/Records 均直接从 UtilityBills 统计。
 
 			// 7. 更新用户总碳排放
 			await UpdateUserTotalCarbonEmissionAsync(userId, ct);

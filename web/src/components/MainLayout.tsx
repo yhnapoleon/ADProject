@@ -38,72 +38,40 @@ const MainLayout: React.FC = () => {
     return 'dashboard';
   };
 
+  const pathByKey: Record<string, string> = {
+    dashboard: '/dashboard',
+    records: '/records',
+    leaderboard: '/leaderboard',
+    profile: '/profile',
+    'about-me': '/about-me',
+    'ai-assistant': '/ai-assistant',
+    'log-meal': '/log-meal',
+    'log-travel': '/log-travel',
+    'log-utility': '/log-utility',
+  };
+
+  const handleMenuClick = ({ key }: { key: string }) => {
+    const path = pathByKey[key];
+    if (path) navigate(path);
+  };
+
   // Group A (default/daily mode)
   const groupAItems = [
-    {
-      key: 'dashboard',
-      icon: <AppstoreOutlined />,
-      label: 'Dashboard',
-      onClick: () => navigate('/dashboard'),
-    },
-    {
-      key: 'records',
-      icon: <FileTextOutlined />,
-      label: 'Records',
-      onClick: () => navigate('/records'),
-    },
-    {
-      key: 'leaderboard',
-      icon: <TrophyOutlined />,
-      label: 'Leaderboard',
-      onClick: () => navigate('/leaderboard'),
-    },
-    {
-      key: 'profile',
-      icon: <UserOutlined />,
-      label: 'Profile',
-      onClick: () => navigate('/profile'),
-    },
-    {
-      key: 'about-me',
-      icon: <ReadOutlined />,
-      label: 'About Me',
-      onClick: () => navigate('/about-me'),
-    },
-    {
-      key: 'ai-assistant',
-      icon: <RobotOutlined />,
-      label: 'AI Assistant',
-      onClick: () => navigate('/ai-assistant'),
-    },
+    { key: 'dashboard', icon: <AppstoreOutlined />, label: 'Dashboard' },
+    { key: 'records', icon: <FileTextOutlined />, label: 'Records' },
+    { key: 'leaderboard', icon: <TrophyOutlined />, label: 'Leaderboard' },
+    { key: 'profile', icon: <UserOutlined />, label: 'Profile' },
+    { key: 'about-me', icon: <ReadOutlined />, label: 'About Me' },
+    { key: 'ai-assistant', icon: <RobotOutlined />, label: 'AI Assistant' },
   ];
 
   // Group B (logging mode)
   const groupBItems = [
-    {
-      key: 'dashboard',
-      icon: <AppstoreOutlined />,
-      label: 'Dashboard',
-      onClick: () => navigate('/dashboard'),
-    },
-    {
-      key: 'log-meal',
-      icon: <CoffeeOutlined />,
-      label: 'Food',
-      onClick: () => navigate('/log-meal'),
-    },
-    {
-      key: 'log-travel',
-      icon: <CarOutlined />,
-      label: 'Travel',
-      onClick: () => navigate('/log-travel'),
-    },
-    {
-      key: 'log-utility',
-      icon: <BulbOutlined />,
-      label: 'Utility',
-      onClick: () => navigate('/log-utility'),
-    },
+    { key: 'dashboard', icon: <AppstoreOutlined />, label: 'Dashboard' },
+    { key: 'log-meal', icon: <CoffeeOutlined />, label: 'Food' },
+    { key: 'log-travel', icon: <CarOutlined />, label: 'Travel' },
+    { key: 'log-utility', icon: <BulbOutlined />, label: 'Utility' },
+    { key: 'profile', icon: <UserOutlined />, label: 'Profile' },
   ];
 
   const menuItems = isLoggingPage ? groupBItems : groupAItems;
@@ -133,6 +101,7 @@ const MainLayout: React.FC = () => {
           mode="inline"
           selectedKeys={[getSelectedKey()]}
           items={menuItems}
+          onClick={handleMenuClick}
           style={{ borderRight: 'none' }}
         />
       </Sider>
