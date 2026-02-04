@@ -37,6 +37,10 @@ interface UserProfileApi {
   role: string;
 }
 
+interface VerifyPasswordResponse {
+  valid: boolean;
+}
+
 const defaultUser: User = {
   id: '',
   name: '',
@@ -336,32 +340,54 @@ const Profile = () => {
 
   const submitChangePassword = async () => {
     try {
+      // 1. 前端格式校验
       const values = await passwordForm.validateFields();
+      if (values.oldPassword === values.newPassword) {
+        message.error('New password cannot be the same as the old password');
+        return;
+      }
       if (!passwordStrength.canSave) {
         message.error('Password must be at least medium strength (length >= 8, contains letters and digits).');
         return;
       }
+
+      // 2. 【新增安全步骤】调用后端验证原密码
+      try {
+        // 注意：这里需要配合第一步添加的 VerifyPasswordResponse 接口
+        const verifyRes = await request.post<VerifyPasswordResponse>('/api/user/verify-password', {
+          oldPassword: values.oldPassword,
+        });
+
+        // 检查后端返回的 valid 字段
+        // 兼容处理：防止 axios 拦截器直接返回 data 或者 response 结构不同
+        const isValid = (verifyRes as any)?.valid ?? verifyRes;
+        
+        if (!isValid) {
+          message.error('Original password incorrect');
+          return; // 密码不对，直接中断，不发送修改请求
+        }
+      } catch (verifyErr) {
+        // 如果后端返回 400 或其他错误，视为验证失败
+        message.error('Original password incorrect or verification failed');
+        return;
+      }
+
+      // 3. 原密码验证通过，执行修改
       await request.post('/api/user/change-password', {
         oldPassword: values.oldPassword,
         newPassword: values.newPassword,
       });
+
       message.success('Password changed successfully');
       setPasswordModalOpen(false);
       passwordForm.resetFields();
     } catch (e: any) {
-      if (e.errorFields) throw e; // validation error: keep modal open, no toast
+      if (e.errorFields) return; // 只是表单格式错误，不提示
       const msg = e.response?.data ?? e.message ?? 'Failed to change password';
       message.error(typeof msg === 'string' ? msg : msg.message || msg);
     }
   };
 
-  const fileToBase64 = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
 
   const beforeUpload: UploadProps['beforeUpload'] = async (file) => {
     const formData = new FormData();
