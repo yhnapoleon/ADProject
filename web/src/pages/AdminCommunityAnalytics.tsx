@@ -93,7 +93,7 @@ const AdminCommunityAnalytics: React.FC = () => {
         </div>
 
         <div className="chart-card">
-          <h3>User Engagement Growth (2024)</h3>
+          <h3>User Engagement Growth ({new Date().getFullYear()})</h3>
           {loading && barData.length === 0 ? (
             <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               Loading engagement data...

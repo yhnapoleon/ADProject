@@ -130,6 +130,41 @@
   background-color: #f9f9f9;
 }
 
+.user-row-clickable {
+  cursor: pointer;
+}
+
+.user-row-clickable:hover {
+  background-color: #e8f5e9 !important;
+}
+
+.user-detail-content {
+  padding: 8px 0;
+}
+
+.user-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.user-detail-row:last-child {
+  border-bottom: none;
+}
+
+.user-detail-label {
+  color: #666;
+  font-size: 14px;
+}
+
+.user-detail-value {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
 .status-badge {
   padding: 4px 12px;
   border-radius: 12px;

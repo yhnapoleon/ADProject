@@ -194,25 +194,6 @@
   background-color: #f9f9f9;
 }
 
-.status-badge {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-badge.published {
-  color: #4CAF50;
-}
-
-.status-badge.review-pending {
-  color: #ff9800;
-}
-
-.status-badge.draft {
-  color: #f44336;
-}
-
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -318,13 +299,11 @@
   color: #666;
 }
 
-.factor-cell,
-.status-cell {
+.factor-cell {
   position: relative;
 }
 
-.factor-input,
-.status-select {
+.factor-input {
   width: 100%;
   min-width: 80px;
   padding: 6px 8px;
@@ -336,8 +315,7 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.factor-input:focus,
-.status-select:focus {
+.factor-input:focus {
   border-color: #45a049;
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
 }
