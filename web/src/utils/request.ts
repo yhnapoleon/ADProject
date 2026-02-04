@@ -5,7 +5,7 @@ const baseURL = rawBase ? rawBase.replace(/\/$/, '') : '/api';
 
 const service: AxiosInstance = axios.create({
   baseURL,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 service.interceptors.request.use(
