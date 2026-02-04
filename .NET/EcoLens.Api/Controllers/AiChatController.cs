@@ -100,8 +100,8 @@ public class AiChatController : ControllerBase
 	[HttpPost("analysis")]
 	public async Task<ActionResult<ChatResponseDto>> Analysis([FromBody] AnalysisRequestDto? req, CancellationToken ct)
 	{
-		// 获取用户ID
-		var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		// 获取用户ID（兼容不同 Claim 类型）
+		var userIdStr = User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User?.FindFirst("sub")?.Value;
 		if (string.IsNullOrWhiteSpace(userIdStr) || !int.TryParse(userIdStr, out var userId))
 		{
 			return Unauthorized("Invalid user identity.");
@@ -111,6 +111,7 @@ public class AiChatController : ControllerBase
 		var range = (req?.TimeRange ?? "month").Trim().ToLowerInvariant();
 		var nowUtc = DateTime.UtcNow;
 		var startDate = range == "week" ? nowUtc.AddDays(-7) : nowUtc.AddDays(-30);
+		var periodDesc = range == "week" ? "近7天" : "近30天";
 
 		// 聚合数据（空集安全求和）
 		var foodEmission = await _context.FoodRecords
@@ -128,17 +129,31 @@ public class AiChatController : ControllerBase
 			.Where(b => b.UserId == userId && b.BillPeriodEnd >= startDate)
 			.SumAsync(b => (decimal?)b.TotalCarbonEmission, ct) ?? 0m;
 
-		var total = foodEmission + travelEmission + utilityEmission;
+		var totalEmission = foodEmission + travelEmission + utilityEmission;
 
-		// Build prompt (Markdown, <= 200 words, English)
-		var rangeLabel = range == "week" ? "Last 7 days" : "Last 30 days";
-		var prompt =
-			$"You are an environmental and low-carbon expert. Based on the user's emissions below, write a concise diagnostic in Markdown. " +
-			$"Include two sections: ### 📊 Current Analysis and ### 🌱 Recommendations. Keep the entire output under 200 words. " +
-			$"Respond in English with clear, actionable suggestions.\n" +
-			$"Time range: {rangeLabel}.\n" +
-			$"Total emissions: {total:F1} kg.\n" +
-			$"Breakdown: Food {foodEmission:F1} kg, Travel {travelEmission:F1} kg, Utilities {utilityEmission:F1} kg.";
+		// 4. 构建结构化 Prompt (针对纯文本 + 固定点数优化)
+		string prompt = $@"
+角色：环境科学顾问
+任务：根据用户碳排放数据（{periodDesc}）提供简报。
+
+【用户数据】
+- 食物：{foodEmission:F2} kg
+- 出行：{travelEmission:F2} kg
+- 水电：{utilityEmission:F2} kg
+- 总计：{totalEmission:F2} kg
+
+【输出要求】
+1. **格式**：纯文本 (Plain Text)。禁止使用 Markdown（不要出现 #、**、## 等）。
+2. **结构**：严格包含 1 行现状简评 和 3 条具体建议，按 1. 2. 3. 编号。
+3. **字数**：总字数严格少于 200 字，措辞简洁直接。
+4. **现状**：必须点明占比最高的排放源并做一句话评价。
+
+【输出模板】
+现状：(一句话指出最大排放源及评价)
+1. (建议一)
+2. (建议二)
+3. (建议三)
+";
 
 		var reply = await _aiService.GetAnswerAsync(prompt);
 		return Ok(new ChatResponseDto { Reply = reply ?? string.Empty });
