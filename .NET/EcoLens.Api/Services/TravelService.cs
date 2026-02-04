@@ -101,7 +101,7 @@ public class TravelService : ITravelService
 		if (route == null)
 		{
 			_logger.LogWarning("GetRouteAsync returned null for Origin={Origin}, Dest={Dest}, Mode={Mode}",
-				dto.OriginAddress, dto.DestinationAddress, travelMode);
+				dto.OriginAddress, dto.DestinationAddress, dto.TransportMode);
 			throw new InvalidOperationException(
 				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
@@ -241,7 +241,7 @@ public class TravelService : ITravelService
 		if (route == null)
 		{
 			_logger.LogWarning("GetRouteAsync returned null (preview) for Origin={Origin}, Dest={Dest}, Mode={Mode}",
-				dto.OriginAddress, dto.DestinationAddress, travelMode);
+				dto.OriginAddress, dto.DestinationAddress, dto.TransportMode);
 			throw new InvalidOperationException(
 				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
