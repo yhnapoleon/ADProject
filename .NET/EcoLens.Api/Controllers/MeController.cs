@@ -168,11 +168,11 @@ public class MeController : ControllerBase
     if (u is null) return NotFound();
     if (file is null || file.Length == 0) return BadRequest("No file uploaded.");
 
-    // 验证文件大小（限制在 500KB 以内）
-    const long maxFileSize = 500 * 1024; // 500KB
+    // 验证文件大小（限制在 2MB 以内）
+    const long maxFileSize = 2 * 1024 * 1024; // 2MB
     if (file.Length > maxFileSize)
     {
-      return BadRequest("File size exceeds the maximum limit of 500KB. Please upload a smaller image.");
+      return BadRequest("Avatar file is too large.");
     }
 
     // 验证文件类型
