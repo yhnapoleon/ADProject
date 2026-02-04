@@ -55,40 +55,82 @@ const Profile = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User>(defaultUser);
+  const [user, setUser] = useState<User>(() => {
+    // Fast initial paint: hydrate basic user info from localStorage if available
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return defaultUser;
+      const cached = JSON.parse(raw) as Partial<{
+        id: string;
+        username: string;
+        name: string;
+        email: string;
+        nickname: string;
+        avatar: string;
+        avatarUrl: string;
+      }>;
+      return {
+        ...defaultUser,
+        id: cached.id ?? defaultUser.id,
+        name: cached.username ?? cached.name ?? defaultUser.name,
+        email: cached.email ?? defaultUser.email,
+        nickname: cached.nickname ?? defaultUser.nickname,
+        avatar: cached.avatar ?? cached.avatarUrl ?? defaultUser.avatar,
+      };
+    } catch {
+      return defaultUser;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    // If we have any cached identity, avoid blocking the whole page on API latency
+    return !(user?.id || user?.email || user?.name);
+  });
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const [totalCarbonSaved, setTotalCarbonSaved] = useState(0);
   const [rank, setRank] = useState(0);
-  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [avatarUrl, setAvatarUrl] = useState<string>(() => (user.avatar?.trim() ? user.avatar : ''));
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordForm] = Form.useForm();
   const watchedNewPassword: string = Form.useWatch('newPassword', passwordForm) ?? '';
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    let cancelled = false;
+    const hadCachedIdentity = Boolean(user?.id || user?.email || user?.name);
+    let retryTimer: number | undefined;
+    let warnedSlow = false;
+    let meTimeoutRetries = 0;
+    const maxMeTimeoutRetries = 3;
+    let meRetryStoppedNotified = false;
+
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const normalizeUrl = (url: string | null) => {
+      if (!url) return '';
+      // 如果是 Base64 字符串（data:image 开头），直接返回
+      if (url.startsWith('data:image')) return url;
+      // 如果是完整 URL（http/https 开头），直接返回
+      if (url.startsWith('http')) return url;
+      // 否则拼接基础 URL（兼容旧格式）
+      return `${baseUrl}${url}`;
+    };
+
+    const safe = (fn: () => void) => {
+      if (!cancelled) fn();
+    };
+
+    const isTimeout = (e: any) => (e?.code === 'ECONNABORTED' && /timeout/i.test(String(e?.message ?? '')));
+
+    const scheduleRetry = (fn: () => void, delayMs: number) => {
+      if (cancelled) return;
+      if (retryTimer) window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(() => safe(fn), delayMs);
+    };
+
+    const fetchMe = async (): Promise<MeDto | null> => {
       try {
-        const [meRes, profileRes] = await Promise.all([
-          request.get('/api/user/me').catch(() => null),
-          request.get('/api/user/profile').catch(() => null),
-        ]);
-        const me = meRes as MeDto | null;
-        const profile = profileRes as UserProfileApi | null;
-
-        const baseUrl = import.meta.env.VITE_API_URL || '';
-        const normalizeUrl = (url: string | null) => {
-          if (!url) return '';
-          // 如果是 Base64 字符串（data:image 开头），直接返回
-          if (url.startsWith('data:image')) return url;
-          // 如果是完整 URL（http/https 开头），直接返回
-          if (url.startsWith('http')) return url;
-          // 否则拼接基础 URL（兼容旧格式）
-          return `${baseUrl}${url}`;
-        };
-
-        if (me) {
-          const avatar = normalizeUrl(me.avatar);
+        const me = await request.get<MeDto>('/api/user/me', { timeout: 15000 });
+        const avatar = normalizeUrl(me.avatar);
+        safe(() => {
           setAvatarLoadFailed(false);
           setUser({
             id: me.id,
@@ -104,13 +146,66 @@ const Profile = () => {
             pointsTotal: me.pointsTotal ?? 0,
           });
           setAvatarUrl(avatar);
+          // keep local cache fresh for faster next visit
+          localStorage.setItem(
+            'user',
+            JSON.stringify({
+              id: me.id,
+              username: me.name,
+              name: me.name,
+              nickname: me.nickname,
+              email: me.email,
+              avatar: avatar,
+            })
+          );
+        });
+        // reset retry budget after a successful response
+        meTimeoutRetries = 0;
+        return me;
+      } catch (e: any) {
+        if (e.response?.status === 401) {
+          navigate('/login', { replace: true });
+          return null;
         }
-        if (profile) {
+        // If backend is cold-starting, avoid blocking the whole page; retry quietly in background.
+        if (isTimeout(e) && !cancelled) {
+          if (!warnedSlow) {
+            warnedSlow = true;
+            message.warning('后端响应较慢（可能在冷启动），正在后台重试加载个人信息…');
+          }
+          if (meTimeoutRetries < maxMeTimeoutRetries) {
+            meTimeoutRetries += 1;
+            const delayMs = 2000 * Math.pow(2, meTimeoutRetries - 1); // 2s, 4s, 8s
+            scheduleRetry(() => {
+              void fetchMe().then((me2) => {
+                if (me2) void fetchProfileMetrics(me2);
+              });
+            }, delayMs);
+          } else if (!meRetryStoppedNotified) {
+            meRetryStoppedNotified = true;
+            message.error('后端持续无响应（可能宕机/冷启动过久）。已停止重试，请稍后刷新或切换到本地后端。');
+          }
+        }
+        return null;
+      } finally {
+        safe(() => setLoading(false));
+      }
+    };
+
+    const fetchProfileMetrics = async (me: MeDto | null) => {
+      safe(() => setMetricsLoading(true));
+      try {
+        const profile = await request.get<UserProfileApi>('/api/user/profile', { timeout: 15000 });
+        safe(() => {
           setTotalCarbonSaved(Number(profile.totalCarbonSaved ?? 0));
           setRank(profile.rank ?? 0);
-          if (!me) {
+        });
+
+        // If /me failed, use profile to fill basic fields too
+        if (!me) {
+          const avatar = normalizeUrl(profile.avatarUrl);
+          safe(() => {
             setAvatarLoadFailed(false);
-            const avatar = normalizeUrl(profile.avatarUrl);
             setUser((prev) => ({
               ...prev,
               id: String(profile.id),
@@ -124,26 +219,35 @@ const Profile = () => {
               pointsTotal: profile.currentPoints ?? prev.pointsTotal,
             }));
             setAvatarUrl(avatar);
-          }
-        }
-        if (!me && !profile) {
-          if ((meRes as any)?.response?.status === 401 || (profileRes as any)?.response?.status === 401) {
-            navigate('/login', { replace: true });
-            return;
-          }
-          message.error('Failed to load profile');
+          });
         }
       } catch (e: any) {
         if (e.response?.status === 401) {
           navigate('/login', { replace: true });
           return;
         }
-        message.error(e.response?.data?.message || e.message || 'Failed to load profile');
+        // Metrics failure shouldn't block the whole page; only notify if nothing is shown at all
+        if (!me && !hadCachedIdentity) {
+          message.error('Failed to load profile (check network or try again)');
+        }
       } finally {
-        setLoading(false);
+        safe(() => setMetricsLoading(false));
       }
     };
-    fetchData();
+
+    // Don't block initial render on a slow metrics endpoint
+    safe(() => {
+      setLoading((prev) => prev); // keep initial decision (may be false if cached user exists)
+      setMetricsLoading(true);
+    });
+    fetchMe().then((me) => {
+      void fetchProfileMetrics(me);
+    });
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
   }, [navigate]);
 
   const joinDateText = useMemo(() => {
@@ -324,10 +428,10 @@ const Profile = () => {
                 <Upload accept="image/*" showUploadList={false} beforeUpload={beforeUpload}>
                   <div className={styles.avatarUploadWrapper} aria-label="Upload avatar">
                     <Avatar
-                      src={avatarLoadFailed ? undefined : (avatarUrl || user.avatar) || undefined}
+                      src={avatarLoadFailed ? undefined : ((avatarUrl || user.avatar)?.trim() || undefined)}
                       size={120}
                       style={{ border: '3px solid #674fa3' }}
-                      onError={() => setAvatarLoadFailed(true)}
+                      onError={() => { setAvatarLoadFailed(true); return true; }}
                     >
                       {avatarLoadFailed || !(avatarUrl || user.avatar) ? (user.name?.[0]?.toUpperCase() ?? '') : null}
                     </Avatar>

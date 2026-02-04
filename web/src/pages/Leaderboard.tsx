@@ -32,8 +32,9 @@ const Leaderboard = () => {
       const list = Array.isArray(res) ? res : res.items || [];
       setData(list);
     } catch (error: any) {
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.message?.includes('timeout');
       console.error('Failed to fetch leaderboard:', error);
-      message.error('Failed to load leaderboard data');
+      message.error(isTimeout ? 'Network timeout, please check connection and try again' : 'Failed to load leaderboard data');
     } finally {
       setLoading(false);
     }

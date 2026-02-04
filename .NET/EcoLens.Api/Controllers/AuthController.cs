@@ -127,10 +127,14 @@ public class AuthController : ControllerBase
 	[AllowAnonymous]
 	public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginRequestDto dto, CancellationToken ct)
 	{
-		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Email == dto.Email, ct);
+		var email = dto.Email?.Trim() ?? string.Empty;
+		if (string.IsNullOrEmpty(email))
+			return BadRequest("Email is required.");
+
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Email != null && u.Email.Trim() == email, ct);
 		if (user is null)
 		{
-			return Unauthorized("Invalid credentials.");
+			return NotFound("No account found with this email.");
 		}
 
 		if (!user.IsActive)

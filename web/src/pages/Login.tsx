@@ -67,12 +67,20 @@ const Login = () => {
 
       const resp = error.response;
       const respData = resp?.data;
-      const serverMsg = (respData?.error || respData?.message || '') as string;
+      // Backend may return either { message/error } or a plain string
+      const serverMsgRaw =
+        typeof respData === 'string' ? respData : ((respData?.error || respData?.message || '') as string);
+      const serverMsg = (serverMsgRaw ?? '').toString().trim();
 
-      // Prefer HTTP status: 401 → user is banned; 403/404/msg → other cases
+      // Prefer HTTP status + server message
       if (resp) {
         if (resp.status === 401) {
-          message.error('User is banned');
+          // 401 can mean banned OR invalid credentials depending on server
+          if (/banned|inactive|not\s+active|disabled/i.test(serverMsg)) {
+            message.error('Your account has been banned');
+          } else {
+            message.error('Incorrect email or password');
+          }
         } else if (resp.status === 404 || /not\s+found|no\s+account|user\s+not\s+found/i.test(serverMsg)) {
           message.error('No account found with this email');
         } else if (resp.status === 403 || /banned|disabled|forbidden/i.test(serverMsg)) {

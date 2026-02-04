@@ -2,15 +2,26 @@ import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig, AxiosRequ
 
 const rawBase = import.meta.env.VITE_API_URL;
 const baseURL = rawBase ? rawBase.replace(/\/$/, '') : '/api';
+const enableApiTiming = import.meta.env.DEV || import.meta.env.VITE_DEBUG_API_TIMING === 'true';
+
+type TimedConfig = InternalAxiosRequestConfig & {
+  metadata?: {
+    startTimeMs: number;
+  };
+};
 
 // Cloud backend (e.g. Azure) can be slow on cold start; use 60s to avoid false timeouts
 const service: AxiosInstance = axios.create({
   baseURL,
-  timeout: 60000,
+  timeout: 60000, // 60s，兼容海外/跨区 API（如 Azure）较慢的情况
 });
 
 service.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config: TimedConfig) => {
+    if (enableApiTiming) {
+      config.metadata = { startTimeMs: performance.now() };
+    }
+
     // Normalize to avoid duplicated /api when baseURL already contains /api
     if (config.url && baseURL && baseURL.endsWith('/api') && config.url.startsWith('/api')) {
       config.url = config.url.replace(/^\/api/, '');
@@ -31,11 +42,41 @@ service.interceptors.request.use(
 
 service.interceptors.response.use(
   (response) => {
+    if (enableApiTiming) {
+      const cfg = response.config as TimedConfig;
+      const start = cfg.metadata?.startTimeMs;
+      if (typeof start === 'number') {
+        const durationMs = Math.round(performance.now() - start);
+        const method = (cfg.method || 'GET').toUpperCase();
+        const url = `${cfg.baseURL ?? ''}${cfg.url ?? ''}`;
+        // eslint-disable-next-line no-console
+        console.info(`[API] ${method} ${url} ${durationMs}ms`);
+      }
+    }
     const res = response.data;
     return res;
   },
   (error: AxiosError) => {
-    console.error('Request Error:', error);
+    const cfg = (error.config || {}) as TimedConfig;
+    const method = ((cfg as any).method || 'GET').toUpperCase();
+    const url = `${(cfg as any).baseURL ?? ''}${(cfg as any).url ?? ''}`;
+    const start = cfg.metadata?.startTimeMs;
+    const durationMs = typeof start === 'number' ? Math.round(performance.now() - start) : undefined;
+
+    console.error('Request Error:', {
+      method,
+      url,
+      durationMs,
+      code: (error as any).code,
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
+
+    // Helpful hint for timeouts
+    if ((error as any).code === 'ECONNABORTED' && /timeout/i.test(error.message)) {
+      console.warn(`[API] timeout after ${cfg.timeout ?? 'unknown'}ms: ${method} ${url}`);
+    }
     // 处理401未授权错误，清除token
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
