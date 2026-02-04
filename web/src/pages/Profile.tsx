@@ -60,6 +60,7 @@ const Profile = () => {
   const [totalCarbonSaved, setTotalCarbonSaved] = useState(0);
   const [rank, setRank] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [passwordForm] = Form.useForm();
   const watchedNewPassword: string = Form.useWatch('newPassword', passwordForm) ?? '';
@@ -88,6 +89,7 @@ const Profile = () => {
 
         if (me) {
           const avatar = normalizeUrl(me.avatar);
+          setAvatarLoadFailed(false);
           setUser({
             id: me.id,
             name: me.name,
@@ -107,6 +109,7 @@ const Profile = () => {
           setTotalCarbonSaved(Number(profile.totalCarbonSaved ?? 0));
           setRank(profile.rank ?? 0);
           if (!me) {
+            setAvatarLoadFailed(false);
             const avatar = normalizeUrl(profile.avatarUrl);
             setUser((prev) => ({
               ...prev,
@@ -321,17 +324,13 @@ const Profile = () => {
                 <Upload accept="image/*" showUploadList={false} beforeUpload={beforeUpload}>
                   <div className={styles.avatarUploadWrapper} aria-label="Upload avatar">
                     <Avatar
-                      src={avatarUrl || user.avatar}
+                      src={avatarLoadFailed ? undefined : (avatarUrl || user.avatar) || undefined}
                       size={120}
                       style={{ border: '3px solid #674fa3' }}
-                      onError={() => {
-                        console.error('❌ Avatar image load error');
-                        console.error('Failed src:', avatarUrl || user.avatar);
-                        console.error('src length:', (avatarUrl || user.avatar)?.length);
-                        console.error('src starts with data:image?', (avatarUrl || user.avatar)?.startsWith('data:image'));
-                        return false;
-                      }}
-                    />
+                      onError={() => setAvatarLoadFailed(true)}
+                    >
+                      {avatarLoadFailed || !(avatarUrl || user.avatar) ? (user.name?.[0]?.toUpperCase() ?? '') : null}
+                    </Avatar>
                     <div className={styles.avatarOverlay}>
                       <CameraOutlined />
                       <span style={{ marginLeft: 8, fontWeight: 600 }}>Edit</span>

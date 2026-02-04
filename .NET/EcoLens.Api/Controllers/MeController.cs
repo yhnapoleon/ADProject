@@ -43,7 +43,6 @@ public class MeController : ControllerBase
 
     if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
     {
-      // 使用 Url.Action 生成 API 端点 URL
       return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
     }
 
