@@ -34,15 +34,64 @@ public class TreesController : ControllerBase
 			public int? CurrentProgress { get; set; }
 		}
 
+		/// <summary>
+		/// 获取或更新树状态（兼容 GET 和 POST）
+		/// GET: 返回当前状态（包括步数信息）
+		/// POST: 更新状态并返回完整信息（包括步数信息）
+		/// </summary>
+		[HttpGet("/api/postTree")]
 		[HttpPost("/api/postTree")]
-		public Task<ActionResult<object>> PostTreeAlias([FromBody] PostTreeRequest req, CancellationToken ct)
+		public async Task<ActionResult<object>> PostTreeAlias([FromBody] PostTreeRequest? req, CancellationToken ct)
 		{
-			var dto = new UpdateTreeStateRequest
+			var userId = GetUserId();
+			if (userId is null) return Unauthorized();
+
+			var today = DateTime.UtcNow.Date;
+
+			// 读取用户信息和今日步数
+			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+			if (user is null) return NotFound();
+
+			// 读取今日步数记录
+			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == today, ct);
+			var todaySteps = stepRecord?.StepCount ?? 0;
+
+			// 处理每日重置：若最后消耗日期不是今天，则清零已用步数并刷新日期
+			if (!user.LastStepUsageDate.HasValue || user.LastStepUsageDate.Value.Date != today)
 			{
-				TotalTrees = req.TotalTrees,
-				CurrentProgress = req.CurrentProgress
-			};
-			return UpdateState(dto, ct);
+				user.StepsUsedToday = 0;
+				user.LastStepUsageDate = today;
+				await _db.SaveChangesAsync(ct);
+			}
+
+			// 计算可投入的步数
+			var availableSteps = Math.Max(0, todaySteps - user.StepsUsedToday);
+
+			// 如果是 POST 请求且有更新数据，则更新状态
+			if (req != null && (req.TotalTrees.HasValue || req.CurrentProgress.HasValue))
+			{
+				var dto = new UpdateTreeStateRequest
+				{
+					TotalTrees = req.TotalTrees,
+					CurrentProgress = req.CurrentProgress
+				};
+				await UpdateState(dto, ct);
+				
+				// 重新读取用户信息以获取最新状态
+				user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+				if (user is null) return NotFound();
+			}
+
+			// 返回完整状态信息（包括步数）
+			return Ok(new
+			{
+				totalTrees = user.TreesTotalCount,
+				currentProgress = user.CurrentTreeProgress,
+				todaySteps = todaySteps,
+				availableSteps = availableSteps,
+				status = user.CurrentTreeProgress >= 100 ? "completed" : (user.CurrentTreeProgress > 0 ? "growing" : "idle"),
+				pointsTotal = user.CurrentPoints
+			});
 		}
 
 		private static object BuildState(int totalTrees, int currentProgress, int? pointsTotal = null)

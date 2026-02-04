@@ -211,7 +211,9 @@ public class MeController : ControllerBase
     u.AvatarUrl = dataUri;
     await _db.SaveChangesAsync(ct);
 
-    return Ok(new { avatar = dataUri, avatarUrl = dataUri });
+    // 转换为 API URL 返回
+    var avatarUrl = ConvertAvatarUrlToApiUrl(dataUri, u.Id);
+    return Ok(new { avatar = avatarUrl, avatarUrl = avatarUrl });
   }
 }
 
