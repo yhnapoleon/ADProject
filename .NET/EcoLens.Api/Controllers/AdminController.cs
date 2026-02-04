@@ -720,12 +720,13 @@ public class AdminController : ControllerBase
 	#region Analytics
 
 	/// <summary>
-	/// 类目占比（按 ActivityLog 的 CarbonReference.Category 汇总）。
+	/// 类目占比（按 ActivityLog 的 CarbonReference.Category 汇总，并包含 TravelLogs 的碳排放）。
 	/// </summary>
 	[HttpGet("analytics/category-share")]
 	public async Task<ActionResult<IEnumerable<object>>> CategoryShare(CancellationToken ct)
 	{
 		// 在数据库端完成聚合，避免将整表加载到内存
+		// 1. 从 ActivityLogs 按 Category 汇总
 		var grouped = await _db.ActivityLogs
 			.Join(_db.CarbonReferences,
 				l => l.CarbonReferenceId,
@@ -735,13 +736,23 @@ public class AdminController : ControllerBase
 			.Select(g => new { Category = g.Key, Total = g.Sum(x => x.TotalEmission) })
 			.ToListAsync(ct);
 
-		var total = grouped.Sum(x => x.Total);
-		decimal AsPercent(decimal part) => total > 0 ? Math.Round(part * 100m / total, 2) : 0m;
+		// 2. 从 TravelLogs 汇总所有出行碳排放（计入 Transport 类别）
+		var travelEmission = await _db.TravelLogs
+			.SumAsync(t => (decimal?)t.CarbonEmission, ct) ?? 0m;
 
+		// 3. 从 UtilityBills 汇总所有水电账单碳排放（计入 Utility 类别）
+		var utilityBillsEmission = await _db.UtilityBills
+			.SumAsync(b => (decimal?)b.TotalCarbonEmission, ct) ?? 0m;
+
+		// 4. 计算各类别的总碳排放
 		decimal GetTotal(CarbonCategory cat) => grouped.FirstOrDefault(x => x.Category == cat)?.Total ?? 0m;
 		var food = GetTotal(CarbonCategory.Food);
-		var transport = GetTotal(CarbonCategory.Transport);
-		var utility = GetTotal(CarbonCategory.Utility);
+		var transport = GetTotal(CarbonCategory.Transport) + travelEmission; // Transport = ActivityLogs 中的 Transport + TravelLogs
+		var utility = GetTotal(CarbonCategory.Utility) + utilityBillsEmission; // Utility = ActivityLogs 中的 Utility + UtilityBills
+
+		// 5. 计算总碳排放和百分比
+		var total = food + transport + utility;
+		decimal AsPercent(decimal part) => total > 0 ? Math.Round(part * 100m / total, 2) : 0m;
 
 		return Ok(new[]
 		{
