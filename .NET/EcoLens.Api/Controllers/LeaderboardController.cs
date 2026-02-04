@@ -1,5 +1,6 @@
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs.Social;
+using EcoLens.Api.Models.Enums;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,46 +48,80 @@ public class LeaderboardController : ControllerBase
 
 	/// <summary>
 	/// /leaderboard?period=today|week|month|all&amp;limit=50
+	/// 聚合 ActivityLogs(排除Utility避免重复) + TravelLogs + UtilityBills + FoodRecords
 	/// </summary>
 	[HttpGet]
 	[AllowAnonymous]
 	public async Task<ActionResult<IEnumerable<object>>> Get([FromQuery] string period = "month", [FromQuery] int limit = 50, CancellationToken ct = default)
 	{
-		// 简化实现：按总减排（all），或最近7/30天排放求和排行
-		var users = _db.ApplicationUsers.Where(u => u.IsActive);
-		var logs = _db.ActivityLogs.AsQueryable();
+		var users = await _db.ApplicationUsers.Where(u => u.IsActive).ToListAsync(ct);
 		DateTime? from = null;
 		if (string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date;
 		else if (string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-6);
 		else if (string.Equals(period, "month", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-29);
 		if (limit <= 0 || limit > 100) limit = 50;
 
-		var emissions = logs
-			.Where(l => !from.HasValue || l.CreatedAt.Date >= from.Value)
+		var toDate = DateTime.UtcNow.Date.AddDays(1);
+
+		// 1. ActivityLogs（排除 Utility，因 UtilityBills 单独统计避免重复）
+		var activityEmissions = await _db.ActivityLogs
+			.Include(l => l.CarbonReference)
+			.Where(l => (l.CarbonReference == null || l.CarbonReference.Category != CarbonCategory.Utility) &&
+			            (!from.HasValue || l.CreatedAt.Date >= from.Value))
 			.GroupBy(l => l.UserId)
-			.Select(g => new { UserId = g.Key, Emission = g.Sum(x => x.TotalEmission) });
+			.Select(g => new { UserId = g.Key, Emission = g.Sum(x => x.TotalEmission) })
+			.ToListAsync(ct);
 
-		var query = from u in users
-					join e in emissions on u.Id equals e.UserId into ue
-					from e in ue.DefaultIfEmpty()
-					select new
-					{
-						userId = u.Id,
-						username = u.Username,
-						nickname = u.Nickname ?? u.Username,
-						avatarUrl = u.AvatarUrl,
-						updatedAt = u.UpdatedAt,
-						emissions = (decimal?)e.Emission ?? 0m,
-						pointsWeek = u.CurrentPoints,
-						pointsMonth = u.CurrentPoints,
-						pointsTotal = u.CurrentPoints
-					};
+		// 2. TravelLogs
+		var travelEmissions = await _db.TravelLogs
+			.Where(t => !from.HasValue || (t.CreatedAt.Date >= from.Value && t.CreatedAt.Date < toDate))
+			.GroupBy(t => t.UserId)
+			.Select(g => new { UserId = g.Key, Emission = g.Sum(t => t.CarbonEmission) })
+			.ToListAsync(ct);
 
-		// 要求：排行榜按“积分”降序返回前 50 名，且不包含被封禁用户
-		var list = await query
+		// 3. UtilityBills（按 BillPeriodEnd 归属月份）
+		var utilityEmissions = await _db.UtilityBills
+			.Where(b => !from.HasValue || (b.BillPeriodEnd >= from.Value && b.BillPeriodEnd < toDate))
+			.GroupBy(b => b.UserId)
+			.Select(g => new { UserId = g.Key, Emission = g.Sum(b => b.TotalCarbonEmission) })
+			.ToListAsync(ct);
+
+		// 4. FoodRecords（表可能不存在则忽略）
+		Dictionary<int, decimal> foodDict = new();
+		try
+		{
+			var foodList = await _db.FoodRecords
+				.Where(r => !from.HasValue || (r.CreatedAt.Date >= from.Value && r.CreatedAt.Date < toDate))
+				.GroupBy(r => r.UserId)
+				.Select(g => new { UserId = g.Key, Emission = g.Sum(r => r.Emission) })
+				.ToListAsync(ct);
+			foodDict = foodList.ToDictionary(x => x.UserId, x => x.Emission);
+		}
+		catch { /* FoodRecords 表可能不存在 */ }
+
+		var emissionByUser = users.ToDictionary(u => u.Id, _ => 0m);
+		foreach (var e in activityEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
+		foreach (var e in travelEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
+		foreach (var e in utilityEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
+		foreach (var kv in foodDict) emissionByUser[kv.Key] = emissionByUser.GetValueOrDefault(kv.Key) + kv.Value;
+
+		var list = users
+			.Select(u => new
+			{
+				userId = u.Id,
+				username = u.Username,
+				nickname = u.Nickname ?? u.Username,
+				avatarUrl = u.AvatarUrl,
+				updatedAt = u.UpdatedAt,
+				emissions = emissionByUser.GetValueOrDefault(u.Id),
+				pointsWeek = u.CurrentPoints,
+				pointsMonth = u.CurrentPoints,
+				pointsTotal = u.CurrentPoints
+			})
 			.OrderByDescending(x => x.pointsTotal)
 			.Take(limit)
-			.ToListAsync(ct);
+			.ToList();
+
 		var ranked = list.Select((x, i) => new
 		{
 			rank = i + 1,
@@ -128,49 +163,21 @@ public class LeaderboardController : ControllerBase
 	[AllowAnonymous]
 	public async Task<ActionResult<object>> GetByUsername([FromRoute] string username, [FromQuery] string period = "month", CancellationToken ct = default)
 	{
-		var users = _db.ApplicationUsers.Where(u => u.IsActive);
-		var logs = _db.ActivityLogs.AsQueryable();
-		DateTime? from = null;
-		if (string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date;
-		else if (string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-6);
-		else if (string.Equals(period, "month", StringComparison.OrdinalIgnoreCase)) from = DateTime.UtcNow.Date.AddDays(-29);
-
-		var emissions = logs
-			.Where(l => !from.HasValue || l.CreatedAt.Date >= from.Value)
-			.GroupBy(l => l.UserId)
-			.Select(g => new { UserId = g.Key, Emission = g.Sum(x => x.TotalEmission) });
-
-		var query = from u in users
-					join e in emissions on u.Id equals e.UserId into ue
-					from e in ue.DefaultIfEmpty()
-					select new
-					{
-						userId = u.Id,
-						username = u.Username,
-						nickname = u.Nickname ?? u.Username,
-						avatarUrl = u.AvatarUrl,
-						updatedAt = u.UpdatedAt,
-						emissions = (decimal?)e.Emission ?? 0m,
-						pointsWeek = u.CurrentPoints,
-						pointsMonth = u.CurrentPoints,
-						pointsTotal = u.CurrentPoints
-					};
-
-		var all = await query
-			.OrderByDescending(x => x.pointsTotal)
-			.ToListAsync(ct);
-		var item = all.Select((x, i) => new
+		var getResult = await Get(period, 1000, ct);
+		if (getResult.Result is not OkObjectResult ok || ok.Value is not IEnumerable<object> enumerable)
+			return NotFound();
+		var all = enumerable.ToList();
+		dynamic? item = null;
+		foreach (dynamic x in all)
 		{
-			rank = i + 1,
-			username = x.username,
-			nickname = x.nickname,
-			emissionsTotal = x.emissions,
-			avatarUrl = ConvertAvatarUrlToApiUrl(x.avatarUrl, x.userId, x.updatedAt.Ticks),
-			pointsTotal = x.pointsTotal
-		}).FirstOrDefault(x => string.Equals(x.username, username, StringComparison.OrdinalIgnoreCase));
-
+			if (string.Equals((string?)x.username, username, StringComparison.OrdinalIgnoreCase))
+			{
+				item = x;
+				break;
+			}
+		}
 		if (item == null) return NotFound();
-		return Ok(item);
+		return Ok((object)item);
 	}
 
 	/// <summary>

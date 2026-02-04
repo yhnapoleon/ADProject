@@ -102,7 +102,7 @@ const App: React.FC = () => {
           {/* User Portal Routes (requires login) */}
           <Route element={<RequireUserAuth />}>
             <Route element={<MainLayout />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/ai-assistant" element={<AIAssistant />} />
               <Route path="/leaderboard" element={<Leaderboard />} />

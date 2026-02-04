@@ -44,6 +44,18 @@ const Leaderboard = () => {
     fetchLeaderboard(period);
   }, [period]);
 
+  // 页面重新获得焦点时刷新（如从 Records 删除后返回）
+  useEffect(() => {
+    const onFocus = () => fetchLeaderboard(period);
+    window.addEventListener('focus', onFocus);
+    const onVisibilityChange = () => document.visibilityState === 'visible' && onFocus();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [period]);
+
   const dataSource = useMemo(() => {
     return data.map((row, idx) => ({ ...row, rank: idx + 1 }));
   }, [data]);
