@@ -103,7 +103,7 @@ const AdminCommunityAnalytics: React.FC = () => {
               <BarChart data={barData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                 <XAxis dataKey="month" stroke="#666" />
-                <YAxis stroke="#666" />
+                <YAxis stroke="#666" allowDecimals={false} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="dau" fill="#A5D6A7" name="DAU (Daily Active)" />
