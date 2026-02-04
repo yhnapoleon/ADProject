@@ -157,20 +157,25 @@ const TreePlanting = () => {
     }
 
     setConvertLoading(true);
-    try {
-      // 2. POST /api/postTree：传 usedSteps（本次投的步数）和前端计算后的 totalTrees、currentProgress
-      const payload = {
-        usedSteps: stepsToConvert,
-        totalTrees: nextTotalTrees,
-        currentProgress: nextProgress,
-      };
+    const payload = {
+      usedSteps: stepsToConvert,
+      totalTrees: nextTotalTrees,
+      currentProgress: nextProgress,
+    };
+    type PostTreeRes = { totalTrees?: number; currentProgress?: number; usedSteps?: number; availableSteps?: number };
+    const postOnce = () => request.post('/api/postTree', payload, { timeout: 90000 }) as Promise<PostTreeRes>;
 
-      const res = await request.post('/api/postTree', payload) as {
-        totalTrees?: number;
-        currentProgress?: number;
-        usedSteps?: number;
-        availableSteps?: number;
-      };
+    try {
+      // 2. POST /api/postTree：传 usedSteps（本次投的步数）和前端计算后的 totalTrees、currentProgress；云端可能较慢，90s 超时 + 超时重试一次
+      let res: PostTreeRes | undefined;
+      try {
+        res = await postOnce();
+      } catch (e: any) {
+        if (e?.code === 'ECONNABORTED' || e?.message?.includes('timeout')) {
+          await new Promise((r) => setTimeout(r, 3000));
+          res = await postOnce();
+        } else throw e;
+      }
 
       // 3. 用后端返回的 availableSteps 更新可投步数
       setConvertLoading(false);
