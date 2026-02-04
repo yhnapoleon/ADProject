@@ -9,8 +9,8 @@ interface EmissionFactor {
   factor: number;
   unit: string;
   source: string;
-  status: string;
   lastUpdated: string;
+  status?: string; // API may return; not displayed or edited
 }
 
 const AdminEmissionFactors: React.FC = () => {
@@ -28,7 +28,6 @@ const AdminEmissionFactors: React.FC = () => {
     factor: 0,
     unit: 'kg CO2/kg',
     source: '',
-    status: 'Draft',
     lastUpdated: new Date().toISOString().split('T')[0],
   });
   const [loading, setLoading] = useState(false);
@@ -36,7 +35,6 @@ const AdminEmissionFactors: React.FC = () => {
   const [categories, setCategories] = useState<string[]>(['All']);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingFactors, setEditingFactors] = useState<Record<string, number>>({});
-  const [editingStatuses, setEditingStatuses] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   /** 全量因子列表缓存，用于 Add/Import 时的重复校验（避免分页漏检） */
@@ -128,13 +126,6 @@ const AdminEmissionFactors: React.FC = () => {
     }
   );
 
-  const getStatusClass = (status: string) => {
-    if (status === 'Published') return 'published';
-    if (status === 'Review Pending') return 'review-pending';
-    if (status === 'Draft') return 'draft';
-    return '';
-  };
-
   /** 拉取全量因子列表（分页请求直到取完），用于重复校验；结果缓存在 allFactorsRef */
   const ensureAllFactorsLoaded = async (): Promise<EmissionFactor[]> => {
     if (allFactorsRef.current) return allFactorsRef.current;
@@ -185,15 +176,12 @@ const AdminEmissionFactors: React.FC = () => {
 
   const handleEditModeToggle = () => {
     if (!isEditMode) {
-      // Enter edit mode, save current factors and statuses
+      // Enter edit mode, save current factors
       const factorsMap: Record<string, number> = {};
-      const statusesMap: Record<string, string> = {};
       filteredFactors.forEach(factor => {
         factorsMap[factor.id] = factor.factor;
-        statusesMap[factor.id] = factor.status;
       });
       setEditingFactors(factorsMap);
-      setEditingStatuses(statusesMap);
     }
     setIsEditMode(!isEditMode);
   };
@@ -205,38 +193,16 @@ const AdminEmissionFactors: React.FC = () => {
     });
   };
 
-  const handleStatusChange = (factorId: string, value: string) => {
-    setEditingStatuses({
-      ...editingStatuses,
-      [factorId]: value
-    });
-  };
-
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
       const updatePromises = filteredFactors.map(async (factor) => {
-        const newFactor = editingFactors[factor.id];
-        const newStatus = editingStatuses[factor.id];
-        
-        // Only update if there are changes
-        if (newFactor === undefined && newStatus === undefined) {
+        const newFactorVal = editingFactors[factor.id];
+        if (newFactorVal === undefined || newFactorVal === factor.factor) {
           return null;
         }
-
-        const payload: Partial<EmissionFactor> = {};
-        if (newFactor !== undefined && newFactor !== factor.factor) {
-          payload.factor = newFactor;
-        }
-        if (newStatus !== undefined && newStatus !== factor.status) {
-          payload.status = newStatus;
-        }
-
-        if (Object.keys(payload).length === 0) {
-          return null;
-        }
-
+        const payload: Partial<EmissionFactor> = { factor: newFactorVal };
         try {
           const updated = await request.put(`/admin/emission-factors/${factor.id}`, payload);
           return { id: factor.id, updated };
@@ -250,11 +216,9 @@ const AdminEmissionFactors: React.FC = () => {
       const successCount = results.filter(r => r !== null).length;
       
       if (successCount > 0) {
-        // Refresh the list to get updated data
         await fetchFactors();
         setIsEditMode(false);
         setEditingFactors({});
-        setEditingStatuses({});
         alert(`Successfully updated ${successCount} emission factor(s).`);
       }
     } catch (e: any) {
@@ -273,7 +237,6 @@ const AdminEmissionFactors: React.FC = () => {
   const handleCancel = () => {
     setIsEditMode(false);
     setEditingFactors({});
-    setEditingStatuses({});
   };
 
   const handleDelete = async (factor: EmissionFactor) => {
@@ -322,7 +285,6 @@ const AdminEmissionFactors: React.FC = () => {
           factor: newFactor.factor,
           unit: newFactor.unit || 'kg CO2/kg',
           source: newFactor.source || '',
-          status: newFactor.status || 'Draft',
           lastUpdated: newFactor.lastUpdated || new Date().toISOString().split('T')[0],
         };
 
@@ -337,7 +299,6 @@ const AdminEmissionFactors: React.FC = () => {
           factor: 0,
           unit: 'kg CO2/kg',
           source: '',
-          status: 'Draft',
           lastUpdated: new Date().toISOString().split('T')[0],
         });
         setShowAddModal(false);
@@ -519,17 +480,6 @@ const AdminEmissionFactors: React.FC = () => {
                   placeholder="e.g., IPCC 2023"
                 />
               </div>
-              <div className="form-group">
-                <label>Status</label>
-                <select
-                  value={newFactor.status}
-                  onChange={(e) => setNewFactor({ ...newFactor, status: e.target.value })}
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Review Pending">Review Pending</option>
-                  <option value="Published">Published</option>
-                </select>
-              </div>
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
@@ -613,7 +563,6 @@ const AdminEmissionFactors: React.FC = () => {
                 <th>Factor</th>
                 <th>Unit</th>
                 <th>Source/Ref</th>
-                <th>Status</th>
                 <th>Last Updated</th>
                 {isEditMode && <th>Actions</th>}
               </tr>
@@ -641,23 +590,6 @@ const AdminEmissionFactors: React.FC = () => {
                     </td>
                     <td>{factor.unit}</td>
                     <td>{factor.source}</td>
-                    <td className="status-cell">
-                      {isEditMode ? (
-                        <select
-                          value={editingStatuses[factor.id] !== undefined ? editingStatuses[factor.id] : factor.status}
-                          onChange={(e) => handleStatusChange(factor.id, e.target.value)}
-                          className="status-select"
-                        >
-                          <option value="Draft">Draft</option>
-                          <option value="Review Pending">Review Pending</option>
-                          <option value="Published">Published</option>
-                        </select>
-                      ) : (
-                        <span className={`status-badge ${getStatusClass(factor.status)}`}>
-                          {factor.status}
-                        </span>
-                      )}
-                    </td>
                     <td>{factor.lastUpdated}</td>
                     {isEditMode && (
                       <td className="actions-cell">
@@ -676,7 +608,7 @@ const AdminEmissionFactors: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={isEditMode ? 9 : 8} style={{ textAlign: 'center', padding: '20px' }}>
+                  <td colSpan={isEditMode ? 8 : 7} style={{ textAlign: 'center', padding: '20px' }}>
                     No emission factors found.
                   </td>
                 </tr>

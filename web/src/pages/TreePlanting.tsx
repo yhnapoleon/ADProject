@@ -31,6 +31,7 @@ const TreePlanting = () => {
   const [showFloatTip, setShowFloatTip] = useState<boolean>(false);
   const [treeLoading, setTreeLoading] = useState<boolean>(true);
   const [convertLoading, setConvertLoading] = useState<boolean>(false);
+  const [pointsTotal, setPointsTotal] = useState<number>(0);
 
   // 根据currentTreeGrowth计算stage（1-6）
   const calculateStage = (growth: number): number => {
@@ -95,37 +96,36 @@ const TreePlanting = () => {
   }, [location.state]);
 
   useEffect(() => {
-    const fetchTree = async () => {
-      setTreeLoading(true);
-      try {
-        // 使用 /api/postTree 或 /api/getTree，现在都返回完整信息（包括 todaySteps 和 availableSteps）
-        const stateRes = await request.get('/api/postTree') as { 
-          totalTrees?: number; 
-          currentProgress?: number;
-          todaySteps?: number;
-          availableSteps?: number;
-        };
-        const totalTrees = Number(stateRes?.totalTrees ?? 0);
-        const progress = Number(stateRes?.currentProgress ?? 0);
-        setTotalPlantedTrees(totalTrees);
-        setCurrentTreeGrowth(Math.min(100, Math.max(0, progress)));
-        
-        // 优先使用路由传递的步数，否则使用接口返回的 todaySteps
-        const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
-          ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
-        const serverSteps = Number(stateRes?.todaySteps ?? 0);
-        const steps = typeof stepsFromRoute === 'number' && stepsFromRoute > 0 ? stepsFromRoute : serverSteps;
-        setTodaySteps(steps);
-      } catch (_e) {
-        setTotalPlantedTrees(0);
-        setCurrentTreeGrowth(0);
-      } finally {
-        setTreeLoading(false);
-      }
-    };
-    fetchTree();
-  }, []);
-
+  const fetchTree = async () => {
+    setTreeLoading(true);
+    try {
+      const stateRes = await request.get('/api/postTree') as { 
+        totalTrees?: number; 
+        currentProgress?: number;
+        todaySteps?: number;
+        availableSteps?: number;
+        pointsTotal?: number;
+      };
+      const totalTrees = Number(stateRes?.totalTrees ?? 0);
+      const progress = Number(stateRes?.currentProgress ?? 0);
+      setTotalPlantedTrees(totalTrees);
+      setCurrentTreeGrowth(Math.min(100, Math.max(0, progress)));
+      setPointsTotal(Number(stateRes?.pointsTotal ?? 0));
+      // 优先使用路由传递的步数，否则使用接口返回的 todaySteps
+      const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
+        ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
+      const serverSteps = Number(stateRes?.todaySteps ?? 0);
+      const steps = typeof stepsFromRoute === 'number' && stepsFromRoute > 0 ? stepsFromRoute : serverSteps;
+      setTodaySteps(steps);
+    } catch (_e) {
+      setTotalPlantedTrees(0);
+      setCurrentTreeGrowth(0);
+    } finally {
+      setTreeLoading(false);
+    }
+  };
+  fetchTree();
+}, []);
   const handleStepConversion = async () => {
     if (isCelebrating || convertLoading) return;
 
@@ -134,35 +134,60 @@ const TreePlanting = () => {
       return;
     }
 
+    // 1. 前端计算逻辑 (原本是在后端的)
     const stepsToConvert = todaySteps;
-    const growthGain = Math.floor(stepsToConvert / 150);
+    // 假设 150 步长 1% 的进度，你可以根据需求修改这个系数
+    const growthGain = Math.floor(stepsToConvert / 150); 
     const totalPotential = currentTreeGrowth + growthGain;
+
+    let nextTotalTrees = totalPlantedTrees;
+    let nextProgress = 0;
+    let nextLeftoverGrowth = 0;
+
+    // 计算是否升级
+    if (totalPotential >= 100) {
+      const treesPlantedThisTime = Math.floor(totalPotential / 100);
+      nextLeftoverGrowth = totalPotential % 100;
+      nextTotalTrees += treesPlantedThisTime;
+      nextProgress = nextLeftoverGrowth;
+    } else {
+      nextProgress = totalPotential;
+    }
 
     setConvertLoading(true);
     try {
-      await request.post<{ currentTreeGrowth?: number; totalPlantedTrees?: number; todaySteps?: number }>(
-        '/api/trees/convert-steps',
-        { steps: stepsToConvert }
-      );
+      // 2. 构造完整的 Payload 发给后端
+      // 这里对应你给出的 API 字段结构
+      const payload = {
+        totalTrees: nextTotalTrees,
+        currentProgress: nextProgress,
+        todaySteps: 0,        // 步数用完了，重置为0
+        availableSteps: 0,    // 同步重置
+        status: 'idle',
+        pointsTotal: pointsTotal // 传回保存的积分，如果种树要加分，可以在这里 pointsTotal + 10
+      };
+
+      // 改为调用 postTree
+      await request.post('/api/postTree', payload);
+
+      // 3. 更新前端状态
+      setConvertLoading(false);
+      setTodaySteps(0);
+
+      if (totalPotential >= 100) {
+        setTotalPlantedTrees(nextTotalTrees);
+        setCurrentTreeGrowth(100); // 先设为100触发满树动画
+        setIsCelebrating(true);
+        startCelebration(nextLeftoverGrowth);
+      } else {
+        setCurrentTreeGrowth(nextProgress);
+        showAtTreeTop(`Growth +${growthGain}%`);
+      }
     } catch (e) {
       console.error('Convert steps failed:', e);
       message.error('Failed to convert steps. Please try again.');
       setConvertLoading(false);
       return;
-    }
-    setConvertLoading(false);
-    setTodaySteps(0);
-
-    if (totalPotential >= 100) {
-      const treesPlantedThisTime = Math.floor(totalPotential / 100);
-      const leftoverGrowth = totalPotential % 100;
-      setTotalPlantedTrees((prev) => prev + treesPlantedThisTime);
-      setCurrentTreeGrowth(100);
-      setIsCelebrating(true);
-      startCelebration(leftoverGrowth);
-    } else {
-      setCurrentTreeGrowth(totalPotential);
-      showAtTreeTop(`Growth +${growthGain}%`);
     }
   };
 

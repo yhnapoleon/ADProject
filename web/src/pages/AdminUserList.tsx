@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { message } from 'antd';
+import { message, Modal } from 'antd';
 import request from '../utils/request';
 import './AdminUserList.css';
 
@@ -23,6 +23,8 @@ const AdminUserList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detailUser, setDetailUser] = useState<User | null>(null);
+  const [detailVisible, setDetailVisible] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -129,9 +131,9 @@ const AdminUserList: React.FC = () => {
         })));
         const hasBanned = updates.some(u => u.status === 'Banned');
         if (hasBanned) {
-          message.success('用户封禁成功');
+          message.success('User banned successfully');
         } else {
-          message.success('保存成功');
+          message.success('Saved successfully');
         }
       }
 
@@ -155,6 +157,16 @@ const AdminUserList: React.FC = () => {
     setIsEditMode(false);
     setEditingPoints({});
     setEditingStatus({});
+  };
+
+  const handleRowClick = (user: User) => {
+    setDetailUser(user);
+    setDetailVisible(true);
+  };
+
+  const closeDetail = () => {
+    setDetailVisible(false);
+    setDetailUser(null);
   };
 
   return (
@@ -221,26 +233,31 @@ const AdminUserList: React.FC = () => {
             <tbody>
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => (
-                  <tr key={user.id}>
+                  <tr
+                    key={user.id}
+                    className="user-row-clickable"
+                    onClick={() => handleRowClick(user)}
+                  >
                     <td>{user.id}</td>
                     <td>{user.username}</td>
                     <td>{user.email}</td>
                     <td>{user.joinedDate}</td>
                     <td>{user.totalReduction}</td>
-                    <td className="points-cell">
+                    <td className="points-cell" onClick={(e) => e.stopPropagation()}>
                       {isEditMode ? (
                         <input
                           type="number"
+                          step="1"
+                          min="0"
                           value={editingPoints[user.id] !== undefined ? editingPoints[user.id] : user.points}
                           onChange={(e) => handlePointsChange(user.id, Number(e.target.value))}
                           className="points-input"
-                          min="0"
                         />
                       ) : (
-                        <span className="points-value">{user.points}</span>
+                        <span className="points-value">{Math.round(Number(user.points))}</span>
                       )}
                     </td>
-                    <td className="status-cell">
+                    <td className="status-cell" onClick={(e) => e.stopPropagation()}>
                       {isEditMode ? (
                         <select
                           value={editingStatus[user.id] !== undefined ? editingStatus[user.id] : user.status}
@@ -270,6 +287,49 @@ const AdminUserList: React.FC = () => {
           </div>
         )}
       </div>
+
+      <Modal
+        title="User Info"
+        open={detailVisible}
+        onCancel={closeDetail}
+        footer={null}
+        width={480}
+      >
+        {detailUser && (
+          <div className="user-detail-content">
+            <div className="user-detail-row">
+              <span className="user-detail-label">User ID</span>
+              <span className="user-detail-value">{detailUser.id}</span>
+            </div>
+            <div className="user-detail-row">
+              <span className="user-detail-label">Username</span>
+              <span className="user-detail-value">{detailUser.username}</span>
+            </div>
+            <div className="user-detail-row">
+              <span className="user-detail-label">Email</span>
+              <span className="user-detail-value">{detailUser.email}</span>
+            </div>
+            <div className="user-detail-row">
+              <span className="user-detail-label">Joined Date</span>
+              <span className="user-detail-value">{detailUser.joinedDate}</span>
+            </div>
+            <div className="user-detail-row">
+              <span className="user-detail-label">Total Reduction (kg)</span>
+              <span className="user-detail-value">{detailUser.totalReduction}</span>
+            </div>
+            <div className="user-detail-row">
+              <span className="user-detail-label">Points</span>
+              <span className="user-detail-value">{Math.round(Number(detailUser.points))}</span>
+            </div>
+            <div className="user-detail-row">
+              <span className="user-detail-label">Status</span>
+              <span className={`status-badge ${detailUser.status.toLowerCase()}`}>
+                {detailUser.status}
+              </span>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
