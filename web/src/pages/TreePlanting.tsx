@@ -98,15 +98,22 @@ const TreePlanting = () => {
     const fetchTree = async () => {
       setTreeLoading(true);
       try {
-        const stateRes = await request.get('/api/getTree') as { totalTrees?: number; currentProgress?: number };
+        // 使用 /api/postTree 或 /api/getTree，现在都返回完整信息（包括 todaySteps 和 availableSteps）
+        const stateRes = await request.get('/api/postTree') as { 
+          totalTrees?: number; 
+          currentProgress?: number;
+          todaySteps?: number;
+          availableSteps?: number;
+        };
         const totalTrees = Number(stateRes?.totalTrees ?? 0);
         const progress = Number(stateRes?.currentProgress ?? 0);
         setTotalPlantedTrees(totalTrees);
         setCurrentTreeGrowth(Math.min(100, Math.max(0, progress)));
-        const statsRes = await request.get('/api/trees/stats') as { todaySteps?: number };
-        const serverSteps = Number(statsRes?.todaySteps ?? 0);
+        
+        // 优先使用路由传递的步数，否则使用接口返回的 todaySteps
         const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
           ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
+        const serverSteps = Number(stateRes?.todaySteps ?? 0);
         const steps = typeof stepsFromRoute === 'number' && stepsFromRoute > 0 ? stepsFromRoute : serverSteps;
         setTodaySteps(steps);
       } catch (_e) {
