@@ -52,7 +52,8 @@ const Dashboard = () => {
     const fetchStepSync = async () => {
       setStepsLoading(true);
       try {
-        const res = await request.get<{ todaySteps?: number }>('/api/trees/stats');
+        // 使用 /api/postTree 获取步数信息（现在返回 todaySteps 和 availableSteps）
+        const res = await request.get<{ todaySteps?: number; availableSteps?: number }>('/api/postTree');
         setStepCount(Number(res?.todaySteps ?? 0));
       } catch (_e) {
         setStepCount(0);
