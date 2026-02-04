@@ -26,6 +26,30 @@ public class CommunityController : ControllerBase
 		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
+	/// <summary>
+	/// 将 AvatarUrl 转换为 API URL（如果是 Base64，返回 /api/user/{userId}/avatar）
+	/// </summary>
+	private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId)
+	{
+		if (string.IsNullOrWhiteSpace(avatarUrl))
+		{
+			return null;
+		}
+
+		if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		{
+			// 使用 Url.Action 生成 API 端点 URL
+			return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
+		}
+
+		if (Uri.TryCreate(avatarUrl, UriKind.Absolute, out _))
+		{
+			return avatarUrl;
+		}
+
+		return null;
+	}
+
 	public class PostListItemDto
 	{
 		public int Id { get; set; }
@@ -101,22 +125,23 @@ public class CommunityController : ControllerBase
 			.OrderByDescending(p => p.CreatedAt)
 			.Skip((page - 1) * pageSize)
 			.Take(pageSize)
-			.Select(p => new PostListItemDto
-			{
-				Id = p.Id,
-				Title = p.Title,
-				Content = p.Content,
-				ImageUrls = p.ImageUrls,
-				Type = p.Type,
-				ViewCount = p.ViewCount,
-				CreatedAt = p.CreatedAt,
-				UserId = p.UserId,
-				Username = p.User != null ? p.User.Username : string.Empty,
-				AvatarUrl = p.User != null ? p.User.AvatarUrl : null
-			})
 			.ToListAsync(ct);
 
-		return Ok(items);
+		var result = items.Select(p => new PostListItemDto
+		{
+			Id = p.Id,
+			Title = p.Title,
+			Content = p.Content,
+			ImageUrls = p.ImageUrls,
+			Type = p.Type,
+			ViewCount = p.ViewCount,
+			CreatedAt = p.CreatedAt,
+			UserId = p.UserId,
+			Username = p.User != null ? p.User.Username : string.Empty,
+			AvatarUrl = p.User != null ? ConvertAvatarUrlToApiUrl(p.User.AvatarUrl, p.User.Id) : null
+		}).ToList();
+
+		return Ok(result);
 	}
 
 	/// <summary>
@@ -156,7 +181,7 @@ public class CommunityController : ControllerBase
 			CreatedAt = post.CreatedAt,
 			UserId = post.UserId,
 			Username = post.User != null ? post.User.Username : string.Empty,
-			AvatarUrl = post.User != null ? post.User.AvatarUrl : null,
+			AvatarUrl = post.User != null ? ConvertAvatarUrlToApiUrl(post.User.AvatarUrl, post.User.Id) : null,
 			Comments = comments
 		};
 
@@ -190,6 +215,7 @@ public class CommunityController : ControllerBase
 		await _db.SaveChangesAsync(ct);
 
 		// 返回简要详情
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == post.UserId, ct);
 		var result = new PostDetailDto
 		{
 			Id = post.Id,
@@ -200,8 +226,8 @@ public class CommunityController : ControllerBase
 			ViewCount = post.ViewCount,
 			CreatedAt = post.CreatedAt,
 			UserId = post.UserId,
-			Username = (await _db.ApplicationUsers.Where(u => u.Id == post.UserId).Select(u => u.Username).FirstOrDefaultAsync(ct)) ?? string.Empty,
-			AvatarUrl = await _db.ApplicationUsers.Where(u => u.Id == post.UserId).Select(u => u.AvatarUrl).FirstOrDefaultAsync(ct),
+			Username = user?.Username ?? string.Empty,
+			AvatarUrl = user != null ? ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id) : null,
 			Comments = new List<CommentDto>()
 		};
 

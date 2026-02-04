@@ -1,0 +1,2 @@
+# Delegate to VisionService requirements to keep a single source of truth
+-r VisionService/requirements.txt

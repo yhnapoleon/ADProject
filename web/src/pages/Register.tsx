@@ -82,8 +82,6 @@ const Register = () => {
         region: values.location, // 映射到后端的 Region 属性
         birthDate: values.dateOfBirth.format('YYYY-MM-DD'), // 映射到后端的 BirthDate 属性
       };
-      
-      console.log('Register data:', registerData); // 调试用
 
       // 调用注册 API
       await request.post('/Auth/register', registerData);

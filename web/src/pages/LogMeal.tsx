@@ -294,11 +294,8 @@ const LogMeal = () => {
       text = await tryDecodeFromUrl(dataUrl);
       if (text) return { barcode: text };
 
-      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? 'Barcode not detected' : 'Barcode detected but could not decode');
       return { barcode: null, failureReason: lastReason };
     } catch (error) {
-      console.log('Barcode scan failed:', error);
-      if (lastReason) console.log('Barcode scan failure reason:', lastReason === 'not_found' ? 'Barcode not detected' : 'Barcode detected but could not decode');
       return { barcode: null, failureReason: lastReason };
     } finally {
       if (objectUrl) URL.revokeObjectURL(objectUrl);

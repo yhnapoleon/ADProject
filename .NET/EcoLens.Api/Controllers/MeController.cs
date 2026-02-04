@@ -31,6 +31,30 @@ public class MeController : ControllerBase
     return int.TryParse(id, out var uid) ? uid : null;
   }
 
+  /// <summary>
+  /// 将 AvatarUrl 转换为 API URL（如果是 Base64，返回 /api/user/{userId}/avatar）
+  /// </summary>
+  private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId)
+  {
+    if (string.IsNullOrWhiteSpace(avatarUrl))
+    {
+      return null;
+    }
+
+    if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+    {
+      // 使用 Url.Action 生成 API 端点 URL
+      return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
+    }
+
+    if (Uri.TryCreate(avatarUrl, UriKind.Absolute, out _))
+    {
+      return avatarUrl;
+    }
+
+    return null;
+  }
+
   public class MeDto
   {
     public string Id { get; set; } = string.Empty;
@@ -73,7 +97,7 @@ public class MeController : ControllerBase
       Email = u.Email,
       Location = u.Region,
       BirthDate = u.BirthDate.ToString("yyyy-MM-dd"),
-      Avatar = u.AvatarUrl,
+      Avatar = ConvertAvatarUrlToApiUrl(u.AvatarUrl, u.Id),
       PointsWeek = u.CurrentPoints, // 简化：复用 CurrentPoints
       PointsMonth = u.CurrentPoints,
       PointsTotal = u.CurrentPoints,
@@ -187,7 +211,9 @@ public class MeController : ControllerBase
     u.AvatarUrl = dataUri;
     await _db.SaveChangesAsync(ct);
 
-    return Ok(new { avatar = dataUri, avatarUrl = dataUri });
+    // 转换为 API URL 返回
+    var avatarUrl = ConvertAvatarUrlToApiUrl(dataUri, u.Id);
+    return Ok(new { avatar = avatarUrl, avatarUrl = avatarUrl });
   }
 }
 

@@ -27,6 +27,30 @@ public class UserProfileController : ControllerBase
 		return int.TryParse(id, out var uid) ? uid : null;
 	}
 
+	/// <summary>
+	/// 将 AvatarUrl 转换为 API URL（如果是 Base64，返回 /api/user/{userId}/avatar）
+	/// </summary>
+	private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId)
+	{
+		if (string.IsNullOrWhiteSpace(avatarUrl))
+		{
+			return null;
+		}
+
+		if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		{
+			// 使用 Url.Action 生成 API 端点 URL
+			return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
+		}
+
+		if (Uri.TryCreate(avatarUrl, UriKind.Absolute, out _))
+		{
+			return avatarUrl;
+		}
+
+		return null;
+	}
+
 	public class UserProfileResponseDto
 	{
 		public string Id { get; set; } = string.Empty;          // string
@@ -62,7 +86,7 @@ public class UserProfileController : ControllerBase
 			Email = user.Email,
 			Location = user.Region,
 			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
-			Avatar = user.AvatarUrl,
+			Avatar = ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id),
 			JoinDays = joinDays,
 			PointsTotal = user.CurrentPoints
 		};
@@ -126,7 +150,7 @@ public class UserProfileController : ControllerBase
 			Email = user.Email,
 			Location = user.Region,
 			BirthDate = user.BirthDate.ToString("yyyy-MM-dd"),
-			Avatar = user.AvatarUrl,
+			Avatar = ConvertAvatarUrlToApiUrl(user.AvatarUrl, user.Id),
 			JoinDays = joinDays,
 			PointsTotal = user.CurrentPoints
 		};
@@ -161,6 +185,43 @@ public class UserProfileController : ControllerBase
 		await _db.SaveChangesAsync(ct);
 
 		return Ok();
+	}
+
+	/// <summary>
+	/// 获取用户头像图片（支持 Base64 和 URL）
+	/// </summary>
+	[HttpGet("{userId}/avatar")]
+	[AllowAnonymous]
+	public async Task<IActionResult> GetAvatar([FromRoute] int userId, CancellationToken ct)
+	{
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+		if (user is null || string.IsNullOrWhiteSpace(user.AvatarUrl))
+		{
+			return NotFound();
+		}
+
+		// 如果 AvatarUrl 是 Base64 格式，解析并返回图片
+		if (user.AvatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		{
+			var base64Data = user.AvatarUrl.Split(',');
+			if (base64Data.Length != 2)
+			{
+				return BadRequest("Invalid avatar format.");
+			}
+
+			var mimeType = base64Data[0].Split(';')[0].Split(':')[1];
+			var imageBytes = Convert.FromBase64String(base64Data[1]);
+
+			return File(imageBytes, mimeType);
+		}
+
+		// 如果是 URL，重定向到该 URL
+		if (Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var uri))
+		{
+			return Redirect(user.AvatarUrl);
+		}
+
+		return NotFound();
 	}
 }
 

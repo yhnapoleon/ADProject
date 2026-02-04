@@ -1,15 +1,19 @@
 fastapi==0.104.1
 uvicorn==0.24.0
-python-multipart==0.0.6
-pydantic==2.5.2
-pillow==10.2.0
+python-multipart==0.0.22
+# Upgrade to a Python 3.13 compatible version (prebuilt pydantic-core wheels)
+pydantic>=2.9.2,<3.0.0
+pillow>=11.0.0,<12
 
 # FIX 1: Pin numpy to avoid 2.0 conflicts
-numpy<2.0.0
+# For Python 3.13 compatibility, require NumPy 2.x
+numpy>=2.1.0,<3.0.0
 
 # FIX 2: Upgrade transformers to a stable recent version
-transformers==4.48.0
+transformers==4.53.0
 
 # FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.6.0
+torch==2.7.1+cpu
+# Pin torchvision to a version compatible with torch 2.7.x
+torchvision==0.22.0
