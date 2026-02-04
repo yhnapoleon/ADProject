@@ -84,15 +84,30 @@ const Leaderboard = () => {
       dataIndex: 'nickname',
       key: 'user',
       render: (_: string, row: any) => {
-        const normalizeUrl = (url?: string | null) => {
-          if (!url) return '';
-          const s = String(url);
-          if (s.startsWith('data:image')) return s;
-          if (s.startsWith('http')) return s;
-          return `${import.meta.env.VITE_API_URL || ''}${s}`;
-        };
+        // 1. 获取原始数据 (兼容 avatarUrl 或 avatar 字段)
         const avatarRaw = row.avatarUrl ?? row.avatar;
-        const avatarSrc = normalizeUrl(avatarRaw) || undefined;
+
+        // 2. 处理 URL 的函数
+        const normalizeUrl = (url?: string | null) => {
+          if (!url) return undefined; // 返回 undefined 会让 Avatar 组件自动显示名字首字母
+
+          const str = String(url);
+
+          // ✅ 你的情况：如果是完整 URL (http 或 https 开头)，直接返回，不做任何修改
+          if (str.startsWith('http') || str.startsWith('https')) {
+            return str;
+          }
+
+          // 🔄 兼容旧数据：如果是 Base64，直接返回
+          if (str.startsWith('data:image')) {
+            return str;
+          }
+
+          // 🔗 兜底：如果是相对路径 (如 /uploads/xxx)，才尝试拼接域名
+          return `${import.meta.env.VITE_API_URL || ''}${str}`;
+        };
+
+        const avatarSrc = normalizeUrl(avatarRaw);
         const name = row.nickname ?? row.username ?? '';
         const initials = name && name.trim().length > 0
           ? (name.trim().split(/\s+/).length === 1
