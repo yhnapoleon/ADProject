@@ -15,10 +15,25 @@ interface RegionData {
   reductionRate: number; // percentage
 }
 
-// 周报数据接口
+// 周报数据接口（与后端 /admin/impact/weekly 一致：最近 5 周，start = today - 34 天）
 interface WeeklyImpactData {
   week: string;
+  weekLabel: string; // 实际日期范围，用于横轴展示
   value: number;
+}
+
+/** 根据后端逻辑计算第 i 周（0-based）的日期范围标签，便于横轴显示真实日期 */
+function getWeekLabel(i: number): string {
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const start = new Date(todayUtc);
+  start.setUTCDate(start.getUTCDate() - 34);
+  const from = new Date(start);
+  from.setUTCDate(from.getUTCDate() + i * 7);
+  const to = new Date(from);
+  to.setUTCDate(to.getUTCDate() + 6);
+  const fmt = (d: Date) => `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  return `${fmt(from)}-${fmt(to)}`;
 }
 
 // 排放因子接口
@@ -202,12 +217,12 @@ const AdminDashboard: React.FC = () => {
           console.error('Failed to load region map stats:', regionMapRes.reason);
         }
 
-        // 加载周报数据
+        // 加载周报数据（横轴用与后端一致的日期范围展示）
         if (weeklyRes.status === 'fulfilled') {
           const weekly: any[] = weeklyRes.value || [];
-          // 转换API返回的数据格式为图表所需格式
           const formattedWeekly = weekly.map((item: any, index: number) => ({
             week: item.week || `Week ${index + 1}`,
+            weekLabel: getWeekLabel(index),
             value: item.value || item.carbonReduced || 0,
           }));
           setWeeklyData(formattedWeekly);
@@ -564,7 +579,7 @@ const AdminDashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={weeklyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="week" stroke="#666" />
+                <XAxis dataKey="weekLabel" stroke="#666" />
                 <YAxis stroke="#666" domain={[0, 'dataMax + 200']} />
                 <Tooltip />
                 <Area type="monotone" dataKey="value" stroke="#4CAF50" fill="#4CAF50" fillOpacity={0.3} />

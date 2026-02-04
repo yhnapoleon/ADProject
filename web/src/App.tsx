@@ -21,7 +21,6 @@ import AdminUserList from './pages/AdminUserList';
 import AdminEmissionFactors from './pages/AdminEmissionFactors';
 import AdminCommunityAnalytics from './pages/AdminCommunityAnalytics';
 import AdminUserEmissions from './pages/AdminUserEmissions';
-import AdminSettings from './pages/AdminSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -92,7 +91,7 @@ const App: React.FC = () => {
                       <Route path="emission-factors" element={<AdminEmissionFactors />} />
                       <Route path="community-analytics" element={<AdminCommunityAnalytics />} />
                       <Route path="user-emissions" element={<AdminUserEmissions />} />
-                      <Route path="settings" element={<AdminSettings />} />
+                      {/* <Route path="settings" element={<AdminSettings />} /> */}
                     </Routes>
                   </div>
                 </div>
