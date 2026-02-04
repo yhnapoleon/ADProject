@@ -66,17 +66,10 @@ public class TravelService : ITravelService
 		await PreFlightCheckAsync(dto.TransportMode, originGeocode, destGeocode, straightLineDistanceKm, ct);
 
 		// 2. 获取路线信息（先获取导航距离，用于验证和计算）
-		var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
-		var route = await _googleMapsService.GetRouteAsync(
-			originGeocode.Latitude,
-			originGeocode.Longitude,
-			destGeocode.Latitude,
-			destGeocode.Longitude,
-			travelMode,
-			ct);
-
-		// 飞机/轮船：Google 无驾车路线时（如跨国）用大圆距离作为航程
-		if (route == null && (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship))
+		RouteResult? route = null;
+		
+		// 飞机/轮船：始终使用大圆距离（因为 Google Maps 不支持飞机/轮船路线，驾车路线不准确）
+		if (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship)
 		{
 			var greatCircleMeters = GetGreatCircleDistanceMeters(
 				originGeocode.Latitude, originGeocode.Longitude,
@@ -92,6 +85,18 @@ public class TravelService : ITravelService
 			_logger.LogInformation("Using great-circle distance for {Mode}: {DistanceKm:F1} km",
 				dto.TransportMode, greatCircleMeters / 1000.0);
 		}
+		else
+		{
+			// 其他交通工具使用 Google Maps API 获取路线
+			var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
+			route = await _googleMapsService.GetRouteAsync(
+				originGeocode.Latitude,
+				originGeocode.Longitude,
+				destGeocode.Latitude,
+				destGeocode.Longitude,
+				travelMode,
+				ct);
+		}
 
 		if (route == null)
 		{
@@ -105,18 +110,31 @@ public class TravelService : ITravelService
 		var navigationDistanceKm = route.DistanceMeters / 1000.0;
 		await ValidateTransportModeForRouteAsync(dto.TransportMode, originGeocode, destGeocode, navigationDistanceKm, ct);
 
-		// 3. 查找碳排放因子
-		var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
-		if (carbonFactor == null)
+		// 3. 计算碳排放（使用导航距离）
+		// 对于步行和自行车，使用碳减排值（负值），而不是碳排放
+		var distanceKm = (decimal)navigationDistanceKm;
+		decimal totalCarbonEmission;
+		
+		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle || dto.TransportMode == TransportMode.ElectricBike)
 		{
-			throw new InvalidOperationException($"Carbon emission factor not found for transport mode: {dto.TransportMode}");
+			// 步行和自行车使用碳减排值（负值）
+			// 步行：-0.12 kg CO₂e/km（相当于避免了汽油车同距离的排放）
+			// 自行车/电动车：-0.20 kg CO₂e/km（相当于避免了汽油车同距离的排放）
+			var reductionFactor = dto.TransportMode == TransportMode.Walking ? -0.12m : -0.20m;
+			totalCarbonEmission = distanceKm * reductionFactor; // 负值表示碳减排
+		}
+		else
+		{
+			// 其他交通工具使用正常的碳排放因子
+			var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
+			if (carbonFactor == null)
+			{
+				throw new InvalidOperationException($"Carbon emission factor not found for transport mode: {dto.TransportMode}");
+			}
+			totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
 		}
 
-		// 4. 计算碳排放（使用导航距离）
-		var distanceKm = (decimal)navigationDistanceKm;
-		var totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
-
-		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		// 4. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
 		var passengerCount = GetPassengerCount(dto.TransportMode);
 		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
@@ -190,17 +208,10 @@ public class TravelService : ITravelService
 		await PreFlightCheckAsync(dto.TransportMode, originGeocode, destGeocode, straightLineDistanceKm, ct);
 
 		// 2. 获取路线信息（先获取导航距离，用于验证和计算）
-		var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
-		var route = await _googleMapsService.GetRouteAsync(
-			originGeocode.Latitude,
-			originGeocode.Longitude,
-			destGeocode.Latitude,
-			destGeocode.Longitude,
-			travelMode,
-			ct);
-
-		// 飞机/轮船：无驾车路线时用大圆距离
-		if (route == null && (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship))
+		RouteResult? route = null;
+		
+		// 飞机/轮船：始终使用大圆距离（因为 Google Maps 不支持飞机/轮船路线，驾车路线不准确）
+		if (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship)
 		{
 			var greatCircleMeters = GetGreatCircleDistanceMeters(
 				originGeocode.Latitude, originGeocode.Longitude,
@@ -213,6 +224,18 @@ public class TravelService : ITravelService
 				DurationText = null,
 				Polyline = null
 			};
+		}
+		else
+		{
+			// 其他交通工具使用 Google Maps API 获取路线
+			var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
+			route = await _googleMapsService.GetRouteAsync(
+				originGeocode.Latitude,
+				originGeocode.Longitude,
+				destGeocode.Latitude,
+				destGeocode.Longitude,
+				travelMode,
+				ct);
 		}
 
 		if (route == null)
@@ -227,18 +250,31 @@ public class TravelService : ITravelService
 		var navigationDistanceKm = route.DistanceMeters / 1000.0;
 		await ValidateTransportModeForRouteAsync(dto.TransportMode, originGeocode, destGeocode, navigationDistanceKm, ct);
 
-		// 3. 查找碳排放因子
-		var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
-		if (carbonFactor == null)
+		// 3. 计算碳排放（使用导航距离）
+		// 对于步行和自行车，使用碳减排值（负值），而不是碳排放
+		var distanceKm = (decimal)navigationDistanceKm;
+		decimal totalCarbonEmission;
+		
+		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle || dto.TransportMode == TransportMode.ElectricBike)
 		{
-			throw new InvalidOperationException($"Carbon emission factor not found for transport mode: {dto.TransportMode}");
+			// 步行和自行车使用碳减排值（负值）
+			// 步行：-0.12 kg CO₂e/km（相当于避免了汽油车同距离的排放）
+			// 自行车/电动车：-0.20 kg CO₂e/km（相当于避免了汽油车同距离的排放）
+			var reductionFactor = dto.TransportMode == TransportMode.Walking ? -0.12m : -0.20m;
+			totalCarbonEmission = distanceKm * reductionFactor; // 负值表示碳减排
+		}
+		else
+		{
+			// 其他交通工具使用正常的碳排放因子
+			var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
+			if (carbonFactor == null)
+			{
+				throw new InvalidOperationException($"Carbon emission factor not found for transport mode: {dto.TransportMode}");
+			}
+			totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
 		}
 
-		// 4. 计算碳排放（使用导航距离）
-		var distanceKm = (decimal)navigationDistanceKm;
-		var totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
-
-		// 4.5. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		// 4. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
 		var passengerCount = GetPassengerCount(dto.TransportMode);
 		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
