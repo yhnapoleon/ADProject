@@ -272,6 +272,17 @@ public class ApplicationDbContext : DbContext
 		modelBuilder.Entity<UtilityBill>()
 			.HasIndex(u => new { u.UserId, u.YearMonth });
 
+		// === Critical Indexes for Lookups and Leaderboard ===
+		modelBuilder.Entity<ApplicationUser>()
+			.HasIndex(u => u.Email)
+			.IsUnique(); // 邮箱必须唯一且加索引
+
+		modelBuilder.Entity<ApplicationUser>()
+			.HasIndex(u => u.CurrentPoints); // 加速排行榜排序
+
+		modelBuilder.Entity<ApplicationUser>()
+			.HasIndex(u => u.TotalCarbonSaved); // 加速总减排量排序
+
 		// Seed data for CarbonReferences
 		modelBuilder.Entity<CarbonReference>().HasData(
 			new CarbonReference
