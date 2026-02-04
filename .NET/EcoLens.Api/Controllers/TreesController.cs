@@ -24,20 +24,37 @@ public class TreesController : ControllerBase
 		_pointService = pointService;
 	}
 
-		// 兼容别名：/api/getTree 与 /api/postTree（与前端约定）
+		/// <summary>
+		/// GET /api/getTree：获取当前树状态与步数。返回总步数 todaySteps、后端计算的可用步数 availableSteps。
+		/// </summary>
 		[HttpGet("/api/getTree")]
-		public Task<ActionResult<object>> GetTreeAlias(CancellationToken ct) => GetState(ct);
+		public async Task<ActionResult<object>> GetTreeAlias(CancellationToken ct)
+		{
+			var userId = GetUserId();
+			if (userId is null) return Unauthorized();
+
+			var (user, todaySteps, availableSteps) = await GetUserAndStepInfoAsync(userId.Value, ct);
+			if (user is null) return NotFound();
+
+			return Ok(new
+			{
+				totalTrees = user.TreesTotalCount,
+				currentProgress = user.CurrentTreeProgress,
+				todaySteps = todaySteps,
+				availableSteps = availableSteps
+			});
+		}
 
 		public sealed class PostTreeRequest
 		{
 			public int? TotalTrees { get; set; }
 			public int? CurrentProgress { get; set; }
+			/// <summary>本次投进去的步数，后端会累加到已用步数并返回新的 availableSteps。</summary>
+			public int? UsedSteps { get; set; }
 		}
 
 		/// <summary>
-		/// 获取或更新树状态（兼容 GET 和 POST）
-		/// GET: 返回当前状态（包括步数信息）
-		/// POST: 更新状态并返回完整信息（包括步数信息）
+		/// POST /api/postTree：前端投步数或同步树状态。传 usedSteps 时后端累加已用步数，返回 usedSteps 与新的 availableSteps；totalTrees/currentProgress 由前端计算后可选传入存储。
 		/// </summary>
 		[HttpPost("/api/postTree")]
 		public async Task<ActionResult<object>> PostTreeAlias([FromBody] PostTreeRequest? req, CancellationToken ct)
@@ -45,17 +62,63 @@ public class TreesController : ControllerBase
 			var userId = GetUserId();
 			if (userId is null) return Unauthorized();
 
-			var today = DateTime.UtcNow.Date;
-
-			// 读取用户信息和今日步数
-			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+			var (user, todaySteps, availableSteps) = await GetUserAndStepInfoAsync(userId.Value, ct);
 			if (user is null) return NotFound();
 
-			// 读取今日步数记录
-			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == today, ct);
+			var usedStepsThisTime = 0;
+
+			if (req != null)
+			{
+				// 本次投进去的步数：累加到 StepsUsedToday，并限制不超过今日总步数
+				if (req.UsedSteps.HasValue && req.UsedSteps.Value > 0)
+				{
+					var toAdd = Math.Min(req.UsedSteps.Value, Math.Max(0, todaySteps - user.StepsUsedToday));
+					user.StepsUsedToday += toAdd;
+					usedStepsThisTime = toAdd;
+					await _db.SaveChangesAsync(ct);
+				}
+
+				// 可选：前端计算后的 totalTrees、currentProgress 传回后端存储
+				if (req.TotalTrees.HasValue || req.CurrentProgress.HasValue)
+				{
+					var dto = new UpdateTreeStateRequest
+					{
+						TotalTrees = req.TotalTrees,
+						CurrentProgress = req.CurrentProgress
+					};
+					await UpdateState(dto, ct);
+					user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+					if (user is null) return NotFound();
+				}
+			}
+
+			// 重新取今日步数与已用步数，计算当前可用步数
+			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == DateTime.UtcNow.Date, ct);
+			var todayStepsNow = stepRecord?.StepCount ?? 0;
+			user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+			var availableStepsNow = user is null ? 0 : Math.Max(0, todayStepsNow - user.StepsUsedToday);
+
+			return Ok(new
+			{
+				totalTrees = user!.TreesTotalCount,
+				currentProgress = user.CurrentTreeProgress,
+				usedSteps = usedStepsThisTime,
+				availableSteps = availableStepsNow
+			});
+		}
+
+		/// <summary>
+		/// 获取当前用户、今日总步数、当前可用步数（含每日重置逻辑）。
+		/// </summary>
+		private async Task<(Models.ApplicationUser? user, int todaySteps, int availableSteps)> GetUserAndStepInfoAsync(int userId, CancellationToken ct)
+		{
+			var today = DateTime.UtcNow.Date;
+			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
+			if (user is null) return (null, 0, 0);
+
+			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId && r.RecordDate == today, ct);
 			var todaySteps = stepRecord?.StepCount ?? 0;
 
-			// 处理每日重置：若最后消耗日期不是今天，则清零已用步数并刷新日期
 			if (!user.LastStepUsageDate.HasValue || user.LastStepUsageDate.Value.Date != today)
 			{
 				user.StepsUsedToday = 0;
@@ -63,34 +126,8 @@ public class TreesController : ControllerBase
 				await _db.SaveChangesAsync(ct);
 			}
 
-			// 计算可投入的步数
 			var availableSteps = Math.Max(0, todaySteps - user.StepsUsedToday);
-
-			// 如果是 POST 请求且有更新数据，则更新状态
-			if (req != null && (req.TotalTrees.HasValue || req.CurrentProgress.HasValue))
-			{
-				var dto = new UpdateTreeStateRequest
-				{
-					TotalTrees = req.TotalTrees,
-					CurrentProgress = req.CurrentProgress
-				};
-				await UpdateState(dto, ct);
-				
-				// 重新读取用户信息以获取最新状态
-				user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
-				if (user is null) return NotFound();
-			}
-
-			// 返回完整状态信息（包括步数）
-			return Ok(new
-			{
-				totalTrees = user.TreesTotalCount,
-				currentProgress = user.CurrentTreeProgress,
-				todaySteps = todaySteps,
-				availableSteps = availableSteps,
-				status = user.CurrentTreeProgress >= 100 ? "completed" : (user.CurrentTreeProgress > 0 ? "growing" : "idle"),
-				pointsTotal = user.CurrentPoints
-			});
+			return (user, todaySteps, availableSteps);
 		}
 
 		private static object BuildState(int totalTrees, int currentProgress, int? pointsTotal = null)
