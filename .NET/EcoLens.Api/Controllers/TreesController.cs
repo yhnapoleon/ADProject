@@ -16,7 +16,21 @@ public class TreesController : ControllerBase
 	private readonly ApplicationDbContext _db;
 	private readonly IPointService _pointService;
 	private const int StepsPerTree = 15000; // 与移动端交互契合：约 150 步=1% -> 15000 步=100%
-		private const int StepsPerProgressPoint = StepsPerTree / 100; // 150 步 == 1 进度点
+	private const int StepsPerProgressPoint = StepsPerTree / 100; // 150 步 == 1 进度点
+
+	/// <summary>步数/种树「今天」按新加坡时区（UTC+8），与数据库步数记录日期一致，避免云端 UTC 已次日导致查不到步数。</summary>
+	private static DateTime GetTodayForSteps()
+	{
+		try
+		{
+			var tz = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+			return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+		}
+		catch
+		{
+			return DateTime.UtcNow.Date;
+		}
+	}
 
 	public TreesController(ApplicationDbContext db, IPointService pointService)
 	{
@@ -93,7 +107,9 @@ public class TreesController : ControllerBase
 			}
 
 			// 重新取今日步数与已用步数，计算当前可用步数
-			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == DateTime.UtcNow.Date, ct);
+			var todayForSteps = GetTodayForSteps();
+			var tomorrowForSteps = todayForSteps.AddDays(1);
+			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate >= todayForSteps && r.RecordDate < tomorrowForSteps, ct);
 			var todayStepsNow = stepRecord?.StepCount ?? 0;
 			user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 			var availableStepsNow = user is null ? 0 : Math.Max(0, todayStepsNow - user.StepsUsedToday);
@@ -112,11 +128,12 @@ public class TreesController : ControllerBase
 		/// </summary>
 		private async Task<(Models.ApplicationUser? user, int todaySteps, int availableSteps)> GetUserAndStepInfoAsync(int userId, CancellationToken ct)
 		{
-			var today = DateTime.UtcNow.Date;
+			var today = GetTodayForSteps();
+			var tomorrow = today.AddDays(1);
 			var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
 			if (user is null) return (null, 0, 0);
 
-			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId && r.RecordDate == today, ct);
+			var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId && r.RecordDate >= today && r.RecordDate < tomorrow, ct);
 			var todaySteps = stepRecord?.StepCount ?? 0;
 
 			if (!user.LastStepUsageDate.HasValue || user.LastStepUsageDate.Value.Date != today)
@@ -167,9 +184,10 @@ public class TreesController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var today = DateTime.UtcNow.Date;
+		var today = GetTodayForSteps();
+		var tomorrow = today.AddDays(1);
 		var todaySteps = await _db.StepRecords
-			.Where(r => r.UserId == userId.Value && r.RecordDate == today)
+			.Where(r => r.UserId == userId.Value && r.RecordDate >= today && r.RecordDate < tomorrow)
 			.Select(r => r.StepCount)
 			.FirstOrDefaultAsync(ct);
 
@@ -269,8 +287,9 @@ public class TreesController : ControllerBase
 		if (userId is null) return Unauthorized();
 		if (req.Steps < 0) return BadRequest("steps must be non-negative.");
 
-		var today = DateTime.UtcNow.Date;
-		var record = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == today, ct);
+		var today = GetTodayForSteps();
+		var tomorrow = today.AddDays(1);
+		var record = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate >= today && r.RecordDate < tomorrow, ct);
 		if (record is null)
 		{
 			record = new Models.StepRecord
@@ -316,13 +335,14 @@ public class TreesController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		var today = DateTime.UtcNow.Date;
+		var today = GetTodayForSteps();
+		var tomorrow = today.AddDays(1);
 
 		// 读取用户与当日步数
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (user is null) return NotFound();
 
-		var record = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == today, ct);
+		var record = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate >= today && r.RecordDate < tomorrow, ct);
 		var totalStepsToday = record?.StepCount ?? 0;
 
 		// 每日重置：若最后消耗日期不是今天，则清零已用步数并刷新日期
