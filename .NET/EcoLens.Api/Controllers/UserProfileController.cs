@@ -187,6 +187,28 @@ public class UserProfileController : ControllerBase
 	}
 
 	/// <summary>
+	/// 验证旧密码是否正确（仅校验，不修改）。
+	/// </summary>
+	[HttpPost("verify-password")]
+	public async Task<ActionResult<VerifyPasswordResponseDto>> VerifyPassword([FromBody] VerifyPasswordRequestDto dto, CancellationToken ct)
+	{
+		var userId = GetUserId();
+		if (userId is null) return Unauthorized();
+
+		if (string.IsNullOrWhiteSpace(dto.OldPassword))
+		{
+			return BadRequest("OldPassword is required.");
+		}
+
+		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
+		if (user is null) return NotFound();
+
+		var oldHash = PasswordHasher.Hash(dto.OldPassword);
+		var valid = string.Equals(oldHash, user.PasswordHash, StringComparison.OrdinalIgnoreCase);
+		return Ok(new VerifyPasswordResponseDto { Valid = valid });
+	}
+
+	/// <summary>
 	/// 获取用户头像图片（支持 Base64 和 URL）
 	/// </summary>
 	[HttpGet("{userId}/avatar")]

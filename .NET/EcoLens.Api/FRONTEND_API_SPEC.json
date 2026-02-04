@@ -230,6 +230,30 @@
               "example": "Old password is incorrect."
             }
           }
+        },
+        {
+          "name": "验证旧密码",
+          "path": "/api/user/verify-password",
+          "method": "POST",
+          "authRequired": true,
+          "description": "验证旧密码是否正确，不修改密码",
+          "request": {
+            "contentType": "application/json",
+            "body": {
+              "oldPassword": "string (必填) - 旧密码"
+            },
+            "example": {
+              "oldPassword": "OldPass123!"
+            }
+          },
+          "response": {
+            "200": {
+              "description": "验证结果",
+              "example": {
+                "valid": true
+              }
+            }
+          }
         }
       ]
     },
