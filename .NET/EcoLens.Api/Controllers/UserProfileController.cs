@@ -6,6 +6,7 @@ using EcoLens.Api.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EcoLens.Api.Controllers;
 
@@ -15,10 +16,12 @@ namespace EcoLens.Api.Controllers;
 public class UserProfileController : ControllerBase
 {
 	private readonly ApplicationDbContext _db;
+	private readonly IMemoryCache _cache;
 
-	public UserProfileController(ApplicationDbContext db)
+	public UserProfileController(ApplicationDbContext db, IMemoryCache cache)
 	{
 		_db = db;
+		_cache = cache;
 	}
 
 	private int? GetUserId()
@@ -139,6 +142,12 @@ public class UserProfileController : ControllerBase
 
 		await _db.SaveChangesAsync(ct);
 
+		// 如果头像被更新，清理内存缓存
+		if (dto.Avatar is not null)
+		{
+			_cache.Remove($"Avatar_{userId.Value}");
+		}
+
 		var joinDays = (int)Math.Max(0, (DateTime.UtcNow.Date - user.CreatedAt.Date).TotalDays);
 
 		var result = new UserProfileResponseDto
@@ -213,33 +222,65 @@ public class UserProfileController : ControllerBase
 	/// </summary>
 	[HttpGet("{userId}/avatar")]
 	[AllowAnonymous]
-	public async Task<IActionResult> GetAvatar([FromRoute] int userId, CancellationToken ct)
+	[ResponseCache(Duration = 31536000, VaryByQueryKeys = new[] { "v" })]
+	public async Task<IActionResult> GetAvatar([FromRoute] int userId, [FromQuery] long? v, CancellationToken ct)
 	{
-		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId, ct);
-		if (user is null || string.IsNullOrWhiteSpace(user.AvatarUrl))
+		var cacheKey = $"Avatar_{userId}";
+
+		// 先尝试命中内存缓存
+		if (_cache.TryGetValue<(byte[] ImageBytes, string ContentType)>(cacheKey, out var cached))
+		{
+			return File(cached.ImageBytes, cached.ContentType);
+		}
+
+		// 仅投影查询 AvatarUrl 字段，避免加载整个实体
+		var avatarUrl = await _db.ApplicationUsers
+			.AsNoTracking()
+			.Where(u => u.Id == userId)
+			.Select(u => u.AvatarUrl)
+			.FirstOrDefaultAsync(ct);
+
+		if (string.IsNullOrWhiteSpace(avatarUrl))
 		{
 			return NotFound();
 		}
 
-		// 如果 AvatarUrl 是 Base64 格式，解析并返回图片
-		if (user.AvatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+		// Base64 -> 解析并缓存
+		if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
 		{
-			var base64Data = user.AvatarUrl.Split(',');
-			if (base64Data.Length != 2)
+			var parts = avatarUrl.Split(',');
+			if (parts.Length != 2)
 			{
 				return BadRequest("Invalid avatar format.");
 			}
 
-			var mimeType = base64Data[0].Split(';')[0].Split(':')[1];
-			var imageBytes = Convert.FromBase64String(base64Data[1]);
+			try
+			{
+				var meta = parts[0]; // data:image/png;base64
+				var contentType = meta.Split(';')[0].Split(':')[1];
+				var imageBytes = Convert.FromBase64String(parts[1]);
 
-			return File(imageBytes, mimeType);
+				_cache.Set(cacheKey, (imageBytes, contentType), new MemoryCacheEntryOptions
+				{
+					AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1)
+				});
+
+				return File(imageBytes, contentType);
+			}
+			catch (FormatException)
+			{
+				return BadRequest("Invalid avatar base64 content.");
+			}
+			catch
+			{
+				return BadRequest("Failed to parse avatar content.");
+			}
 		}
 
-		// 如果是 URL，重定向到该 URL
-		if (Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var uri))
+		// 普通 URL -> 直接重定向（无需缓存）
+		if (Uri.TryCreate(avatarUrl, UriKind.Absolute, out var uri))
 		{
-			return Redirect(user.AvatarUrl);
+			return Redirect(avatarUrl);
 		}
 
 		return NotFound();

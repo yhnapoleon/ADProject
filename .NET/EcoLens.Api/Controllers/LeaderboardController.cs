@@ -22,7 +22,7 @@ public class LeaderboardController : ControllerBase
 	/// <summary>
 	/// 将 AvatarUrl 转换为 API URL（如果是 Base64，返回 /api/user/{userId}/avatar）
 	/// </summary>
-	private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId)
+	private string? ConvertAvatarUrlToApiUrl(string? avatarUrl, int userId, long version)
 	{
 		if (string.IsNullOrWhiteSpace(avatarUrl))
 		{
@@ -32,7 +32,7 @@ public class LeaderboardController : ControllerBase
 		// 如果是 Base64 格式，返回 API 端点 URL
 		if (avatarUrl.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
 		{
-			return Url.Action("GetAvatar", "UserProfile", new { userId }, Request.Scheme, Request.Host.Value);
+			return Url.Action("GetAvatar", "UserProfile", new { userId, v = version }, Request.Scheme, Request.Host.Value);
 		}
 
 		// 如果已经是 URL，直接返回
@@ -75,6 +75,7 @@ public class LeaderboardController : ControllerBase
 						username = u.Username,
 						nickname = u.Nickname ?? u.Username,
 						avatarUrl = u.AvatarUrl,
+						updatedAt = u.UpdatedAt,
 						emissions = (decimal?)e.Emission ?? 0m,
 						pointsWeek = u.CurrentPoints,
 						pointsMonth = u.CurrentPoints,
@@ -92,7 +93,7 @@ public class LeaderboardController : ControllerBase
 			username = x.username,
 			nickname = x.nickname,
 			emissionsTotal = x.emissions,
-			avatarUrl = ConvertAvatarUrlToApiUrl(x.avatarUrl, x.userId),
+			avatarUrl = ConvertAvatarUrlToApiUrl(x.avatarUrl, x.userId, x.updatedAt.Ticks),
 			pointsTotal = x.pointsTotal
 		});
 		return Ok(ranked);
@@ -148,6 +149,7 @@ public class LeaderboardController : ControllerBase
 						username = u.Username,
 						nickname = u.Nickname ?? u.Username,
 						avatarUrl = u.AvatarUrl,
+						updatedAt = u.UpdatedAt,
 						emissions = (decimal?)e.Emission ?? 0m,
 						pointsWeek = u.CurrentPoints,
 						pointsMonth = u.CurrentPoints,
@@ -163,7 +165,7 @@ public class LeaderboardController : ControllerBase
 			username = x.username,
 			nickname = x.nickname,
 			emissionsTotal = x.emissions,
-			avatarUrl = ConvertAvatarUrlToApiUrl(x.avatarUrl, x.userId),
+			avatarUrl = ConvertAvatarUrlToApiUrl(x.avatarUrl, x.userId, x.updatedAt.Ticks),
 			pointsTotal = x.pointsTotal
 		}).FirstOrDefault(x => string.Equals(x.username, username, StringComparison.OrdinalIgnoreCase));
 
@@ -186,7 +188,7 @@ public class LeaderboardController : ControllerBase
 		var itemsDto = items.Select(u => new LeaderboardItemDto
 		{
 			Username = u.Username,
-			AvatarUrl = ConvertAvatarUrlToApiUrl(u.AvatarUrl, u.Id),
+			AvatarUrl = ConvertAvatarUrlToApiUrl(u.AvatarUrl, u.Id, u.UpdatedAt.Ticks),
 			TotalCarbonSaved = u.TotalCarbonSaved
 		}).ToList();
 
@@ -241,7 +243,7 @@ public class LeaderboardController : ControllerBase
 		var itemsDto = items.Select(u => new LeaderboardItemDto
 		{
 			Username = u.Username,
-			AvatarUrl = ConvertAvatarUrlToApiUrl(u.AvatarUrl, u.Id),
+			AvatarUrl = ConvertAvatarUrlToApiUrl(u.AvatarUrl, u.Id, u.UpdatedAt.Ticks),
 			TotalCarbonSaved = u.TotalCarbonSaved
 		}).ToList();
 
