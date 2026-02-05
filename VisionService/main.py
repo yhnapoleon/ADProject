@@ -12,7 +12,6 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import uvicorn
-from prometheus_fastapi_instrumentator import Instrumentator
 
 
 class FoodClassifier:
@@ -208,12 +207,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Prometheus metrics: instrument and expose /metrics
+# --- 必须放在全局作用域 ---
+from prometheus_fastapi_instrumentator import Instrumentator
+# 极简配置，确保 /metrics 路由被注册
 Instrumentator().instrument(app).expose(app)
 
 @app.get("/")
 def root():
-    return {"status": "online", "service": "EcoLens AI Vision"}
+    return {"status": "online", "version": "v3-fixed-scope"}
 
 @app.post("/predict/image", response_model=PredictionResponse)
 async def predict_image(file: UploadFile = File(...)):
