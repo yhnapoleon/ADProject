@@ -865,8 +865,8 @@ const LogMeal = () => {
               >
                 Save
               </Button>
-              <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
-                This adds a food record into your carbon ledger (stored locally)...
+              <Text style={{ fontSize: 15, color: '#8c8c8c' }}>
+                This adds a food record into your carbon ledger.
               </Text>
             </Space>
         </Form>

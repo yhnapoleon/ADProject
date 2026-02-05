@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Button, Progress, message, Spin } from 'antd';
+import { Button, Progress, message, Spin, Tooltip} from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import Lottie, { LottieRefCurrentProps } from 'lottie-react';
 import request from '../utils/request';
@@ -22,7 +22,7 @@ const TreePlanting = () => {
 
   const routeSteps = (location.state as { steps?: number; todaySteps?: number })?.steps
     ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps ?? 0;
-
+  const [availableSteps, setAvailableSteps] = useState<number>(routeSteps);
   const [todaySteps, setTodaySteps] = useState<number>(routeSteps);
   const [currentTreeGrowth, setCurrentTreeGrowth] = useState<number>(0);
   const [totalPlantedTrees, setTotalPlantedTrees] = useState<number>(0);
@@ -114,9 +114,10 @@ const TreePlanting = () => {
         const progress = Number(stateRes?.currentProgress ?? 0);
         setTotalPlantedTrees(totalTrees);
         setCurrentTreeGrowth(Math.min(100, Math.max(0, progress)));
+        const serverAvailable = Number(stateRes?.availableSteps ?? 0);
+        setAvailableSteps(serverAvailable);
         const stepsFromRoute = (location.state as { steps?: number; todaySteps?: number })?.steps
           ?? (location.state as { steps?: number; todaySteps?: number })?.todaySteps;
-        const serverAvailable = Number(stateRes?.availableSteps ?? 0);
         const steps = typeof stepsFromRoute === 'number' && stepsFromRoute > 0 ? stepsFromRoute : serverAvailable;
         setTodaySteps(steps);
       } catch (_e) {
@@ -131,13 +132,13 @@ const TreePlanting = () => {
   const handleStepConversion = async () => {
     if (isCelebrating || convertLoading) return;
 
-    if (todaySteps <= 0) {
+    if (availableSteps <= 0) {
       showAtTreeTop('No steps to convert!');
       return;
     }
 
     // 1. 前端计算逻辑 (原本是在后端的)
-    const stepsToConvert = todaySteps;
+    const stepsToConvert = availableSteps;
     // 假设 150 步长 1% 的进度，你可以根据需求修改这个系数
     const growthGain = Math.floor(stepsToConvert / 150); 
     const totalPotential = currentTreeGrowth + growthGain;
@@ -179,7 +180,9 @@ const TreePlanting = () => {
 
       // 3. 用后端返回的 availableSteps 更新可投步数
       setConvertLoading(false);
-      setTodaySteps(Number(res?.availableSteps ?? 0));
+      const newAvailable = Number(res?.availableSteps ?? 0);
+      setAvailableSteps(newAvailable);
+      setTodaySteps(newAvailable);
 
       if (totalPotential >= 100) {
         setTotalPlantedTrees(nextTotalTrees);
@@ -459,6 +462,13 @@ const TreePlanting = () => {
             zIndex: 5,
           }}
         >
+          <Tooltip 
+          title={`${currentTreeGrowth}%`}
+          color="#4CAF50"
+          placement="top"
+          overlayInnerStyle={{ color: '#FFFFFF', fontWeight: '600', fontSize: '13px' }}
+          >
+          <div>
           <Progress
             percent={currentTreeGrowth}
             strokeColor="#4CAF50"
@@ -468,6 +478,8 @@ const TreePlanting = () => {
               background: 'rgba(255, 255, 255, 0.4)',
             }}
           />
+          </div>
+          </Tooltip>
         </div>
 
         {/* 底部控制卡片 */}
@@ -501,14 +513,22 @@ const TreePlanting = () => {
             >
               Today's Steps: {todaySteps.toLocaleString()}
             </div>
-
+              <div
+              style={{
+                fontSize: '16px',
+                fontWeight: '700',
+                color: '#674fa3',
+              }}
+            >
+              Available Steps: {availableSteps.toLocaleString()}
+            </div>
             {/* 转换按钮 */}
             <Button
               type="primary"
               size="large"
               onClick={handleStepConversion}
               loading={convertLoading}
-              disabled={isCelebrating || todaySteps === 0 || treeLoading}
+              disabled={isCelebrating || availableSteps === 0 || treeLoading}
               style={{
                 borderRadius: '20px',
                 background: '#674fa3',
@@ -521,17 +541,7 @@ const TreePlanting = () => {
               Convert to Growth
             </Button>
 
-            {/* 碳影响文本 */}
-            <div
-              style={{
-                fontSize: '13px',
-                color: '#333333',
-                textAlign: 'center',
-                marginTop: '4px',
-              }}
-            >
-              Your carbon reduction from walking is equivalent to planting {totalPlantedTrees} trees for the Earth.
-            </div>
+            
           </div>
         </div>
 

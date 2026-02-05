@@ -40,7 +40,7 @@ const EMISSION_FACTORS: Record<string, number> = {
   Bicycle: 0,
   Ship: 0.03,
   Subway: 0.03,
-  Motorcycle: 0.02,
+  Motorcycle: 0.12,
   CarElectric: 0.05,
   CarGasolineExtra: 0.2,
 };
@@ -215,6 +215,9 @@ const LogTravel = () => {
               >
                 Save
               </Button>
+              <Text style={{ fontSize: 15, color: '#8c8c8c' }}>
+              This adds a travel record into your carbon ledger.(Emissions are calculated per passenger)
+            </Text>
             </Space>
           </div>
         </Form>

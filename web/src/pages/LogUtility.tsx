@@ -199,8 +199,8 @@ const LogUtility = () => {
             >
               Save
             </Button>
-            <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
-              This will be added to your carbon ledger and included in stats.
+            <Text style={{ fontSize: 15, color: '#8c8c8c' }}>
+              This adds a monthly utility bill record into your carbon ledger.
             </Text>
           </Space>
         </Form>
