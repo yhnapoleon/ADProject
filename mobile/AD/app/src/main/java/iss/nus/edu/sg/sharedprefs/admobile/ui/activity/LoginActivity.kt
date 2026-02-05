@@ -11,6 +11,9 @@ import iss.nus.edu.sg.sharedprefs.admobile.R
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.LoginRequestDto
 import iss.nus.edu.sg.sharedprefs.admobile.data.repository.AuthRepository
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 class LoginActivity : AppCompatActivity() {
 
@@ -36,7 +39,7 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // 🌟 1. 进入加载状态：禁用按钮，隐藏文字，显示进度条
+            // 🌟 1. 进入加载状态
             setLoading(true, btnLogin, progressBar)
 
             lifecycleScope.launch {
@@ -44,7 +47,6 @@ class LoginActivity : AppCompatActivity() {
                 val result = authRepository.login(loginRequest)
 
                 result.onSuccess { authResponse ->
-                    // 保存 Token
                     val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                     prefs.edit().apply {
                         putString("access_token", authResponse.token)
@@ -58,9 +60,11 @@ class LoginActivity : AppCompatActivity() {
                     startActivity(intent)
                     finish()
                 }.onFailure { exception ->
-                    // 🌟 2. 登录失败：恢复 UI 状态，允许用户再次尝试
+                    // 🌟 2. 登录失败：显示易懂的错误提示
                     setLoading(false, btnLogin, progressBar)
-                    Toast.makeText(this@LoginActivity, "Login failed: ${exception.message}", Toast.LENGTH_LONG).show()
+
+                    val friendlyMessage = getFriendlyMessage(exception)
+                    Toast.makeText(this@LoginActivity, friendlyMessage, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -76,15 +80,37 @@ class LoginActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 切换 UI 的加载状态
-     * @param isLoading 是否正在加载
-     * @param button 登录按钮
-     * @param progressBar 进度条
+     * 🌟 将异常转换为用户友好的文案
      */
+    private fun getFriendlyMessage(throwable: Throwable): String {
+        return when (throwable) {
+            is SocketTimeoutException -> "The server is taking too long to respond. Please try again later."
+            is UnknownHostException -> "Cannot connect to server. Please check your internet connection."
+            is HttpException -> {
+                when (throwable.code()) {
+                    401 -> "Invalid email or password. Please try again."
+                    404 -> "Server not found. Please try again later."
+                    500 -> "Server internal error. Our team is working on it."
+                    else -> "Login failed. Please check your credentials."
+                }
+            }
+            else -> {
+                // 如果错误信息里包含某些关键词，手动匹配
+                val msg = throwable.message ?: ""
+                when {
+                    msg.contains("401") -> "Invalid email or password."
+                    msg.contains("403") -> "This account is currently locked."
+                    msg.contains("timeout") -> "Connection timed out."
+                    else -> "An unexpected error occurred. Please try again."
+                }
+            }
+        }
+    }
+
     private fun setLoading(isLoading: Boolean, button: Button, progressBar: ProgressBar) {
         if (isLoading) {
             button.isEnabled = false
-            button.text = "" // 清空文字，给进度条留出位置
+            button.text = ""
             progressBar.visibility = View.VISIBLE
         } else {
             button.isEnabled = true

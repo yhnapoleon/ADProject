@@ -1,5 +1,6 @@
 package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
+import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -8,10 +9,15 @@ import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.airbnb.lottie.LottieAnimationView
 import com.google.android.material.appbar.MaterialToolbar
 import iss.nus.edu.sg.sharedprefs.admobile.R
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.PostTreeRequest
+import iss.nus.edu.sg.sharedprefs.admobile.data.network.NetworkClient
+import kotlinx.coroutines.launch
 import java.util.Calendar
 
 class TreePlantingActivity : AppCompatActivity() {
@@ -21,19 +27,21 @@ class TreePlantingActivity : AppCompatActivity() {
     private lateinit var lottiePlant: LottieAnimationView
     private lateinit var treeProgress: ProgressBar
     private lateinit var tvTodaySteps: TextView
+    private lateinit var tvAvailableSteps: TextView
     private lateinit var tvCarbonImpact: TextView
     private lateinit var tvPlantedCount: TextView
     private lateinit var btnConvert: Button
     private lateinit var tvFloatTip: TextView
 
     private var isNightMode = false
-    private var todaySteps = 11277
-    private var currentTreeGrowth = 35
-    private var totalPlantedTrees = 5
 
-    // 🌟 新增：标记是否正在执行庆祝动画，防止重置前被干扰
+    // 🌟 将默认值全部设为 0
+    private var todaySteps = 0
+    private var availableSteps = 0
+    private var currentTreeGrowth = 0
+    private var totalPlantedTrees = 0
+
     private var isCelebrating = false
-
     private lateinit var lottieCelebration: LottieAnimationView
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,9 +53,14 @@ class TreePlantingActivity : AppCompatActivity() {
 
         initViews()
 
+        // 🌟 初始化时禁用按钮，直到数据加载完成
+        btnConvert.isEnabled = false
+
         isNightMode = Calendar.getInstance().get(Calendar.HOUR_OF_DAY).let { it < 6 || it >= 18 }
         initThemeState()
-        refreshUI()
+
+        // 🌟 初始获取数据，fetchTreeData 内部会调用 refreshUI
+        fetchTreeData()
 
         btnConvert.setOnClickListener {
             handleStepConversion()
@@ -70,122 +83,142 @@ class TreePlantingActivity : AppCompatActivity() {
         lottiePlant = findViewById(R.id.lottie_plant)
         treeProgress = findViewById(R.id.tree_progress)
         tvTodaySteps = findViewById(R.id.tv_today_steps)
+        tvAvailableSteps = findViewById(R.id.tv_available_steps)
         tvCarbonImpact = findViewById(R.id.tv_carbon_impact_text)
         tvPlantedCount = findViewById(R.id.tv_trees_planted_count)
         btnConvert = findViewById(R.id.btn_convert_steps)
         tvFloatTip = findViewById(R.id.tv_float_tip)
     }
 
+    private fun fetchTreeData() {
+        lifecycleScope.launch {
+            try {
+                val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                val token = "Bearer ${prefs.getString("access_token", "")}"
+
+                val response = NetworkClient.apiService.getTreeData(token)
+                if (response.isSuccessful && response.body() != null) {
+                    val data = response.body()!!
+                    todaySteps = data.todaySteps
+                    availableSteps = data.availableSteps
+                    currentTreeGrowth = data.currentProgress
+                    totalPlantedTrees = data.totalTrees
+
+                    // 🌟 只有成功拿到数据后才启用按钮并刷新 UI
+                    btnConvert.isEnabled = true
+                    refreshUI()
+                }
+            } catch (e: Exception) {
+                tvTodaySteps.text = "Sync Failed"
+                Toast.makeText(this@TreePlantingActivity, "Failed to sync tree data", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun handleStepConversion() {
         if (isCelebrating) return
 
-        if (todaySteps > 0) {
-            val growthGain = todaySteps / 150
-            // 1. 计算当前进度 + 增量的总和
+        if (availableSteps > 0) {
+            val growthGain = availableSteps / 150
             val totalPotential = currentTreeGrowth + growthGain
-            todaySteps = 0
+            val usedStepsThisTime = availableSteps
 
-            // 树木互动动画
-            lottiePlant.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).withEndAction {
-                lottiePlant.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-            }.start()
+            lifecycleScope.launch {
+                try {
+                    val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                    val token = "Bearer ${prefs.getString("access_token", "")}"
 
-            if (totalPotential >= 100) {
-                // 2. 🌟 核心：计算种成了几棵树，以及剩下多少进度给下一棵
-                val treesPlantedThisTime = totalPotential / 100
-                val leftoverGrowth = totalPotential % 100
+                    val newTotalTrees = if (totalPotential >= 100) totalPlantedTrees + (totalPotential / 100) else totalPlantedTrees
+                    val newProgress = totalPotential % 100
 
-                totalPlantedTrees += treesPlantedThisTime
+                    val request = PostTreeRequest(newTotalTrees, newProgress, usedStepsThisTime)
+                    val response = NetworkClient.apiService.postTreeData(token, request)
 
-                // 先显示当前这棵树为成树状态（100%）
-                currentTreeGrowth = 100
-                refreshUI()
-
-                // 3. 传入剩余进度，开始庆祝
-                startCelebration(leftoverGrowth)
-            } else {
-                currentTreeGrowth = totalPotential
-                showAtTreeTop("Growth +$growthGain%")
-                refreshUI()
+                    if (response.isSuccessful) {
+                        performGrowthAnimation(growthGain, totalPotential)
+                        fetchTreeData()
+                    }
+                } catch (e: Exception) {
+                    showAtTreeTop("Network error!")
+                }
             }
         } else {
             showAtTreeTop("No steps to convert!")
         }
     }
 
-    /**
-     * 🌟 庆祝阶段：显示成树 3 秒，展示庆祝语，之后重置
-     */
+    private fun performGrowthAnimation(gain: Int, potential: Int) {
+        lottiePlant.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).withEndAction {
+            lottiePlant.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+        }.start()
+
+        if (potential >= 100) {
+            val leftover = potential % 100
+            currentTreeGrowth = 100
+            refreshUI()
+            startCelebration(leftover)
+        } else {
+            currentTreeGrowth = potential
+            showAtTreeTop("Growth +$gain%")
+            refreshUI()
+        }
+    }
+
     private fun startCelebration(leftover: Int) {
         isCelebrating = true
         btnConvert.isEnabled = false
-
         lottieCelebration.visibility = View.VISIBLE
         lottieCelebration.playAnimation()
-
         showAtTreeTop("Congratulations! New tree planted! 🎉")
 
-        // 延迟 3 秒：展现成树和礼花
         Handler(Looper.getMainLooper()).postDelayed({
-            resetToNewTree(leftover) // 🌟 传入剩余进度
+            resetToNewTree(leftover)
         }, 3000)
     }
 
-    /**
-     * 🌟 重置阶段：清空进度，更新 UI 回到幼苗状态
-     */
     private fun resetToNewTree(leftover: Int) {
-        currentTreeGrowth = leftover // 🌟 新树的起始进度
+        currentTreeGrowth = leftover
         isCelebrating = false
         btnConvert.isEnabled = true
-
         lottieCelebration.cancelAnimation()
         lottieCelebration.visibility = View.GONE
-
         refreshUI()
-
-        if (leftover > 0) {
-            showAtTreeTop("New tree starts with $leftover%!")
-        } else {
-            showAtTreeTop("Let's grow a new one!")
-        }
     }
 
     private fun showAtTreeTop(message: String) {
         tvFloatTip.text = message
         tvFloatTip.visibility = View.VISIBLE
         tvFloatTip.alpha = 1.0f
-
         tvFloatTip.animate().cancel()
-
-        // 如果是庆祝语，我们让它停久一点，不要被自动淡出覆盖
         val displayDuration = if (isCelebrating) 2800L else 2000L
 
         Handler(Looper.getMainLooper()).postDelayed({
-            tvFloatTip.animate()
-                .alpha(0.0f)
-                .setDuration(500)
-                .withEndAction { tvFloatTip.visibility = View.GONE }
-                .start()
+            tvFloatTip.animate().alpha(0.0f).setDuration(500).withEndAction { tvFloatTip.visibility = View.GONE }.start()
         }, displayDuration)
     }
 
     private fun refreshUI() {
         treeProgress.progress = currentTreeGrowth
-        tvTodaySteps.text = "Today's Steps: $todaySteps"
+        tvTodaySteps.text = "Today's Total Steps: $todaySteps"
+        tvAvailableSteps.text = "Available Steps: $availableSteps"
         tvPlantedCount.text = "Trees: $totalPlantedTrees"
-        tvCarbonImpact.text = "Your carbon reduction from walking is equivalent to planting $totalPlantedTrees trees for the Earth."
 
-        val calculatedStage = when {
-            currentTreeGrowth <= 0 -> 1 // 🌟 刚重置
+        // 🌟 动态生成文案，如果没有树则显示空提示
+        if (totalPlantedTrees > 0) {
+            tvCarbonImpact.text = "Your walking equivalent: $totalPlantedTrees trees planted!"
+        } else {
+            tvCarbonImpact.text = "Start walking to grow your first tree!"
+        }
+
+        val stage = when {
             currentTreeGrowth < 17 -> 1
             currentTreeGrowth < 34 -> 2
             currentTreeGrowth < 51 -> 3
             currentTreeGrowth < 68 -> 4
             currentTreeGrowth < 85 -> 5
-            else -> 6 // 100% 状态
+            else -> 6
         }
-        updatePlantStage(calculatedStage)
+        updatePlantStage(stage)
     }
 
     private fun updatePlantStage(stage: Int) {
@@ -204,7 +237,6 @@ class TreePlantingActivity : AppCompatActivity() {
         }
     }
 
-    // ... 原有的 initThemeState 和 performThemeSwitch 保持不变 ...
     private fun initThemeState() {
         if (isNightMode) {
             lottieBg.setAnimation(R.raw.background_night)

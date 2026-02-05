@@ -42,7 +42,7 @@
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="183dp"
-                        android:layout_height="120dp"
+                        android:layout_height="125dp"
                         android:layout_marginEnd="12dp"
                         app:cardCornerRadius="12dp"
                         app:cardElevation="2dp">
@@ -51,14 +51,34 @@
                             android:layout_height="match_parent"
                             android:gravity="center"
                             android:orientation="vertical">
-                            <TextView android:id="@+id/tv_total_emissions_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Total Emissions" android:textSize="12sp" android:textColor="#757575"/>
-                            <TextView android:id="@+id/tv_comparison_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3333 kg" android:textSize="22sp" android:textStyle="bold" android:textColor="#674fa3" android:layout_marginTop="8dp"/>
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Total Emissions"
+                                android:textSize="13sp"
+                                android:textColor="#757575"/>
+                            <TextView
+                                android:id="@+id/tv_total_emissions_value"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0 kg"
+                                android:textSize="26sp"
+                                android:textStyle="bold"
+                                android:textColor="#674fa3"
+                                android:layout_marginTop="8dp"/>
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="since you joined"
+                                android:textSize="11sp"
+                                android:textColor="#9E9E9E"
+                                android:layout_marginTop="4dp"/>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
 
                     <com.google.android.material.card.MaterialCardView
                         android:layout_width="183dp"
-                        android:layout_height="120dp"
+                        android:layout_height="125dp"
                         android:layout_marginEnd="12dp"
                         app:cardCornerRadius="12dp"
                         app:cardElevation="2dp">
@@ -67,8 +87,29 @@
                             android:layout_height="match_parent"
                             android:gravity="center"
                             android:orientation="vertical">
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Comparison" android:textSize="12sp" android:textColor="#757575"/>
-                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="↓ 15%" android:textSize="22sp" android:textStyle="bold" android:textColor="#4CAF50" android:layout_marginTop="8dp"/>
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Comparison"
+                                android:textSize="13sp"
+                                android:textColor="#757575"/>
+                            <TextView
+                                android:id="@+id/tv_comparison_value"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="--%"
+                                android:textSize="26sp"
+                                android:textStyle="bold"
+                                android:textColor="#4CAF50"
+                                android:layout_marginTop="8dp"/>
+                            <TextView
+                                android:id="@+id/tv_comparison_desc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="lower than average"
+                                android:textSize="11sp"
+                                android:textColor="#4CAF50"
+                                android:layout_marginTop="4dp"/>
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </LinearLayout>

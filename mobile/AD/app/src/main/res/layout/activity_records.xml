@@ -27,8 +27,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:orientation="horizontal"
         app:layout_constraintTop_toBottomOf="@id/toolbar">
 
@@ -37,33 +37,44 @@
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
+            android:layout_weight="1.2"
+            android:layout_marginEnd="4dp"
             android:text="All Types"
             android:textAllCaps="false"
             android:textColor="#674fa3"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:backgroundTint="#FFFFFF"
-            app:cornerRadius="20dp"
-
+            app:cornerRadius="12dp"
             app:icon="@drawable/ic_arrow_drop_down"
             app:iconGravity="end"
-            app:iconSize="20dp"
-            app:iconTint="#674fa3"
-            android:paddingEnd="12dp" />
+            app:iconTint="#674fa3" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_filter_month"
+            android:id="@+id/btn_start_date"
             style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
-            android:text="All Months"
+            android:layout_marginEnd="4dp"
+            android:text="Start"
             android:textAllCaps="false"
             android:textColor="#674fa3"
-            android:textSize="12sp"
+            android:textSize="11sp"
             app:backgroundTint="#FFFFFF"
-            app:cornerRadius="20dp" />
+            app:cornerRadius="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_end_date"
+            style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="End"
+            android:textAllCaps="false"
+            android:textColor="#674fa3"
+            android:textSize="11sp"
+            app:backgroundTint="#FFFFFF"
+            app:cornerRadius="12dp" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView

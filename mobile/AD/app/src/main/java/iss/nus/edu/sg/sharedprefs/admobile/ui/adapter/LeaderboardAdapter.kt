@@ -34,19 +34,19 @@ class LeaderboardAdapter(private var items: List<LeaderboardItem>) :
         holder.tvName.text = item.nickname ?: item.username
         holder.tvValue.text = String.format("%.2f kg", item.emissionsTotal)
 
-        // 🌟 统一头像处理逻辑
-        var avatarPath = item.avatarUrl ?: ""
+        // 🌟 处理 URL 拼接：此时 item.avatarUrl 已包含 ?v=xxx
+        val avatarPath = item.avatarUrl ?: ""
         val fullAvatarUrl = if (avatarPath.isNotEmpty()) {
             if (avatarPath.startsWith("http")) avatarPath
             else "$BASE_URL${avatarPath.replace("\\", "/")}"
         } else null
 
-        // 🌟 强制禁用缓存加载
+        // 🌟 性能优化：启用缓存以实现流畅滑动
         Glide.with(holder.itemView.context)
             .load(fullAvatarUrl)
             .apply(RequestOptions.circleCropTransform())
-            .skipMemoryCache(true) // 🌟 跳过内存
-            .diskCacheStrategy(DiskCacheStrategy.NONE) // 🌟 跳过磁盘
+            .skipMemoryCache(false) // 🌟 允许内存缓存：滑动回看时瞬间加载
+            .diskCacheStrategy(DiskCacheStrategy.ALL) // 🌟 允许磁盘缓存：下次打开 App 免下载
             .placeholder(R.drawable.ic_avatar_placeholder)
             .error(R.drawable.ic_avatar_placeholder)
             .into(holder.ivAvatar)

@@ -6,8 +6,7 @@ import iss.nus.edu.sg.sharedprefs.admobile.data.model.AddTravelRequest
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.AuthResponseDto
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.AvatarUploadResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.BarcodeResponse
-import iss.nus.edu.sg.sharedprefs.admobile.data.model.BatchDeleteRequest
-import iss.nus.edu.sg.sharedprefs.admobile.data.model.BatchDeleteResponse
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.BatchDeleteTypedResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.CalculateFoodRequest
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.CalculateFoodResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.ChangePasswordRequest
@@ -19,17 +18,22 @@ import iss.nus.edu.sg.sharedprefs.admobile.data.model.LeaderboardItem
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.LoginRequestDto
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.MainPageResponseDto
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.ManualUtilityRequest
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.PostTreeRequest
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.RegisterRequestDto
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.StepSyncRequest
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.StepSyncResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.TravelHistoryResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.TravelResponse
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.TreeResponse
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.TypedDeleteEntry
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UpdateProfileRequest
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UserProfileResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UserStatsResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UtilityBillResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UtilityHistoryItem
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UtilityHistoryResponse
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.VerifyPasswordRequest
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.VerifyPasswordResponse
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -141,6 +145,12 @@ interface EcoLensApiService {
         @Body request: AddFoodRequest
     ): Response<AddFoodResponse>
 
+    @POST("api/user/verify-password")
+    suspend fun verifyPassword(
+        @Header("Authorization") token: String,
+        @Body request: VerifyPasswordRequest
+    ): Response<VerifyPasswordResponse>
+
     @POST("api/user/change-password")
     suspend fun changePassword(
         @Header("Authorization") token: String,
@@ -178,11 +188,11 @@ interface EcoLensApiService {
         @Path("id") id: Int
     ): Response<Unit>
 
-    @POST("/api/carbon-emission/batch-delete")
-    suspend fun batchDeleteRecords(
+    @POST("/api/carbon-emission/batch-delete-typed")
+    suspend fun batchDeleteTypedRecords(
         @Header("Authorization") token: String,
-        @Body request: BatchDeleteRequest
-    ): Response<BatchDeleteResponse>
+        @Body request: List<TypedDeleteEntry> // 注意：这里直接传 List
+    ): Response<BatchDeleteTypedResponse>
 
     @POST("api/Step/sync")
     suspend fun syncSteps(
@@ -190,4 +200,14 @@ interface EcoLensApiService {
         @Body request: StepSyncRequest
     ): Response<StepSyncResponse>
 
+    @GET("api/getTree")
+    suspend fun getTreeData(
+        @Header("Authorization") token: String
+    ): Response<TreeResponse>
+
+    @POST("api/postTree")
+    suspend fun postTreeData(
+        @Header("Authorization") token: String,
+        @Body request: PostTreeRequest
+    ): Response<Unit>
 }

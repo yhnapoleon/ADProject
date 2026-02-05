@@ -1,15 +1,10 @@
 package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.Spinner
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.mikephil.charting.charts.LineChart
@@ -29,7 +24,8 @@ class ProfileStatsActivity : AppCompatActivity() {
     private var statsData: List<UserStatsResponse> = emptyList()
 
     private lateinit var tvTotalValue: TextView
-    private lateinit var tvCompValue: TextView
+    private lateinit var tvComparisonValue: TextView
+    private lateinit var tvComparisonDesc: TextView
     private lateinit var spinner: Spinner
     private lateinit var lineChart: LineChart
     private lateinit var pieChart: PieChart
@@ -42,9 +38,10 @@ class ProfileStatsActivity : AppCompatActivity() {
         window.statusBarColor = Color.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
-        // 1. 初始化视图
+        // 1. 初始化视图绑定
         tvTotalValue = findViewById(R.id.tv_total_emissions_value)
-        tvCompValue = findViewById(R.id.tv_comparison_value)
+        tvComparisonValue = findViewById(R.id.tv_comparison_value)
+        tvComparisonDesc = findViewById(R.id.tv_comparison_desc)
         spinner = findViewById(R.id.spinner_time_range)
         lineChart = findViewById(R.id.lineChart)
         pieChart = findViewById(R.id.pieChart)
@@ -53,15 +50,14 @@ class ProfileStatsActivity : AppCompatActivity() {
             onBackPressedDispatcher.onBackPressed()
         }
 
-        // 2. 初始配置图表样式
+        // 2. 配置图表基础样式
         initChartStyles()
 
-        // 3. 从后端获取真实数据
+        // 3. 后端拉取数据
         fetchStatsFromServer()
     }
 
     private fun initChartStyles() {
-        // LineChart 基础样式
         lineChart.apply {
             description.isEnabled = false
             axisRight.isEnabled = false
@@ -70,9 +66,10 @@ class ProfileStatsActivity : AppCompatActivity() {
             animateY(1000)
         }
 
-        // PieChart 基础样式
         pieChart.apply {
-            isDrawHoleEnabled = false
+            isDrawHoleEnabled = true
+            setHoleColor(Color.TRANSPARENT)
+            holeRadius = 40f
             description.isEnabled = false
             legend.verticalAlignment = Legend.LegendVerticalAlignment.BOTTOM
             legend.horizontalAlignment = Legend.LegendHorizontalAlignment.CENTER
@@ -85,64 +82,61 @@ class ProfileStatsActivity : AppCompatActivity() {
             try {
                 val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
                 val token = "Bearer ${prefs.getString("access_token", "")}"
-
                 val response = NetworkClient.apiService.getAboutMe(token)
 
                 if (response.isSuccessful && response.body() != null) {
                     statsData = response.body()!!
 
-                    // 🌟 打印后端返回的完整数据列表
-                    android.util.Log.d("ECO_DEBUG", "About-Me Raw Data: $statsData")
-
-                    // 🌟 也可以循环打印每一个月的数据，看得更清楚
-                    statsData.forEach { data ->
-                        android.util.Log.d("ECO_DEBUG", "Month: ${data.month} | Total: ${data.emissionsTotal} | AvgAll: ${data.averageAllUsers}")
-                    }
-
-                    // 更新 UI
+                    // 数据同步后更新 UI
                     updateTopCards()
                     setupLineChart()
                     setupTimeRangeSpinner()
                 } else {
-                    // 打印错误响应信息
-                    android.util.Log.e("ECO_DEBUG", "API Error: ${response.code()} - ${response.errorBody()?.string()}")
                     Toast.makeText(this@ProfileStatsActivity, "Failed to load statistics", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                // 打印网络异常信息
-                android.util.Log.e("ECO_DEBUG", "Fetch Stats Exception: ${e.message}")
                 Toast.makeText(this@ProfileStatsActivity, "Network error", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     /**
-     * 更新顶部总排放量和对比卡片
+     * 🌟 修改后的顶部卡片逻辑：匹配图片样式
      */
     private fun updateTopCards() {
         if (statsData.isEmpty()) return
 
-        // 使用最近一个月的数据
-        val latest = statsData.last()
-        tvTotalValue.text = "${String.format("%.1f", latest.emissionsTotal)} kg"
+        // 1. 总排放量：计算加入以来的所有月份总和
+        val totalSum = statsData.sumOf { it.emissionsTotal }
+        tvTotalValue.text = "${String.format("%.0f", totalSum)} kg"
 
-        // 计算与全站平均水平的差异
+        // 2. 对比：基于最近一个月的数据与全站平均值进行比较
+        val latest = statsData.last()
         val avg = latest.averageAllUsers
+
         if (avg > 0) {
             val diffPercent = ((latest.emissionsTotal - avg) / avg) * 100
+
             if (diffPercent > 0) {
-                tvCompValue.text = "↑ ${String.format("%.1f", diffPercent)}%"
-                tvCompValue.setTextColor(Color.RED)
+                // 高于平均值 (红色警示)
+                tvComparisonValue.text = "↑ ${String.format("%.0f", diffPercent)}%"
+                tvComparisonValue.setTextColor(Color.parseColor("#FF5252"))
+                tvComparisonDesc.text = "higher than average"
+                tvComparisonDesc.setTextColor(Color.parseColor("#FF5252"))
             } else {
-                tvCompValue.text = "↓ ${String.format("%.1f", Math.abs(diffPercent))}%"
-                tvCompValue.setTextColor(Color.parseColor("#4CAF50"))
+                // 低于平均值 (绿色优秀 - 匹配图片)
+                val absPercent = Math.abs(diffPercent)
+                tvComparisonValue.text = "↓ ${String.format("%.0f", absPercent)}%"
+                tvComparisonValue.setTextColor(Color.parseColor("#4CAF50"))
+                tvComparisonDesc.text = "lower than average"
+                tvComparisonDesc.setTextColor(Color.parseColor("#4CAF50"))
             }
+        } else {
+            tvComparisonValue.text = "--"
+            tvComparisonDesc.text = "no average data"
         }
     }
 
-    /**
-     * 配置折线图：显示个人排放趋势
-     */
     private fun setupLineChart() {
         val entries = ArrayList<Entry>()
         val labels = ArrayList<String>()
@@ -152,14 +146,14 @@ class ProfileStatsActivity : AppCompatActivity() {
             labels.add(data.month)
         }
 
-        val dataSet = LineDataSet(entries, "Total Emissions (kg)").apply {
+        val dataSet = LineDataSet(entries, "Monthly (kg)").apply {
             color = Color.parseColor("#674fa3")
             setCircleColor(Color.parseColor("#674fa3"))
             lineWidth = 3f
             mode = LineDataSet.Mode.CUBIC_BEZIER
             setDrawFilled(true)
             fillColor = Color.parseColor("#674fa3")
-            fillAlpha = 30
+            fillAlpha = 35
             setDrawValues(false)
         }
 
@@ -169,9 +163,6 @@ class ProfileStatsActivity : AppCompatActivity() {
         lineChart.invalidate()
     }
 
-    /**
-     * 配置时间范围选择器
-     */
     private fun setupTimeRangeSpinner() {
         val options = mutableListOf("All Time")
         options.addAll(statsData.map { it.month })
@@ -181,30 +172,24 @@ class ProfileStatsActivity : AppCompatActivity() {
         spinner.adapter = adapter
 
         spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                updatePieChart(options[position])
+            override fun onItemSelected(p0: AdapterView<*>?, p1: View?, pos: Int, p3: Long) {
+                updatePieChart(options[pos])
             }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+            override fun onNothingSelected(p0: AdapterView<*>?) {}
         }
     }
 
-    /**
-     * 根据选择的月份更新饼图数据
-     */
     private fun updatePieChart(selectedRange: String) {
         val entries = ArrayList<PieEntry>()
 
         if (selectedRange == "All Time") {
-            // 计算所有月份的总和
             val foodSum = statsData.sumOf { it.food }.toFloat()
             val transportSum = statsData.sumOf { it.transport }.toFloat()
             val utilitySum = statsData.sumOf { it.utility }.toFloat()
-
             entries.add(PieEntry(foodSum, "Food"))
             entries.add(PieEntry(transportSum, "Travel"))
             entries.add(PieEntry(utilitySum, "Utility"))
         } else {
-            // 查找特定月份的数据
             val data = statsData.find { it.month == selectedRange }
             data?.let {
                 entries.add(PieEntry(it.food.toFloat(), "Food"))
@@ -217,10 +202,10 @@ class ProfileStatsActivity : AppCompatActivity() {
             colors = arrayListOf(
                 Color.parseColor("#674fa3"),
                 Color.parseColor("#64B5F6"),
-                Color.parseColor("#FFEB3B")
+                Color.parseColor("#FFD54F")
             )
-            sliceSpace = 2f
-            valueTextColor = Color.BLACK
+            sliceSpace = 3f
+            valueTextColor = Color.WHITE
             valueTextSize = 12f
         }
 
