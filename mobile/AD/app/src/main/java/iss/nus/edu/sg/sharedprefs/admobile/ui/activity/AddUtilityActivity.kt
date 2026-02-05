@@ -168,7 +168,6 @@ class AddUtilityActivity : AppCompatActivity() {
             billPeriodEnd = apiDateFormat.format(endCalendar.time),
             electricityUsage = etElectricity.text.toString().toDoubleOrNull() ?: 0.0,
             waterUsage = etWater.text.toString().toDoubleOrNull() ?: 0.0,
-            gasUsage = 0.0,
             notes = noteContent // 🌟 将获取的内容放入请求对象
         )
 
