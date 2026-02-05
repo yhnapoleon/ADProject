@@ -16,9 +16,9 @@ public enum TransportMode
 	Bicycle = 1,
 
 	/// <summary>
-	/// 电动车
+	/// 烧油的摩托车
 	/// </summary>
-	ElectricBike = 2,
+	Motorcycle = 2,
 
 	/// <summary>
 	/// 地铁

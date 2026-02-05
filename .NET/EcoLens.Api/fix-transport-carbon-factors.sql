@@ -28,16 +28,16 @@ BEGIN
     PRINT 'Bicycle carbon factor already exists';
 END
 
--- 3. ElectricBike (电动车)
-IF NOT EXISTS (SELECT * FROM [CarbonReferences] WHERE [LabelName] = 'ElectricBike')
+-- 3. Motorcycle (烧油的摩托车)
+IF NOT EXISTS (SELECT * FROM [CarbonReferences] WHERE [LabelName] = 'Motorcycle')
 BEGIN
     INSERT INTO [CarbonReferences] ([LabelName], [Category], [Co2Factor], [Unit], [Source], [CreatedAt], [UpdatedAt])
-    VALUES ('ElectricBike', 1, 0.02, 'kgCO2/km', 'Local', GETUTCDATE(), GETUTCDATE());
-    PRINT 'Added ElectricBike carbon factor';
+    VALUES ('Motorcycle', 1, 0.12, 'kgCO2/km', 'Local', GETUTCDATE(), GETUTCDATE());
+    PRINT 'Added Motorcycle carbon factor';
 END
 ELSE
 BEGIN
-    PRINT 'ElectricBike carbon factor already exists';
+    PRINT 'Motorcycle carbon factor already exists';
 END
 
 -- 4. Bus (公交车)

@@ -8,7 +8,6 @@ package iss.nus.edu.sg.sharedprefs.admobile.data.model
         val billPeriodEnd: String,
         val electricityUsage: Double,
         val waterUsage: Double,
-        val gasUsage: Double,
         val electricityCarbonEmission: Double,
         val waterCarbonEmission: Double,
         val totalCarbonEmission: Double
@@ -21,7 +20,6 @@ package iss.nus.edu.sg.sharedprefs.admobile.data.model
         val billPeriodEnd: String,
         val electricityUsage: Double,
         val waterUsage: Double,
-        val gasUsage: Double = 0.0, // 默认 0
         val notes: String? = ""
     )
 

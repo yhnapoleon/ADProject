@@ -23,12 +23,7 @@ public class UtilityBillStatisticsDto
 	public decimal TotalWaterUsage { get; set; }
 
 	/// <summary>
-	/// 总用气量（kWh 或 m³）
-	/// </summary>
-	public decimal TotalGasUsage { get; set; }
-
-	/// <summary>
-	/// 总碳排放（kg CO2）
+	/// 总碳排放（kg CO2，仅电+水，不含煤气）
 	/// </summary>
 	public decimal TotalCarbonEmission { get; set; }
 
@@ -69,12 +64,7 @@ public class BillTypeStatisticsDto
 	public decimal TotalWaterUsage { get; set; }
 
 	/// <summary>
-	/// 总用气量（kWh 或 m³）
-	/// </summary>
-	public decimal TotalGasUsage { get; set; }
-
-	/// <summary>
-	/// 总碳排放（kg CO2）
+	/// 总碳排放（kg CO2，仅电+水，不含煤气）
 	/// </summary>
 	public decimal TotalCarbonEmission { get; set; }
 }

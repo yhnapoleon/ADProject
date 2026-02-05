@@ -29,10 +29,10 @@ public class CreateTravelLogDto
 	/// 枚举值说明：
 	/// - 0: 步行（Walking）
 	/// - 1: 自行车（Bicycle）
-	/// - 2: 电动车（ElectricBike）
+	/// - 2: 摩托车/烧油（Motorcycle）
 	/// - 3: 地铁（Subway）
 	/// - 4: 公交车（Bus）
-	/// - 5: 出租车/网约车（Taxi）
+	/// - 5: 出租车/网约车（已取消，不可选）
 	/// - 6: 私家车（汽油）（CarGasoline）
 	/// - 7: 私家车（电动车）（CarElectric）
 	/// - 8: 轮船（Ship）

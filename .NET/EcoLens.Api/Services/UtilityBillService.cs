@@ -379,12 +379,11 @@ public class UtilityBillService : IUtilityBillService
 			baseQuery = baseQuery.Where(b => b.BillPeriodStart < endDateInclusive);
 		}
 
-		// 总体统计
+		// 总体统计（不含煤气）
 		var totalRecords = await baseQuery.CountAsync(ct);
 		var totalElectricityUsage = await baseQuery.SumAsync(b => b.ElectricityUsage ?? 0, ct);
 		var totalWaterUsage = await baseQuery.SumAsync(b => b.WaterUsage ?? 0, ct);
-		var totalGasUsage = await baseQuery.SumAsync(b => b.GasUsage ?? 0, ct);
-		var totalCarbonEmission = await baseQuery.SumAsync(b => b.TotalCarbonEmission, ct);
+		var totalCarbonEmission = await baseQuery.SumAsync(b => b.ElectricityCarbonEmission + b.WaterCarbonEmission, ct);
 
 		// 按账单类型分组统计
 		var byBillType = await baseQuery
@@ -395,8 +394,7 @@ public class UtilityBillService : IUtilityBillService
 				RecordCount = g.Count(),
 				TotalElectricityUsage = g.Sum(b => b.ElectricityUsage ?? 0),
 				TotalWaterUsage = g.Sum(b => b.WaterUsage ?? 0),
-				TotalGasUsage = g.Sum(b => b.GasUsage ?? 0),
-				TotalCarbonEmission = g.Sum(b => b.TotalCarbonEmission)
+				TotalCarbonEmission = g.Sum(b => b.ElectricityCarbonEmission + b.WaterCarbonEmission)
 			})
 			.ToListAsync(ct);
 
@@ -407,7 +405,6 @@ public class UtilityBillService : IUtilityBillService
 			RecordCount = g.RecordCount,
 			TotalElectricityUsage = g.TotalElectricityUsage,
 			TotalWaterUsage = g.TotalWaterUsage,
-			TotalGasUsage = g.TotalGasUsage,
 			TotalCarbonEmission = g.TotalCarbonEmission
 		}).ToList();
 
@@ -416,7 +413,6 @@ public class UtilityBillService : IUtilityBillService
 			TotalRecords = totalRecords,
 			TotalElectricityUsage = totalElectricityUsage,
 			TotalWaterUsage = totalWaterUsage,
-			TotalGasUsage = totalGasUsage,
 			TotalCarbonEmission = totalCarbonEmission,
 			ByBillType = byBillTypeList
 		};
@@ -454,6 +450,8 @@ public class UtilityBillService : IUtilityBillService
 	/// </summary>
 	private UtilityBillResponseDto ToResponseDto(UtilityBill bill)
 	{
+		// 接口不返回煤气；总排放仅含电+水
+		var totalCarbon = bill.ElectricityCarbonEmission + bill.WaterCarbonEmission;
 		return new UtilityBillResponseDto
 		{
 			Id = bill.Id,
@@ -463,15 +461,13 @@ public class UtilityBillService : IUtilityBillService
 			BillPeriodEnd = bill.BillPeriodEnd,
 			ElectricityUsage = bill.ElectricityUsage,
 			WaterUsage = bill.WaterUsage,
-			GasUsage = bill.GasUsage,
 			ElectricityCarbonEmission = bill.ElectricityCarbonEmission,
 			WaterCarbonEmission = bill.WaterCarbonEmission,
-			GasCarbonEmission = bill.GasCarbonEmission,
-			TotalCarbonEmission = bill.TotalCarbonEmission,
+			TotalCarbonEmission = totalCarbon,
 			InputMethod = bill.InputMethod,
 			InputMethodName = GetInputMethodName(bill.InputMethod),
 			OcrConfidence = bill.OcrConfidence,
-			OcrRawText = bill.OcrRawText, // Include OCR text for debugging
+			OcrRawText = bill.OcrRawText,
 			Notes = bill.Notes,
 			CreatedAt = bill.CreatedAt
 		};

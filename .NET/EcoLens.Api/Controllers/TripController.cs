@@ -31,14 +31,14 @@ public class TripController : ControllerBase
 		decimal factorPerKm = dto.TransportMode switch
 		{
 			TransportMode.CarGasoline => 0.21m, // 约 0.21 kgCO2/km
-			TransportMode.Taxi => 0.20m, // 出租车
+			TransportMode.Taxi => 0.20m, // 出租车（已取消，仅兼容旧请求）
 			TransportMode.Subway => 0.03m, // 地铁
 			TransportMode.Bus => 0.05m, // 公交
 			TransportMode.Ship => 0.03m, // 轮船
 			TransportMode.Walking => 0.00m, // 步行为 0
 			TransportMode.Bicycle => 0.00m, // 自行车为 0
-			TransportMode.ElectricBike => 0.02m, // 电动车
-			TransportMode.CarElectric => 0.05m, // 电动车
+			TransportMode.Motorcycle => 0.12m, // 烧油的摩托车
+			TransportMode.CarElectric => 0.05m, // 私家车电动
 			TransportMode.Plane => 0.25m, // 飞机
 			_ => 0.10m
 		};
