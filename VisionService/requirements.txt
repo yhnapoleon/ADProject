@@ -13,8 +13,8 @@ numpy>=2.1.0,<3.0.0
 transformers==4.53.0
 
 # FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.7.1+cpu
+# 使用 PyPI 上的 CPU 默认轮子，移除额外索引与 +cpu 后缀
+torch==2.7.1
 # Pin torchvision to a version compatible with torch 2.7.x
 torchvision==0.22.0
 prometheus-fastapi-instrumentator
