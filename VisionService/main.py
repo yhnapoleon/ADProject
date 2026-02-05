@@ -214,7 +214,7 @@ Instrumentator().instrument(app).expose(app)
 
 @app.get("/")
 def root():
-    return {"status": "online", "version": "v3-fixed-scope"}
+    return {"status": "online", "version": "v4-fixed-structure"}
 
 @app.post("/predict/image", response_model=PredictionResponse)
 async def predict_image(file: UploadFile = File(...)):
