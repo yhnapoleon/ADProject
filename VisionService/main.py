@@ -211,6 +211,10 @@ app = FastAPI(lifespan=lifespan)
 # Prometheus metrics: instrument and expose /metrics
 Instrumentator().instrument(app).expose(app)
 
+@app.get("/")
+def root():
+    return {"status": "online", "service": "EcoLens AI Vision"}
+
 @app.post("/predict/image", response_model=PredictionResponse)
 async def predict_image(file: UploadFile = File(...)):
     """
