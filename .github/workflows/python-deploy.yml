@@ -1,0 +1,46 @@
+name: Deploy VisionService to Azure
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "VisionService/**"
+      - ".github/workflows/python-deploy.yml"
+
+concurrency:
+  group: visionservice-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r VisionService/requirements.txt
+
+      - name: Run tests (if present)
+        run: |
+          if [ -d "VisionService/tests" ] || [ -f "VisionService/pytest.ini" ]; then
+            echo "Detected tests, installing pytest and running..."
+            pip install pytest
+            pytest -q VisionService
+          else
+            echo "No pytest config/tests detected. Skipping tests."
+          fi
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "ecolens-vision-team06"
+          publish-profile: ${{ secrets.AZURE_PYTHON_PUBLISH_PROFILE }}
+          package: "./VisionService"
