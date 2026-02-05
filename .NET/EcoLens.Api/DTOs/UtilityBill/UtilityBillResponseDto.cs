@@ -44,11 +44,6 @@ public class UtilityBillResponseDto
 	public decimal? WaterUsage { get; set; }
 
 	/// <summary>
-	/// 用气量（kWh 或 m³）
-	/// </summary>
-	public decimal? GasUsage { get; set; }
-
-	/// <summary>
 	/// 电力碳排放（kg CO2）
 	/// </summary>
 	public decimal ElectricityCarbonEmission { get; set; }
@@ -59,12 +54,7 @@ public class UtilityBillResponseDto
 	public decimal WaterCarbonEmission { get; set; }
 
 	/// <summary>
-	/// 燃气碳排放（kg CO2）
-	/// </summary>
-	public decimal GasCarbonEmission { get; set; }
-
-	/// <summary>
-	/// 总碳排放（kg CO2）
+	/// 总碳排放（kg CO2，仅电+水，不含煤气）
 	/// </summary>
 	public decimal TotalCarbonEmission { get; set; }
 

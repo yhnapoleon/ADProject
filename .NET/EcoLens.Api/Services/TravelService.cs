@@ -34,6 +34,9 @@ public class TravelService : ITravelService
 	/// </summary>
 	public async Task<TravelLogResponseDto> CreateTravelLogAsync(int userId, CreateTravelLogDto dto, CancellationToken ct = default)
 	{
+		if (dto.TransportMode == TransportMode.Taxi)
+			throw new InvalidOperationException("出租车已取消，请选择其他出行方式。");
+
 		// 1. 地址转坐标（先检查缓存）
 		var originGeocode = await _cacheService.GetCachedGeocodeAsync(dto.OriginAddress);
 		if (originGeocode == null)
@@ -115,17 +118,16 @@ public class TravelService : ITravelService
 		var distanceKm = (decimal)navigationDistanceKm;
 		decimal totalCarbonEmission;
 		
-		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle || dto.TransportMode == TransportMode.ElectricBike)
+		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle)
 		{
 			// 步行和自行车使用碳减排值（负值）
-			// 步行：-0.12 kg CO₂e/km（相当于避免了汽油车同距离的排放）
-			// 自行车/电动车：-0.20 kg CO₂e/km（相当于避免了汽油车同距离的排放）
+			// 步行：-0.12 kg CO₂e/km；自行车：-0.20 kg CO₂e/km
 			var reductionFactor = dto.TransportMode == TransportMode.Walking ? -0.12m : -0.20m;
 			totalCarbonEmission = distanceKm * reductionFactor; // 负值表示碳减排
 		}
 		else
 		{
-			// 其他交通工具使用正常的碳排放因子
+			// 其他交通工具（含摩托车）使用数据库碳排放因子
 			var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
 			if (carbonFactor == null)
 			{
@@ -176,6 +178,9 @@ public class TravelService : ITravelService
 	/// </summary>
 	public async Task<RoutePreviewDto> PreviewRouteAsync(CreateTravelLogDto dto, CancellationToken ct = default)
 	{
+		if (dto.TransportMode == TransportMode.Taxi)
+			throw new InvalidOperationException("出租车已取消，请选择其他出行方式。");
+
 		// 1. 地址转坐标（先检查缓存）
 		var originGeocode = await _cacheService.GetCachedGeocodeAsync(dto.OriginAddress);
 		if (originGeocode == null)
@@ -255,17 +260,14 @@ public class TravelService : ITravelService
 		var distanceKm = (decimal)navigationDistanceKm;
 		decimal totalCarbonEmission;
 		
-		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle || dto.TransportMode == TransportMode.ElectricBike)
+		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle)
 		{
 			// 步行和自行车使用碳减排值（负值）
-			// 步行：-0.12 kg CO₂e/km（相当于避免了汽油车同距离的排放）
-			// 自行车/电动车：-0.20 kg CO₂e/km（相当于避免了汽油车同距离的排放）
 			var reductionFactor = dto.TransportMode == TransportMode.Walking ? -0.12m : -0.20m;
-			totalCarbonEmission = distanceKm * reductionFactor; // 负值表示碳减排
+			totalCarbonEmission = distanceKm * reductionFactor;
 		}
 		else
 		{
-			// 其他交通工具使用正常的碳排放因子
 			var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
 			if (carbonFactor == null)
 			{
@@ -477,7 +479,7 @@ public class TravelService : ITravelService
 		{
 			TransportMode.Walking => "Walking",
 			TransportMode.Bicycle => "Bicycle",
-			TransportMode.ElectricBike => "Electric Bike",
+			TransportMode.Motorcycle => "Motorcycle (Gas)",
 			TransportMode.Subway => "Subway",
 			TransportMode.Bus => "Bus",
 			TransportMode.Taxi => "Taxi/Rideshare",
@@ -513,7 +515,7 @@ public class TravelService : ITravelService
 		{
 			TransportMode.Walking => "walking",
 			TransportMode.Bicycle => "bicycling",
-			TransportMode.ElectricBike => "bicycling", // 电动车使用自行车模式
+			TransportMode.Motorcycle => "driving", // 摩托车
 			TransportMode.Subway => "transit",
 			TransportMode.Bus => "transit",
 			TransportMode.Taxi => "driving",
@@ -544,7 +546,7 @@ public class TravelService : ITravelService
 		{
 			TransportMode.Walking => "Walking",
 			TransportMode.Bicycle => "Bicycle",
-			TransportMode.ElectricBike => "ElectricBike",
+			TransportMode.Motorcycle => "Motorcycle",
 			TransportMode.Subway => "Subway",
 			TransportMode.Bus => "Bus",
 			TransportMode.Taxi => "Taxi",
@@ -707,12 +709,12 @@ public class TravelService : ITravelService
 			}
 		}
 
-		// 自行车/电动车：新加坡内部，超过30km不合理
-		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.ElectricBike)
+		// 自行车/摩托车：新加坡内部，超过30km不合理
+		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 30)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "电动车";
+				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
 				throw new InvalidOperationException(
 					$"在新加坡内部，距离 {distanceKm:F1} 公里不适合使用{modeName}。请选择地铁、公交或其他交通工具。");
 			}
@@ -793,12 +795,12 @@ public class TravelService : ITravelService
 			}
 		}
 
-		// 自行车/电动车：城市间不合理
-		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.ElectricBike)
+		// 自行车/摩托车：城市间不合理
+		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 100)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "电动车";
+				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
 				throw new InvalidOperationException(
 					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用{modeName}。请选择火车、高铁或飞机。");
 			}
@@ -879,12 +881,12 @@ public class TravelService : ITravelService
 			}
 		}
 
-		// 自行车/电动车：通常 < 50km
-		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.ElectricBike)
+		// 自行车/摩托车：通常 < 50km
+		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 50)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "电动车";
+				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
 				throw new InvalidOperationException(
 					$"距离 {distanceKm:F1} 公里不适合使用{modeName}。{modeName}通常用于50公里以内。请选择其他交通工具。");
 			}
@@ -1091,12 +1093,12 @@ public class TravelService : ITravelService
 			}
 		}
 
-		// 验证自行车：自行车适合短到中距离
-		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.ElectricBike)
+		// 验证自行车/摩托车：适合短到中距离
+		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 50)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "电动车";
+				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
 				throw new InvalidOperationException(
 					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用{modeName}。{modeName}通常用于短到中距离出行（50公里以内）。请选择其他出行方式。");
 			}

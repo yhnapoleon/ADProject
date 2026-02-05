@@ -162,9 +162,7 @@ public class UtilityController : ControllerBase
 		public decimal ElectricityCost { get; set; }
 		public decimal WaterUsage { get; set; }
 		public decimal WaterCost { get; set; }
-		public decimal GasUsage { get; set; }
-		public decimal GasCost { get; set; }
-		public decimal EstimatedEmission { get; set; } // 合计的估算碳排放（kg CO2e）
+		public decimal EstimatedEmission { get; set; } // 合计的估算碳排放（kg CO2e，仅电+水，不含煤气）
 	}
 
 	/// <summary>
@@ -245,6 +243,10 @@ public class UtilityController : ControllerBase
 
 		await _db.SaveChangesAsync(ct);
 
+		// 接口不返回煤气；EstimatedEmission 仅含电+水
+		var electricityFactor = await FindUtilityFactorAsync("Electricity");
+		var waterFactor = await FindUtilityFactorAsync("Water");
+		var emissionElectricityWater = (bill.ElectricityUsage ?? 0m) * (electricityFactor?.Co2Factor ?? 0m) + (bill.WaterUsage ?? 0m) * (waterFactor?.Co2Factor ?? 0m);
 		var response = new UtilityRecordResponseDto
 		{
 			Id = bill.Id,
@@ -253,9 +255,7 @@ public class UtilityController : ControllerBase
 			ElectricityCost = bill.ElectricityCost,
 			WaterUsage = bill.WaterUsage ?? 0m,
 			WaterCost = bill.WaterCost,
-			GasUsage = bill.GasUsage ?? 0m,
-			GasCost = bill.GasCost,
-			EstimatedEmission = totalEmission
+			EstimatedEmission = emissionElectricityWater
 		};
 
 		return Ok(response);
@@ -289,10 +289,9 @@ public class UtilityController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		// 估算排放：按当前参考因子临时计算（无需严格一致）
+		// 估算排放：仅电+水（不含煤气）
 		var electricity = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == "Electricity" && c.Category == CarbonCategory.Utility, ct);
 		var water = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == "Water" && c.Category == CarbonCategory.Utility, ct);
-		var gas = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == "Gas" && c.Category == CarbonCategory.Utility, ct);
 
 		var items = await _db.UtilityBills
 			.Where(b => b.UserId == userId.Value)
@@ -301,16 +300,13 @@ public class UtilityController : ControllerBase
 			{
 				Id = b.Id,
 				YearMonth = b.YearMonth,
-					ElectricityUsage = b.ElectricityUsage ?? 0m,
+				ElectricityUsage = b.ElectricityUsage ?? 0m,
 				ElectricityCost = b.ElectricityCost,
-					WaterUsage = b.WaterUsage ?? 0m,
+				WaterUsage = b.WaterUsage ?? 0m,
 				WaterCost = b.WaterCost,
-					GasUsage = b.GasUsage ?? 0m,
-				GasCost = b.GasCost,
 				EstimatedEmission =
 					((b.ElectricityUsage ?? 0m) * (electricity != null ? electricity.Co2Factor : 0m)) +
-					((b.WaterUsage ?? 0m) * (water != null ? water.Co2Factor : 0m)) +
-					((b.GasUsage ?? 0m) * (gas != null ? gas.Co2Factor : 0m))
+					((b.WaterUsage ?? 0m) * (water != null ? water.Co2Factor : 0m))
 			})
 			.ToListAsync(ct);
 
