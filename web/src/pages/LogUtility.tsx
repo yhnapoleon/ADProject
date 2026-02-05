@@ -20,13 +20,11 @@ type UtilityBillResponse = {
   billPeriodEnd: string;
   electricityUsage?: number | null;
   waterUsage?: number | null;
-  gasUsage?: number | null;
 };
 
 type FormValues = {
   electricityUsage?: number;
   waterUsage?: number;
-  gasUsage?: number;
   month?: dayjs.Dayjs;
   note?: string;
 };
@@ -59,7 +57,6 @@ const LogUtility = () => {
       form.setFieldsValue({
         electricityUsage: res?.electricityUsage ?? undefined,
         waterUsage: res?.waterUsage ?? undefined,
-        gasUsage: res?.gasUsage ?? undefined,
         // 使用 billPeriodEnd 来设置月份，因为账单属于结束日期所在的月份
         month: res?.billPeriodEnd ? dayjs(res.billPeriodEnd) : undefined,
       });
@@ -138,7 +135,6 @@ const LogUtility = () => {
               billPeriodEnd,
               electricityUsage: values.electricityUsage ?? null,
               waterUsage: values.waterUsage ?? null,
-              gasUsage: values.gasUsage ?? null,
               notes: values.note?.trim() || null,
             });
             message.success('Utility bill saved.');
@@ -172,12 +168,7 @@ const LogUtility = () => {
               <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
             </Form.Item>
 
-            <Form.Item 
-              label="Gas - Usage (kWh or Cu M, optional)" 
-              name="gasUsage"
-            >
-              <InputNumber style={{ width: '100%', ...inputBg }} min={0} />
-            </Form.Item>
+            
           </div>
 
           <Form.Item 
