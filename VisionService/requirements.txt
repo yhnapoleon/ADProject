@@ -14,7 +14,7 @@ transformers==4.53.0
 
 # FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
 # 使用 PyPI 上的 CPU 默认轮子，移除额外索引与 +cpu 后缀
-torch==2.7.1
+torch==2.7.0
 # Pin torchvision to a version compatible with torch 2.7.x
 torchvision==0.22.0
 prometheus-fastapi-instrumentator
