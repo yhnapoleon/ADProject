@@ -37,4 +37,13 @@
         android:visibility="gone"
         android:inputType="textPersonName" />
 
+    <Spinner
+        android:id="@+id/info_spinner"
+        android:layout_width="180dp"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:background="@drawable/chat_input_bg"
+        android:gravity="end"
+        android:visibility="gone" />
+
 </RelativeLayout>

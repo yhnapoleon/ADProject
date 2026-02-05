@@ -20,14 +20,14 @@ import iss.nus.edu.sg.sharedprefs.admobile.data.model.StepSyncRequest
 import iss.nus.edu.sg.sharedprefs.admobile.data.network.NetworkClient
 import iss.nus.edu.sg.sharedprefs.admobile.data.repository.AuthRepository
 import iss.nus.edu.sg.sharedprefs.admobile.utils.NavigationUtils
-import iss.nus.edu.sg.sharedprefs.admobile.utils.StepCounterManager // 🌟 导入你的 Manager
+import iss.nus.edu.sg.sharedprefs.admobile.utils.StepCounterManager
 import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
     private val authRepository by lazy { AuthRepository(this) }
-
-    // 🌟 引入步数管理器
     private lateinit var stepCounterManager: StepCounterManager
     private val TAG = "ECO_DEBUG"
 
@@ -39,47 +39,34 @@ class MainActivity : AppCompatActivity() {
 
         setupClickListeners()
 
-        // 🌟 页面启动时加载看板、排行榜、步数
+        // 🌟 加载所有数据
         loadDashboardData()
         loadRankingData()
+        fetchStepDataFromBackend() // 从后端获取步数并更新 UI
+
         checkStepPermissionAndStart()
 
         NavigationUtils.setupBottomNavigation(this, R.id.nav_home)
     }
 
     /**
-     * 🌟 新增：检查步数权限并开始监听
+     * 🌟 核心修改：格式化步数显示
+     * 小于 10,000 步显示具体数字（带千分位，如 9,277）
+     * 大于等于 10,000 步显示为 "w"（如 1.2w）
      */
-    private fun checkStepPermissionAndStart() {
-        if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
-            startStepCounting()
+    private fun formatStepCount(steps: Int): String {
+        return if (steps >= 10000) {
+            val wan = steps / 10000.0
+            String.format("%.1fw", wan)
         } else {
-            // 请求身体活动权限 (API 29+)
-            requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 100)
+            NumberFormat.getInstance(Locale.US).format(steps)
         }
     }
 
     /**
-     * 🌟 新增：启动步数监听并处理上传
+     * 🌟 核心修改：从 /api/getTree 获取今日总步数并更新主页 UI
      */
-    private fun startStepCounting() {
-        stepCounterManager.startListening { todaySteps ->
-            Log.d(TAG, "Step Counter Triggered! Today's steps: $todaySteps")
-
-            // 将步数实时反映在 UI 上（如果有对应的 TextView）
-            // findViewById<TextView>(R.id.tv_today_steps)?.text = todaySteps.toString()
-
-            // 异步上传步数到后端
-            uploadSteps(todaySteps)
-        }
-    }
-
-    /**
-     * 🌟 新增：上传步数到服务器
-     */
-    private fun uploadSteps(steps: Int) {
-        if (steps <= 0) return
-
+    private fun fetchStepDataFromBackend() {
         lifecycleScope.launch {
             try {
                 val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
@@ -87,37 +74,62 @@ class MainActivity : AppCompatActivity() {
                 if (token.isEmpty()) return@launch
 
                 val authHeader = "Bearer $token"
-
-                // 🌟 格式化时间为后端要求的 ISO 8601 格式
-                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
-                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
-                val currentDate = sdf.format(java.util.Date())
-
-                val request = StepSyncRequest(
-                    stepCount = steps,
-                    date = currentDate
-                )
-
-                Log.d(TAG, "Syncing steps to backend: $steps at $currentDate")
-                val response = NetworkClient.apiService.syncSteps(authHeader, request)
+                val response = NetworkClient.apiService.getTreeData(authHeader)
 
                 if (response.isSuccessful && response.body() != null) {
                     val data = response.body()!!
-                    Log.i(TAG, "Step Sync Success! Total: ${data.totalSteps}, Available: ${data.availableSteps}")
+                    Log.d(TAG, "MainPage Step Sync: Today Total = ${data.todaySteps}")
 
-                    // 🌟 可选：将可用步数更新到首页的 UI 上（例如步数卡片）
-                    // updateStepUI(data.availableSteps)
-                } else {
-                    Log.e(TAG, "Step Sync Failed: ${response.code()} ${response.errorBody()?.string()}")
+                    // 使用格式化函数更新 UI
+                    val formattedSteps = formatStepCount(data.todaySteps)
+                    findViewById<TextView>(R.id.steps_number_text)?.text = formattedSteps
                 }
-
             } catch (e: Exception) {
-                Log.e(TAG, "Network error during step sync: ${e.message}")
+                Log.e(TAG, "Error fetching step data: ${e.message}")
             }
         }
     }
 
-    // 权限申请回调
+    private fun checkStepPermissionAndStart() {
+        if (checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
+            startStepCounting()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), 100)
+        }
+    }
+
+    private fun startStepCounting() {
+        stepCounterManager.startListening { todaySteps ->
+            Log.d(TAG, "Local Step Counter: $todaySteps")
+            uploadSteps(todaySteps)
+        }
+    }
+
+    private fun uploadSteps(steps: Int) {
+        if (steps <= 0) return
+        lifecycleScope.launch {
+            try {
+                val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+                val token = prefs.getString("access_token", "") ?: ""
+                val authHeader = "Bearer $token"
+
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                val currentDate = sdf.format(java.util.Date())
+
+                val request = StepSyncRequest(stepCount = steps, date = currentDate)
+                val response = NetworkClient.apiService.syncSteps(authHeader, request)
+
+                if (response.isSuccessful) {
+                    // 上传成功后立即重新拉取后端数据，保证 UI 同步
+                    fetchStepDataFromBackend()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Step upload error: ${e.message}")
+            }
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 100 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -128,23 +140,13 @@ class MainActivity : AppCompatActivity() {
     private fun loadDashboardData() {
         lifecycleScope.launch {
             val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
-            val token = prefs.getString("access_token", null)
+            val token = prefs.getString("access_token", null) ?: return@launch
 
-            if (token == null) {
-                startActivity(Intent(this@MainActivity, LoginActivity::class.java))
-                finish()
-                return@launch
-            }
-
-            Log.d(TAG, "Starting Dashboard API call...")
             val result = authRepository.getMainPageData(token)
-
             result.onSuccess { data ->
-                Log.d(TAG, "Dashboard Success! Total: ${data.total}")
                 updateDashboardUI(data)
             }.onFailure { e ->
                 Log.e(TAG, "Dashboard Error: ${e.message}")
-                Toast.makeText(this@MainActivity, "Update failed: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -154,9 +156,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 val response = NetworkClient.apiService.getTodayLeaderboard(3)
                 if (response.isSuccessful && response.body() != null) {
-                    val list = response.body()!!
-                    Log.d(TAG, "Ranking API Success! Found ${list.size} users")
-                    updateRankingUI(list)
+                    updateRankingUI(response.body()!!)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ranking API Error: ${e.message}")
@@ -219,7 +219,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         loadDashboardData()
         loadRankingData()
-        // 🌟 返回主页时再次检查并更新步数
+        fetchStepDataFromBackend() // 返回页面时强制刷新步数
         checkStepPermissionAndStart()
     }
 }

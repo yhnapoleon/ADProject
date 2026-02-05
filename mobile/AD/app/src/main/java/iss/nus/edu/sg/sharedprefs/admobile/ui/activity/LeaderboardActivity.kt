@@ -28,6 +28,7 @@ class LeaderboardActivity : AppCompatActivity() {
     private lateinit var tvAllTime: TextView
     private lateinit var adapter: LeaderboardAdapter
 
+    // 🌟 后端 Base URL
     private val BASE_URL = "https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net"
 
     private enum class RankingType { DAILY, MONTHLY, TOTAL }
@@ -70,9 +71,6 @@ class LeaderboardActivity : AppCompatActivity() {
     private fun fetchData(type: RankingType) {
         lifecycleScope.launch {
             try {
-                // 🌟 获取数据前先清理 Glide 内存缓存，防止列表复用旧位图
-                Glide.get(this@LeaderboardActivity).clearMemory()
-
                 val response = when (type) {
                     RankingType.DAILY -> NetworkClient.apiService.getTodayLeaderboard(50)
                     RankingType.MONTHLY -> NetworkClient.apiService.getMonthLeaderboard(50)
@@ -114,24 +112,26 @@ class LeaderboardActivity : AppCompatActivity() {
             tvName.text = data.nickname ?: data.username
             tvValue.text = "${String.format("%.1f", data.emissionsTotal)} kg"
 
-            // 🌟 核心：拼接 URL，并处理转义字符
+            // 🌟 核心：处理 URL 拼接逻辑
             var avatarPath = data.avatarUrl ?: ""
             val fullAvatarUrl = if (avatarPath.isNotEmpty()) {
+                // 如果后端已经给出了完整 URL (包含 http)，直接使用
+                // 此时 avatarPath 已经包含了 ?v=xxx
                 if (avatarPath.startsWith("http")) avatarPath
                 else "$BASE_URL${avatarPath.replace("\\", "/")}"
             } else null
 
-            // 🌟 核心：使用 .skipMemoryCache(true) 强制刷新
+            // 🌟 性能优化核心：利用版本号进行缓存
             Glide.with(this)
                 .load(fullAvatarUrl)
                 .apply(RequestOptions.circleCropTransform())
-                .skipMemoryCache(true) // 🌟 跳过内存缓存
-                .diskCacheStrategy(DiskCacheStrategy.NONE) // 🌟 不使用磁盘缓存
+                // 🌟 修改：由于 URL 包含版本号，我们可以安全地开启缓存
+                .skipMemoryCache(false)
+                .diskCacheStrategy(DiskCacheStrategy.ALL) // 🌟 缓存所有版本的图片
                 .placeholder(R.drawable.ic_avatar_placeholder)
                 .error(R.drawable.ic_avatar_placeholder)
                 .into(ivAvatar)
         } else {
-            // ... 处理 data == null 的逻辑 ...
             tvName.text = "-"
             tvValue.text = "0 kg"
             ivAvatar.setImageResource(R.drawable.ic_avatar_placeholder)

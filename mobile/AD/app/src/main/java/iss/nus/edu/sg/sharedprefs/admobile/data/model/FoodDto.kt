@@ -59,15 +59,15 @@ data class BarcodeResponse(
 )
 
 // 批量删除请求体
-data class BatchDeleteRequest(
-    val activityLogIds: List<Int>? = null,
-    val travelLogIds: List<Int>? = null,
-    val utilityBillIds: List<Int>? = null
+// 新的批量删除请求单条目 DTO
+data class TypedDeleteEntry(
+    val type: Int, // 1=Food, 2=Travel, 3=Utility
+    val id: Int
 )
 
-// 批量删除响应结果
-data class BatchDeleteResponse(
-    val activityLogsDeleted: Int,
+// 批量删除响应 DTO
+data class BatchDeleteTypedResponse(
+    val foodRecordsDeleted: Int,
     val travelLogsDeleted: Int,
     val utilityBillsDeleted: Int,
     val totalDeleted: Int

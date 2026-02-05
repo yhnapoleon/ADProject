@@ -454,7 +454,7 @@
                             android:id="@+id/steps_number_text"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="9,277"
+                            android:text="--"
                             android:textSize="26sp"
                             android:textColor="#674fa3"
                             android:textStyle="bold"
@@ -560,14 +560,14 @@
                                 android:layout_height="wrap_content"
                                 android:layout_toEndOf="@id/rank1_icon"
                                 android:layout_marginStart="12dp"
-                                android:text="-"
+                                android:text="Loading..."
                                 android:textColor="#333333" />
                             <TextView
                                 android:id="@+id/tv_rank1_value"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentEnd="true"
-                                android:text="0.0 kg"
+                                android:text="-- kg"
                                 android:textStyle="bold"
                                 android:textColor="#4CAF50" />
                         </RelativeLayout>
@@ -592,14 +592,14 @@
                                 android:layout_height="wrap_content"
                                 android:layout_toEndOf="@id/rank2_icon"
                                 android:layout_marginStart="12dp"
-                                android:text="-"
+                                android:text="Loading..."
                                 android:textColor="#333333" />
                             <TextView
                                 android:id="@+id/tv_rank2_value"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentEnd="true"
-                                android:text="0.0 kg"
+                                android:text="-- kg"
                                 android:textStyle="bold" />
                         </RelativeLayout>
 
@@ -623,14 +623,14 @@
                                 android:layout_height="wrap_content"
                                 android:layout_toEndOf="@id/rank3_icon"
                                 android:layout_marginStart="12dp"
-                                android:text="-"
+                                android:text="Loading..."
                                 android:textColor="#333333" />
                             <TextView
                                 android:id="@+id/tv_rank3_value"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_alignParentEnd="true"
-                                android:text="0.0 kg"
+                                android:text="-- kg"
                                 android:textStyle="bold" />
                         </RelativeLayout>
                     </LinearLayout>

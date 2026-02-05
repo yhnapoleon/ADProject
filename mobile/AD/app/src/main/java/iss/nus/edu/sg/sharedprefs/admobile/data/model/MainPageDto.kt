@@ -28,3 +28,16 @@ data class StepSyncResponse(
     val usedSteps: Int,
     val availableSteps: Int
 )
+
+data class TreeResponse(
+    val totalTrees: Int,
+    val currentProgress: Int,
+    val todaySteps: Int,
+    val availableSteps: Int
+)
+
+data class PostTreeRequest(
+    val totalTrees: Int,
+    val currentProgress: Int,
+    val usedSteps: Int
+)

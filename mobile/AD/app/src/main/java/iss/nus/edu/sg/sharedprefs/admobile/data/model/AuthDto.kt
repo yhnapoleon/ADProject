@@ -60,6 +60,16 @@ data class UpdateProfileRequest(
     val birthDate: String?
 )
 
+// VerifyPasswordRequest.kt
+data class VerifyPasswordRequest(
+    val oldPassword: String
+)
+
+// VerifyPasswordResponse.kt
+data class VerifyPasswordResponse(
+    val valid: Boolean
+)
+
 data class ChangePasswordRequest(
     val oldPassword: String,
     val newPassword: String

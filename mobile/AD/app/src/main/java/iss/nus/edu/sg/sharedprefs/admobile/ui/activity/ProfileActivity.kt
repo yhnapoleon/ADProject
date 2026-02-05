@@ -1,6 +1,7 @@
 package iss.nus.edu.sg.sharedprefs.admobile.ui.activity
 
 import android.Manifest
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,7 +14,6 @@ import android.os.Environment
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
-import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -25,9 +25,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import iss.nus.edu.sg.sharedprefs.admobile.R
-import iss.nus.edu.sg.sharedprefs.admobile.data.model.ChangePasswordRequest
-import iss.nus.edu.sg.sharedprefs.admobile.data.model.UpdateProfileRequest
-import iss.nus.edu.sg.sharedprefs.admobile.data.model.UserProfileResponse
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.*
 import iss.nus.edu.sg.sharedprefs.admobile.data.network.NetworkClient
 import iss.nus.edu.sg.sharedprefs.admobile.utils.NavigationUtils
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +36,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.*
 
 class ProfileActivity : AppCompatActivity() {
 
@@ -83,6 +82,7 @@ class ProfileActivity : AppCompatActivity() {
         editBtn = findViewById(R.id.btn_edit_profile)
 
         fetchUserProfile()
+        setupLocationSpinner()
 
         profileAvatar.setOnClickListener { showImageSourceDialog() }
         editBtn.setOnClickListener { toggleEditMode() }
@@ -96,10 +96,34 @@ class ProfileActivity : AppCompatActivity() {
         NavigationUtils.setupBottomNavigation(this, R.id.nav_person)
     }
 
-    // --- 修改密码逻辑 (保持不变) ---
+    private fun setupLocationSpinner() {
+        val root = findViewById<View>(R.id.item_location)
+        val spinner = root.findViewById<Spinner>(R.id.info_spinner)
+        ArrayAdapter.createFromResource(
+            this,
+            R.array.regions_array,
+            android.R.layout.simple_spinner_item
+        ).also { adapter ->
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinner.adapter = adapter
+        }
+    }
+
+    private fun showDatePicker(editText: EditText) {
+        val calendar = Calendar.getInstance()
+        val dialog = DatePickerDialog(this, { _, year, month, day ->
+            val date = String.format("%04d-%02d-%02d", year, month + 1, day)
+            editText.setText(date)
+        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
+        dialog.datePicker.maxDate = calendar.timeInMillis
+        dialog.show()
+    }
+
+    // --- 🌟 修改密码：分步验证逻辑 ---
+
     private fun showStep1OldPasswordDialog() {
         val etOld = EditText(this).apply {
-            hint = "Enter Old Password"
+            hint = "Enter Current Password"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
         val container = FrameLayout(this).apply {
@@ -107,17 +131,45 @@ class ProfileActivity : AppCompatActivity() {
             params.setMargins(60, 40, 60, 0)
             addView(etOld, params)
         }
-        AlertDialog.Builder(this)
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Identity Verification")
             .setMessage("Please enter your current password to continue.")
             .setView(container)
-            .setPositiveButton("Next") { _, _ ->
-                val oldPwd = etOld.text.toString()
-                if (oldPwd.isNotEmpty()) showStep2NewPasswordDialog(oldPwd)
-                else Toast.makeText(this, "Old password is required", Toast.LENGTH_SHORT).show()
-            }
+            .setPositiveButton("Next", null) // 手动处理点击
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val oldPwd = etOld.text.toString()
+            if (oldPwd.isNotEmpty()) {
+                verifyOldPasswordAndProceed(oldPwd, dialog)
+            } else {
+                Toast.makeText(this, "Password is required", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun verifyOldPasswordAndProceed(oldPwd: String, step1Dialog: AlertDialog) {
+        lifecycleScope.launch {
+            val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+            val token = "Bearer ${prefs.getString("access_token", "")}"
+            try {
+                // 调用后端 verify-password 接口
+                val response = NetworkClient.apiService.verifyPassword(token, VerifyPasswordRequest(oldPwd))
+                if (response.isSuccessful && response.body()?.valid == true) {
+                    step1Dialog.dismiss()
+                    showStep2NewPasswordDialog(oldPwd)
+                } else {
+                    val msg = if (response.code() == 401) "Incorrect password" else "Verification failed"
+                    Toast.makeText(this@ProfileActivity, msg, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@ProfileActivity, "Network Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showStep2NewPasswordDialog(oldPwd: String) {
@@ -130,7 +182,7 @@ class ProfileActivity : AppCompatActivity() {
             .setTitle("Set New Password")
             .setView(dialogView)
             .setPositiveButton("Confirm", null)
-            .setNegativeButton("Back", null)
+            .setNegativeButton("Back") { _, _ -> showStep1OldPasswordDialog() }
             .create()
 
         etNew.addTextChangedListener(object : TextWatcher {
@@ -174,8 +226,7 @@ class ProfileActivity : AppCompatActivity() {
                     Toast.makeText(this@ProfileActivity, "Password successfully updated!", Toast.LENGTH_SHORT).show()
                     dialog.dismiss()
                 } else {
-                    val msg = if (response.code() == 401) "Old password is incorrect" else "Error: ${response.code()}"
-                    Toast.makeText(this@ProfileActivity, msg, Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@ProfileActivity, "Failed: ${response.code()}", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
                 Toast.makeText(this@ProfileActivity, "Network Error: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -184,6 +235,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     // --- Profile 数据获取与展示 ---
+
     private fun fetchUserProfile() {
         lifecycleScope.launch {
             val prefs = getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
@@ -198,7 +250,6 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun updateUI(p: UserProfileResponse) {
-        // 1. 基础文字信息绑定
         findViewById<TextView>(R.id.profile_name).text = p.nickname ?: p.name
         findViewById<TextView>(R.id.profile_email).text = p.email
 
@@ -209,14 +260,10 @@ class ProfileActivity : AppCompatActivity() {
         setInfo(R.id.item_location, "Location", p.location ?: "Not set")
         setInfo(R.id.item_join_date, "Join Days", "${p.joinDays} Days")
 
-        // 2. 🌟 核心修改：头像显示逻辑（增加禁用缓存配置）
         val avatarUrl = p.avatar
-        android.util.Log.d("AVATAR_DEBUG", "Current Avatar URL from Server: $avatarUrl")
-
         if (!avatarUrl.isNullOrEmpty()) {
             com.bumptech.glide.Glide.with(this)
                 .load(avatarUrl)
-                // 🌟 关键：跳过内存和磁盘缓存，强制从服务器拉取最新图片内容
                 .skipMemoryCache(true)
                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
                 .placeholder(R.drawable.ic_avatar_placeholder)
@@ -228,7 +275,6 @@ class ProfileActivity : AppCompatActivity() {
         }
     }
 
-    // --- 🌟 核心修改：头像上传逻辑 🌟 ---
     private fun processPrepareAndUploadAvatar(uri: Uri) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -241,7 +287,6 @@ class ProfileActivity : AppCompatActivity() {
                     var quality = 80
                     it.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
 
-                    // 压缩逻辑（保持在 500KB 以内）
                     while (outputStream.toByteArray().size > 500 * 1024 && quality > 10) {
                         outputStream.reset()
                         quality -= 10
@@ -250,8 +295,6 @@ class ProfileActivity : AppCompatActivity() {
 
                     val imageBytes = outputStream.toByteArray()
                     val requestFile = imageBytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
-
-                    // 网页端字段名为 "file"
                     val body = MultipartBody.Part.createFormData("file", "avatar.jpg", requestFile)
 
                     withContext(Dispatchers.Main) {
@@ -259,38 +302,24 @@ class ProfileActivity : AppCompatActivity() {
                         val token = prefs.getString("access_token", "") ?: ""
                         val fullToken = if (token.startsWith("Bearer ")) token else "Bearer $token"
 
-                        android.util.Log.d("AVATAR_DEBUG", "Starting Multipart PUT...")
-
                         val response = NetworkClient.apiService.uploadAvatar(fullToken, body)
-
                         if (response.isSuccessful) {
-                            android.util.Log.d("AVATAR_DEBUG", "Upload Success! Response Body: ${response.body()}")
-
-                            // 🌟 核心改进：手动清理 Glide 内存缓存
                             com.bumptech.glide.Glide.get(this@ProfileActivity).clearMemory()
-
                             Toast.makeText(this@ProfileActivity, "Avatar updated successfully!", Toast.LENGTH_SHORT).show()
-
-                            // 🌟 重新获取用户信息
-                            // 由于 updateUI 已经设置了 skipMemoryCache，fetchUserProfile 后会看到新头像
                             fetchUserProfile()
                         } else {
-                            val errorDetail = response.errorBody()?.string()
-                            android.util.Log.e("AVATAR_ERROR", "Code: ${response.code()} Detail: $errorDetail")
                             Toast.makeText(this@ProfileActivity, "Upload failed: ${response.code()}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    android.util.Log.e("AVATAR_ERROR", "Exception: ${e.message}")
                     Toast.makeText(this@ProfileActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
-    // --- 其他 Profile 功能 (保持不变) ---
     private fun toggleEditMode() {
         if (isEditing) saveProfileChanges()
         else { enterEditMode(); isEditing = true; editBtn.text = "Save Changes" }
@@ -322,17 +351,41 @@ class ProfileActivity : AppCompatActivity() {
 
     private fun getRealTimeValue(viewId: Int): String {
         val root = findViewById<View>(viewId)
-        val value = if (isEditing) root.findViewById<EditText>(R.id.info_edit).text.toString() else root.findViewById<TextView>(R.id.info_value).text.toString()
-        return if (value == "Not set") "" else value
+        val value = if (isEditing) {
+            if (viewId == R.id.item_location) {
+                root.findViewById<Spinner>(R.id.info_spinner).selectedItem.toString()
+            } else {
+                root.findViewById<EditText>(R.id.info_edit).text.toString()
+            }
+        } else {
+            root.findViewById<TextView>(R.id.info_value).text.toString()
+        }
+        return if (value == "Not set" || value == "null") "" else value
     }
 
     private fun enterEditMode() {
         for (id in editableIds) {
             val root = findViewById<View>(id)
             root.findViewById<TextView>(R.id.info_value).visibility = View.GONE
-            root.findViewById<EditText>(R.id.info_edit).apply {
-                visibility = View.VISIBLE
-                setText(root.findViewById<TextView>(R.id.info_value).text)
+            if (id == R.id.item_location) {
+                val spinner = root.findViewById<Spinner>(R.id.info_spinner)
+                spinner.visibility = View.VISIBLE
+                val currentValue = root.findViewById<TextView>(R.id.info_value).text.toString()
+                val adapter = spinner.adapter as ArrayAdapter<String>
+                val pos = adapter.getPosition(currentValue)
+                if (pos >= 0) spinner.setSelection(pos)
+                root.findViewById<EditText>(R.id.info_edit).visibility = View.GONE
+            } else {
+                val et = root.findViewById<EditText>(R.id.info_edit)
+                et.visibility = View.VISIBLE
+                et.setText(root.findViewById<TextView>(R.id.info_value).text)
+                if (id == R.id.item_birth) {
+                    et.inputType = InputType.TYPE_NULL
+                    et.setOnClickListener { showDatePicker(et) }
+                } else {
+                    et.inputType = InputType.TYPE_CLASS_TEXT
+                    et.setOnClickListener(null)
+                }
             }
         }
     }
@@ -342,6 +395,7 @@ class ProfileActivity : AppCompatActivity() {
             val root = findViewById<View>(id)
             root.findViewById<TextView>(R.id.info_value).visibility = View.VISIBLE
             root.findViewById<EditText>(R.id.info_edit).visibility = View.GONE
+            root.findViewById<Spinner>(R.id.info_spinner)?.visibility = View.GONE
         }
     }
 
