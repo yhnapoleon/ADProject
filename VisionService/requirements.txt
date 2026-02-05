@@ -17,4 +17,4 @@ transformers==4.53.0
 torch==2.7.0
 # Pin torchvision to a version compatible with torch 2.7.x
 torchvision==0.22.0
-prometheus-fastapi-instrumentator
+prometheus-fastapi-instrumentator==7.0.0
