@@ -129,9 +129,7 @@ jobs:
         with:
           name: zap-baseline-reports
           path: |
-            zap_report.html
-            zap_report.md
-            owasp-zap*/*.html
-            owasp-zap*/*.md
-            owasp-zap*/*.json
+            report_html.html
+            report_md.md
+            report_json.json
 
