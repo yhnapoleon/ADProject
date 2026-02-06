@@ -229,8 +229,7 @@ public class UtilityBillController : ControllerBase
 			}
 
 			// 重复账单：业务异常或数据库唯一约束/重复键
-			if (fullText.Contains("重复", StringComparison.Ordinal) ||
-			    fullText.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
+			if (fullText.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
 			    fullText.Contains("unique constraint", StringComparison.OrdinalIgnoreCase) ||
 			    fullText.Contains("UNIQUE", StringComparison.Ordinal) ||
 			    fullText.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
@@ -240,8 +239,8 @@ public class UtilityBillController : ControllerBase
 				return BadRequest(new { error = "This bill already exists. Do not add duplicate." });
 			}
 			// 因子未找到等业务错误也返回 400
-			if (msg.Contains("factor", StringComparison.OrdinalIgnoreCase) || msg.Contains("因子", StringComparison.Ordinal) ||
-			    msg.Contains("not found", StringComparison.OrdinalIgnoreCase) || msg.Contains("未找到", StringComparison.Ordinal))
+			if (msg.Contains("factor", StringComparison.OrdinalIgnoreCase) ||
+			    msg.Contains("not found", StringComparison.OrdinalIgnoreCase))
 			{
 				_logger.LogWarning(ex, "Config/business error: UserId={UserId}", userId);
 				return BadRequest(new { error = msg });

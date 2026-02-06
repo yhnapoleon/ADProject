@@ -4,9 +4,7 @@ using EcoLens.Api.Models.Enums;
 
 namespace EcoLens.Api.Services;
 
-/// <summary>
-/// 水电账单数据提取服务实现
-/// </summary>
+/// <summary>Utility bill data extraction service.</summary>
 public class UtilityBillParser : IUtilityBillParser
 {
 	private readonly ILogger<UtilityBillParser> _logger;
@@ -16,9 +14,7 @@ public class UtilityBillParser : IUtilityBillParser
 		_logger = logger;
 	}
 
-	/// <summary>
-	/// 从OCR识别的文本中提取账单数据
-	/// </summary>
+	/// <summary>Extract bill data from OCR text.</summary>
 	public async Task<ExtractedBillData?> ParseBillDataAsync(string ocrText, UtilityBillType? expectedType = null, CancellationToken ct = default)
 	{
 		try
@@ -70,12 +66,10 @@ public class UtilityBillParser : IUtilityBillParser
 		}
 	}
 
-	/// <summary>
-	/// 识别账单类型
-	/// </summary>
+	/// <summary>Identify bill type from text.</summary>
 	private UtilityBillType IdentifyBillType(string lowerText)
 	{
-		// 增强的新加坡水电账单关键词
+		// Singapore utility bill keywords
 		var hasElectricity = ContainsKeywords(lowerText, new[]
 		{
 			"electricity", "electric", "power", "kwh", "kw·h", "kw h", "kilowatt",
@@ -122,12 +116,10 @@ public class UtilityBillParser : IUtilityBillParser
 		return keywords.Any(keyword => text.Contains(keyword, StringComparison.OrdinalIgnoreCase));
 	}
 
-	/// <summary>
-	/// 提取用电量（kWh）
-	/// </summary>
+	/// <summary>Extract electricity usage (kWh).</summary>
 	private decimal? ExtractElectricityUsage(string text)
 	{
-		// 匹配模式：数字 + kWh/kW·h/kwh
+		// Pattern: number + kWh/kW·h/kwh
 		var patterns = new[]
 		{
 			@"(\d+\.?\d*)\s*(?:kwh|kw·h|kwh)",

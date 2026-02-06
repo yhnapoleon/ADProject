@@ -3,9 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EcoLens.Api.Services;
 
-/// <summary>
-/// 水电账单碳排放计算服务实现
-/// </summary>
+/// <summary>Utility bill carbon emission calculation service.</summary>
 public class UtilityBillCalculationService : IUtilityBillCalculationService
 {
 	private readonly ApplicationDbContext _db;
@@ -19,9 +17,7 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 		_logger = logger;
 	}
 
-	/// <summary>
-	/// 根据用量计算碳排放
-	/// </summary>
+	/// <summary>Calculate carbon emission from usage.</summary>
 	public async Task<CarbonEmissionResult> CalculateCarbonEmissionAsync(
 		decimal? electricityUsage,
 		decimal? waterUsage,
@@ -30,7 +26,6 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 	{
 		try
 		{
-		// 1. 从数据库读取排放因子
 		var electricityFactor = await _db.CarbonReferences
 			.FirstOrDefaultAsync(c => c.LabelName == "Electricity", ct);
 
@@ -40,7 +35,6 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 		var gasFactor = await _db.CarbonReferences
 			.FirstOrDefaultAsync(c => c.LabelName == "Gas", ct);
 
-		// 2. 验证排放因子是否存在
 		if (electricityFactor == null)
 		{
 			_logger.LogError("Electricity carbon factor not found in database");
@@ -59,7 +53,6 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 			throw new InvalidOperationException("Gas carbon emission factor not found");
 		}
 
-			// 3. 计算各项碳排放
 			var electricityCarbon = electricityUsage.HasValue && electricityUsage.Value > 0
 				? electricityUsage.Value * electricityFactor.Co2Factor
 				: 0m;
@@ -72,10 +65,8 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 				? gasUsage.Value * gasFactor.Co2Factor
 				: 0m;
 
-			// 4. 计算总碳排放
 			var totalCarbon = electricityCarbon + waterCarbon + gasCarbon;
 
-			// 5. 记录日志
 			_logger.LogInformation(
 				"Carbon emission calculated: Electricity={Electricity} kWh -> {ElectricityCarbon} kg CO2, " +
 				"Water={Water} m³ -> {WaterCarbon} kg CO2, " +
@@ -86,13 +77,12 @@ public class UtilityBillCalculationService : IUtilityBillCalculationService
 				gasUsage, gasCarbon,
 				totalCarbon);
 
-			// 6. 验证计算结果
 			if (totalCarbon < 0)
 			{
 				_logger.LogWarning("Negative carbon emission calculated: {Total}", totalCarbon);
 			}
 
-			if (totalCarbon > 1000000) // 1,000,000 kg CO2 = 1000 吨 CO2，异常大
+			if (totalCarbon > 1000000) // 1000 t CO2, unusually large
 			{
 				_logger.LogWarning("Unusually large carbon emission calculated: {Total} kg CO2", totalCarbon);
 			}

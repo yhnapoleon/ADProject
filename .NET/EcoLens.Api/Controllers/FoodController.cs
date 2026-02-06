@@ -100,11 +100,11 @@ public class FoodController : ControllerBase
 	[Consumes("multipart/form-data")]
 	public async Task<ActionResult<FoodSimpleCalcResponse>> IngestFromImage([FromForm] FoodIngestFromImageRequest req, CancellationToken ct)
 	{
+		if (req.File == null || req.File.Length == 0) return BadRequest("No image uploaded.");
+		if (req.Quantity < 0) return BadRequest("Quantity must be non-negative.");
+
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
-
-		if (req.File == null || req.File.Length == 0) return BadRequest("Have not uploaded image.");
-		if (req.Quantity < 0) return BadRequest("Quantity must be non-negative.");
 
 		var vision = await _visionService.PredictAsync(req.File, ct);
 		var food = await FindFoodCarbonFactorAsync(vision.Label, ct);
