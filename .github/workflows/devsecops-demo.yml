@@ -77,6 +77,7 @@ jobs:
           app-name: 'ecolens-demo-environment'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEMO }}
           package: './.NET/EcoLens.Api/publish'
+        continue-on-error: true
 
   ai_service:
     name: AI Service Pipeline
@@ -118,6 +119,7 @@ jobs:
         with:
           target: 'https://ecolens-demo-environment-bbcxhdd3gseagvag.southeastasia-01.azurewebsites.net'
           allow_issue_writing: false
+          artifact_name: 'zap-scan'
           cmd_options: '-m 10 -d 1'
         continue-on-error: true
 
