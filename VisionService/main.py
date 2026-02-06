@@ -1,4 +1,5 @@
 from __future__ import annotations
+from prometheus_fastapi_instrumentator import Instrumentator
 
 import os
 import io
@@ -12,6 +13,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import uvicorn
+from azure.monitor.opentelemetry import configure_azure_monitor
 
 
 class FoodClassifier:
@@ -205,16 +207,28 @@ async def lifespan(app: FastAPI):
         CLASSIFIER = None
 
 
+# Azure Application Insights 配置
+# 优先从环境变量获取连接字符串
+APPINSIGHTS_CONNECTION_STRING = os.getenv(
+    "APPLICATIONINSIGHTS_CONNECTION_STRING")
+
+if APPINSIGHTS_CONNECTION_STRING:
+    print("正在配置 Azure Application Insights...")
+    configure_azure_monitor(connection_string=APPINSIGHTS_CONNECTION_STRING)
+else:
+    print("未找到 APPLICATIONINSIGHTS_CONNECTION_STRING，跳过监控配置。")
+
 app = FastAPI(lifespan=lifespan)
 
 # --- 必须放在全局作用域 ---
-from prometheus_fastapi_instrumentator import Instrumentator
 # 极简配置，确保 /metrics 路由被注册
 Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/")
 def root():
     return {"status": "online", "version": "v4-fixed-structure"}
+
 
 @app.post("/predict/image", response_model=PredictionResponse)
 async def predict_image(file: UploadFile = File(...)):

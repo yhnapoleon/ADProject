@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s # 演示用 5秒抓一次，数据变化快，效果好
+
+scrape_configs:
+  - job_name: 'ecolens_ai_service'
+    scheme: https  # 关键：Azure 强制 HTTPS
+    static_configs:
+      - targets: ['ecolens-vision-team06.azurewebsites.net']
