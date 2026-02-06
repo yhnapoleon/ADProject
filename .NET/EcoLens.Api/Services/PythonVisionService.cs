@@ -27,7 +27,7 @@ public class PythonVisionService : IVisionService
 	{
 		if (image == null || image.Length == 0)
 		{
-			throw new ArgumentException("上传图片无效。", nameof(image));
+			throw new ArgumentException("Uploaded image is invalid.", nameof(image));
 		}
 
 		var requestUri = "predict/image"; // baseAddress 已配置为 http://host:8000/
@@ -43,13 +43,13 @@ public class PythonVisionService : IVisionService
 
 		if (!response.IsSuccessStatusCode)
 		{
-			throw new HttpRequestException($"Python VisionService 调用失败: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
+			throw new HttpRequestException($"Python VisionService call failed: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
 		}
 
 		var dto = JsonSerializer.Deserialize<VisionPredictionResponseDto>(responseText, SerializerOptions);
 		if (dto == null)
 		{
-			throw new InvalidOperationException("Python VisionService 返回了无效的数据。");
+			throw new InvalidOperationException("Python VisionService returned invalid data.");
 		}
 		return dto;
 	}

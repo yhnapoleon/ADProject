@@ -45,7 +45,7 @@ public class SimpleFoodController : ControllerBase
 		var food = await FindFoodByNameAsync(req.Name, ct);
 		if (food is null)
 		{
-			return NotFound($"未找到食物：{req.Name} 的排放因子。");
+			return NotFound($"Emission factor not found for food: {req.Name}.");
 		}
 
 		// 前端 amount 为克，/1000 转为 kg 再按 kgCO2/kg 计算

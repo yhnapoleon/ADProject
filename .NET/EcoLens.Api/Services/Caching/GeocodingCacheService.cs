@@ -11,7 +11,7 @@ public class GeocodingCacheService : IGeocodingCacheService
 {
 	private readonly IMemoryCache _cache;
 	private readonly ILogger<GeocodingCacheService> _logger;
-	private const int CacheExpirationMinutes = 60 * 24; // 24小时过期
+	private const int CacheExpirationMinutes = 60 * 24; // 24h expiry
 
 	public GeocodingCacheService(IMemoryCache cache, ILogger<GeocodingCacheService> logger)
 	{

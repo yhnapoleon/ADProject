@@ -55,7 +55,7 @@ public class GoogleMapsService : IGoogleMapsService
 	{
 		try
 		{
-			// 仅对明确为新加坡的输入（邮编、本地简称）追加 Singapore；其余地名保持原样以支持全球识别
+			// Normalize Singapore-only input (postal code, short names); leave other addresses as-is for global recognition
 			var normalizedAddress = NormalizeAddressForSingapore(address);
 			var isSingaporeTarget = normalizedAddress.Contains("Singapore", StringComparison.OrdinalIgnoreCase) ||
 			                       normalizedAddress.Contains("新加坡", StringComparison.OrdinalIgnoreCase);
@@ -99,9 +99,7 @@ public class GoogleMapsService : IGoogleMapsService
 		}
 	}
 
-	/// <summary>
-	/// 反向地理编码：将经纬度坐标转换为地址
-	/// </summary>
+	/// <summary>Reverse geocode: convert lat/lng to address.</summary>
 	public async Task<ReverseGeocodingResult?> ReverseGeocodeAsync(double latitude, double longitude, CancellationToken ct = default)
 	{
 		try
@@ -192,7 +190,7 @@ public class GoogleMapsService : IGoogleMapsService
 	{
 		try
 		{
-			// 对于机场和港口，使用 type 参数更精确；对于其他关键词，使用 keyword 参数
+			// Use type for airport/port when available; keyword for others
 			var isAirport = keyword.Equals("airport", StringComparison.OrdinalIgnoreCase);
 			var isPort = keyword.Equals("port", StringComparison.OrdinalIgnoreCase) || 
 			            keyword.Equals("ferry terminal", StringComparison.OrdinalIgnoreCase);
@@ -208,7 +206,7 @@ public class GoogleMapsService : IGoogleMapsService
 			}
 			else if (isPort)
 			{
-				// 对于港口，使用 keyword 搜索（Google Places API 没有专门的 port type）
+				// Port: use keyword (Google Places has no dedicated port type)
 				url += $"&keyword={Uri.EscapeDataString(keyword)}";
 			}
 			else
@@ -446,11 +444,7 @@ public class GoogleMapsService : IGoogleMapsService
 
 	#endregion
 
-	/// <summary>
-	/// 仅对明确为新加坡的输入做标准化，其余地名原样返回以支持全球识别：
-	/// - 6位数字视为新加坡邮编，自动添加 "Singapore"
-	/// - 仅当为已知新加坡简称（如 NUS、NTU、SMU）时追加 " Singapore"，其他地名不修改
-	/// </summary>
+	/// <summary>Normalize Singapore-only input: 6-digit postal code or known short names get "Singapore" suffix; other addresses unchanged.</summary>
 	private string NormalizeAddressForSingapore(string address)
 	{
 		if (string.IsNullOrWhiteSpace(address))
@@ -458,12 +452,12 @@ public class GoogleMapsService : IGoogleMapsService
 
 		var trimmed = address.Trim();
 
-		// 已包含 Singapore/新加坡 的地址不再修改
+		// Already contains Singapore: do not modify
 		if (trimmed.Contains("Singapore", StringComparison.OrdinalIgnoreCase) ||
 		    trimmed.Contains("新加坡", StringComparison.OrdinalIgnoreCase))
 			return trimmed;
 
-		// 新加坡邮编：6位数字
+		// Singapore postal code: 6 digits
 		if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\d{6}$"))
 		{
 			_logger.LogDebug("Detected Singapore postal code: {PostalCode}, adding 'Singapore' suffix", SanitizeForLog(trimmed));

@@ -31,7 +31,7 @@ namespace EcoLens.Api.Services
             var content = await response.Content.ReadAsStringAsync(ct);
             var result = JsonSerializer.Deserialize<OpenFoodFactsProductResponseDto>(content, JsonOptions);
 
-            // 若反序列化后仍取不到 co2_total，从原始 JSON 中尝试提取并补全
+            // If co2_total still missing after deserialize, try to patch from raw JSON
             if (result?.Product != null && !TryGetCo2FromEcoScore(result.Product.EcoScoreData, out _))
                 TryPatchEcoScoreFromRaw(content, result.Product);
 
@@ -77,7 +77,7 @@ namespace EcoLens.Api.Services
                 else
                     product.EcoScoreData.Agribalyse = new AgribalyseDataDto { Co2Total = co2 };
             }
-            catch { /* 忽略解析异常 */ }
+            catch { /* ignore parse error */ }
         }
 
         private static void TryGetCo2FromElement(JsonElement el, out decimal? co2)

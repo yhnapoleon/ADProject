@@ -63,7 +63,7 @@ public class FoodController : ControllerBase
 		var food = await FindFoodCarbonFactorAsync(name, ct);
 		if (food is null)
 		{
-			return NotFound($"未找到食物：{name} 的碳因子。");
+			return NotFound($"Carbon factor not found for food: {name}.");
 		}
 
 		var inputUnit = NormalizeUnit(request.Unit);
@@ -72,7 +72,7 @@ public class FoodController : ControllerBase
 		var normalizedQuantity = ConvertToFactorUnit(name, request.Quantity, inputUnit, factorUnit);
 		if (normalizedQuantity < 0)
 		{
-			return BadRequest("份量换算失败，请检查单位与数值。");
+			return BadRequest("Portion conversion failed. Check unit and value.");
 		}
 
 		var total = (decimal)normalizedQuantity * food.Co2Factor;
@@ -100,26 +100,26 @@ public class FoodController : ControllerBase
 	[Consumes("multipart/form-data")]
 	public async Task<ActionResult<FoodSimpleCalcResponse>> IngestFromImage([FromForm] FoodIngestFromImageRequest req, CancellationToken ct)
 	{
+		if (req.File == null || req.File.Length == 0) return BadRequest("No image uploaded.");
+		if (req.Quantity < 0) return BadRequest("Quantity must be non-negative.");
+
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		if (req.File == null || req.File.Length == 0) return BadRequest("未上传图片。");
-		if (req.Quantity < 0) return BadRequest("Quantity 必须为非负数。");
-
 		var vision = await _visionService.PredictAsync(req.File, ct);
 		var food = await FindFoodCarbonFactorAsync(vision.Label, ct);
-		if (food is null) return NotFound($"未找到食物：{vision.Label} 的碳因子。");
+		if (food is null) return NotFound($"Carbon factor not found for food: {vision.Label}.");
 
 		// 计算总排放
 		var inputUnit = NormalizeUnit(req.Unit);
 		var factorUnit = NormalizeUnit(food.Unit);
 		var normalizedQuantity = ConvertToFactorUnit(vision.Label, req.Quantity, inputUnit, factorUnit);
-		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
+		if (normalizedQuantity < 0) return BadRequest("Portion conversion failed. Check unit and value.");
 		var total = (decimal)normalizedQuantity * food.Co2Factor;
 
 		// 入库（amount 统一保存为 kg）
 		var amountKg = ToKilograms(vision.Label, req.Quantity, inputUnit);
-		if (amountKg < 0) return BadRequest("份量换算失败（kg）。");
+		if (amountKg < 0) return BadRequest("Portion conversion failed (kg).");
 
 		var record = new FoodRecord
 		{
@@ -165,16 +165,16 @@ public class FoodController : ControllerBase
 		if (userId is null) return Unauthorized();
 
 		var food = await FindFoodCarbonFactorAsync(req.Name, ct);
-		if (food is null) return NotFound($"未找到食物：{req.Name} 的碳因子。");
+		if (food is null) return NotFound($"Carbon factor not found for food: {req.Name}.");
 
 		var inputUnit = NormalizeUnit(req.Unit);
 		var factorUnit = NormalizeUnit(food.Unit);
 		var normalizedQuantity = ConvertToFactorUnit(req.Name, req.Quantity, inputUnit, factorUnit);
-		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
+		if (normalizedQuantity < 0) return BadRequest("Portion conversion failed. Check unit and value.");
 		var total = (decimal)normalizedQuantity * food.Co2Factor;
 
 		var amountKg = ToKilograms(req.Name, req.Quantity, inputUnit);
-		if (amountKg < 0) return BadRequest("份量换算失败（kg）。");
+		if (amountKg < 0) return BadRequest("Portion conversion failed (kg).");
 
 		var record = new FoodRecord
 		{
@@ -216,12 +216,12 @@ public class FoodController : ControllerBase
 		if (!ModelState.IsValid) return ValidationProblem(ModelState);
 
 		var food = await FindFoodCarbonFactorAsync(req.Name, ct);
-		if (food is null) return NotFound($"未找到食物：{req.Name} 的碳因子。");
+		if (food is null) return NotFound($"Carbon factor not found for food: {req.Name}.");
 
 		var inputUnit = NormalizeUnit(req.Unit);
 		var factorUnit = NormalizeUnit(food.Unit);
 		var normalizedQuantity = ConvertToFactorUnit(req.Name, req.Quantity, inputUnit, factorUnit);
-		if (normalizedQuantity < 0) return BadRequest("份量换算失败，请检查单位与数值。");
+		if (normalizedQuantity < 0) return BadRequest("Portion conversion failed. Check unit and value.");
 
 		var total = (decimal)normalizedQuantity * food.Co2Factor;
 
@@ -243,7 +243,7 @@ public class FoodController : ControllerBase
 	{
 		if (dto.File == null || dto.File.Length == 0)
 		{
-			return BadRequest("未上传图片。");
+			return BadRequest("No image uploaded.");
 		}
 
 		var vision = await _visionService.PredictAsync(dto.File, ct);
@@ -267,11 +267,11 @@ public class FoodController : ControllerBase
 	{
 		if (req.File == null || req.File.Length == 0)
 		{
-			return BadRequest("未上传图片。");
+			return BadRequest("No image uploaded.");
 		}
 		if (req.Quantity < 0)
 		{
-			return BadRequest("Quantity 必须为非负数。");
+			return BadRequest("Quantity must be non-negative.");
 		}
 		req.Unit ??= "g";
 
@@ -279,7 +279,7 @@ public class FoodController : ControllerBase
 		var food = await FindFoodCarbonFactorAsync(vision.Label, ct);
 		if (food is null)
 		{
-			return NotFound($"未找到食物：{vision.Label} 的碳因子。");
+			return NotFound($"Carbon factor not found for food: {vision.Label}.");
 		}
 
 		var inputUnit = NormalizeUnit(req.Unit);
@@ -287,7 +287,7 @@ public class FoodController : ControllerBase
 		var normalizedQuantity = ConvertToFactorUnit(vision.Label, req.Quantity, inputUnit, factorUnit);
 		if (normalizedQuantity < 0)
 		{
-			return BadRequest("份量换算失败，请检查单位与数值。");
+			return BadRequest("Portion conversion failed. Check unit and value.");
 		}
 
 		var total = (decimal)normalizedQuantity * food.Co2Factor;
