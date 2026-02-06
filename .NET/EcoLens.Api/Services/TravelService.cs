@@ -50,6 +50,11 @@ public class TravelService : ITravelService
 	}
 
 	/// <summary>
+	/// Mask coordinates for logging to avoid exposure of precise location. Rounds to 2 decimal places (~1.1 km precision).
+	/// </summary>
+	private static string MaskCoordinateForLog(double coord) => Math.Round(coord, 2).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+
+	/// <summary>
 	/// 创建出行记录
 	/// </summary>
 	public async Task<TravelLogResponseDto> CreateTravelLogAsync(int userId, CreateTravelLogDto dto, CancellationToken ct = default)
@@ -1151,25 +1156,25 @@ public class TravelService : ITravelService
 			var result = await _googleMapsService.SearchNearbyAsync(latitude, longitude, keyword, radiusMeters, ct);
 			if (result == null || result.Places == null || result.Places.Count == 0)
 			{
-				_logger.LogDebug("No {Infrastructure} found near {Lat}, {Lng} within {Radius}m", keyword, latitude, longitude, radiusMeters);
+				_logger.LogDebug("No {Infrastructure} found near {Lat}, {Lng} within {Radius}m", keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude), radiusMeters);
 				return false;
 			}
 
 			_logger.LogDebug("Found {Count} {Infrastructure} near {Lat}, {Lng}: {Places}", 
-				result.Places.Count, keyword, latitude, longitude, 
+				result.Places.Count, keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude), 
 				string.Join(", ", result.Places.Select(p => p.Name)));
 
 			return result.Places.Count > 0;
 		}
 		catch (Exception ex)
 		{
-			_logger.LogWarning(ex, "Error checking for {Infrastructure} near {Lat}, {Lng}", keyword, latitude, longitude);
+			_logger.LogWarning(ex, "Error checking for {Infrastructure} near {Lat}, {Lng}", keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 			
 			// 严格模式：对于飞机和轮船，如果 API 调用失败，应该拒绝（返回 false）
 			// 这样可以避免在没有基础设施的情况下错误地允许使用这些交通工具
 			if (strict)
 			{
-				_logger.LogError(ex, "Strict mode: Infrastructure check failed for {Infrastructure} near {Lat}, {Lng}, rejecting transport mode", keyword, latitude, longitude);
+				_logger.LogError(ex, "Strict mode: Infrastructure check failed for {Infrastructure} near {Lat}, {Lng}, rejecting transport mode", keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 				return false;
 			}
 			
