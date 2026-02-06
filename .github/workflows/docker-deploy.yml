@@ -37,5 +37,5 @@ jobs:
         uses: azure/webapps-deploy@v2
         with:
           app-name: "ecolens-vision-team06"
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          publish-profile: ${{ secrets.AZURE_PYTHON_PUBLISH_PROFILE }}
           images: 'ecolensacr.azurecr.io/vision-service:${{ github.sha }}'
