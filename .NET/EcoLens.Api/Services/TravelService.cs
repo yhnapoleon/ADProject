@@ -8,9 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EcoLens.Api.Services;
 
-/// <summary>
-/// 出行记录服务实现
-/// </summary>
+/// <summary>Travel log service implementation.</summary>
 public class TravelService : ITravelService
 {
 	private readonly ApplicationDbContext _db;
@@ -54,15 +52,13 @@ public class TravelService : ITravelService
 	/// </summary>
 	private static string MaskCoordinateForLog(double coord) => Math.Round(coord, 2).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
 
-	/// <summary>
-	/// 创建出行记录
-	/// </summary>
+	/// <summary>Create travel log.</summary>
 	public async Task<TravelLogResponseDto> CreateTravelLogAsync(int userId, CreateTravelLogDto dto, CancellationToken ct = default)
 	{
 		if (dto.TransportMode == TransportMode.Taxi)
-			throw new InvalidOperationException("出租车已取消，请选择其他出行方式。");
+			throw new InvalidOperationException("Taxi was cancelled; please choose another transport mode.");
 
-		// 1. 地址转坐标（先检查缓存）
+		// 1. Geocode (check cache first)
 		var originGeocode = await _cacheService.GetCachedGeocodeAsync(dto.OriginAddress);
 		if (originGeocode == null)
 		{
@@ -71,7 +67,7 @@ public class TravelService : ITravelService
 			{
 				throw new InvalidOperationException($"Unable to geocode origin address: {dto.OriginAddress}");
 			}
-			// 保存到缓存
+			// save to cache
 			await _cacheService.SetCachedGeocodeAsync(dto.OriginAddress, originGeocode);
 		}
 
@@ -83,20 +79,20 @@ public class TravelService : ITravelService
 			{
 				throw new InvalidOperationException($"Unable to geocode destination address: {dto.DestinationAddress}");
 			}
-			// 保存到缓存
+			// save to cache
 			await _cacheService.SetCachedGeocodeAsync(dto.DestinationAddress, destGeocode);
 		}
 
-		// 1.5. PreFlightCheck: 在发送地图请求前进行常识校验（使用直线距离）
+		// 1.5. PreFlightCheck: sanity check before map request (straight-line distance)
 		var straightLineDistanceKm = CalculateHaversineDistance(
 			originGeocode.Latitude, originGeocode.Longitude,
 			destGeocode.Latitude, destGeocode.Longitude);
 		await PreFlightCheckAsync(dto.TransportMode, originGeocode, destGeocode, straightLineDistanceKm, ct);
 
-		// 2. 获取路线信息（先获取导航距离，用于验证和计算）
+		// 2. Get route (navigation distance for validation and calculation)
 		RouteResult? route = null;
 		
-		// 飞机/轮船：始终使用大圆距离（因为 Google Maps 不支持飞机/轮船路线，驾车路线不准确）
+		// Plane/Ship: use great-circle distance (Google Maps has no plane/ship route)
 		if (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship)
 		{
 			var greatCircleMeters = GetGreatCircleDistanceMeters(
@@ -115,7 +111,7 @@ public class TravelService : ITravelService
 		}
 		else
 		{
-			// 其他交通工具使用 Google Maps API 获取路线
+			// Other modes: get route via Google Maps API
 			var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
 			route = await _googleMapsService.GetRouteAsync(
 				originGeocode.Latitude,
@@ -134,25 +130,21 @@ public class TravelService : ITravelService
 				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
 
-		// 2.5. 验证出行方式的合理性（在获取导航距离之后，使用实际导航距离进行验证）
+		// 2.5. Validate transport mode for route (using actual navigation distance)
 		var navigationDistanceKm = route.DistanceMeters / 1000.0;
 		await ValidateTransportModeForRouteAsync(dto.TransportMode, originGeocode, destGeocode, navigationDistanceKm, ct);
 
-		// 3. 计算碳排放（使用导航距离）
-		// 对于步行和自行车，使用碳减排值（负值），而不是碳排放
+		// 3. Compute carbon emission (walking/bicycle use reduction factor, others use DB factor)
 		var distanceKm = (decimal)navigationDistanceKm;
 		decimal totalCarbonEmission;
 		
 		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle)
 		{
-			// 步行和自行车使用碳减排值（负值）
-			// 步行：-0.12 kg CO₂e/km；自行车：-0.20 kg CO₂e/km
 			var reductionFactor = dto.TransportMode == TransportMode.Walking ? -0.12m : -0.20m;
-			totalCarbonEmission = distanceKm * reductionFactor; // 负值表示碳减排
+			totalCarbonEmission = distanceKm * reductionFactor;
 		}
 		else
 		{
-			// 其他交通工具（含摩托车）使用数据库碳排放因子
 			var carbonFactor = await GetCarbonFactorAsync(dto.TransportMode, ct);
 			if (carbonFactor == null)
 			{
@@ -161,11 +153,11 @@ public class TravelService : ITravelService
 			totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
 		}
 
-		// 4. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		// 4. Shared transport: allocate emission by passenger count
 		var passengerCount = GetPassengerCount(dto.TransportMode);
 		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
-		// 5. 创建实体
+		// 5. Create entity
 		var travelLog = new TravelLog
 		{
 			UserId = userId,
@@ -185,28 +177,26 @@ public class TravelService : ITravelService
 			Notes = dto.Notes
 		};
 
-		// 6. 保存到数据库
+		// 6. Save to DB
 		await _db.TravelLogs.AddAsync(travelLog, ct);
 		await _db.SaveChangesAsync(ct);
 
-		// 7. 更新用户总碳排放
+		// 7. Update user total emission
 		await UpdateUserTotalCarbonEmissionAsync(userId, ct);
 
 		_logger.LogInformation("Travel log created successfully: UserId={UserId}, TravelLogId={TravelLogId}", userId, travelLog.Id);
 
-		// 8. 转换为DTO返回
+		// 8. Map to DTO
 		return ToResponseDto(travelLog);
 	}
 
-	/// <summary>
-	/// 预览路线和碳排放（不保存到数据库）
-	/// </summary>
+	/// <summary>Preview route and emission (no save).</summary>
 	public async Task<RoutePreviewDto> PreviewRouteAsync(CreateTravelLogDto dto, CancellationToken ct = default)
 	{
 		if (dto.TransportMode == TransportMode.Taxi)
-			throw new InvalidOperationException("出租车已取消，请选择其他出行方式。");
+			throw new InvalidOperationException("Taxi was cancelled; please choose another transport mode.");
 
-		// 1. 地址转坐标（先检查缓存）
+		// 1. Geocode (check cache first)
 		var originGeocode = await _cacheService.GetCachedGeocodeAsync(dto.OriginAddress);
 		if (originGeocode == null)
 		{
@@ -215,7 +205,6 @@ public class TravelService : ITravelService
 			{
 				throw new InvalidOperationException($"Unable to geocode origin address: {dto.OriginAddress}");
 			}
-			// 保存到缓存
 			await _cacheService.SetCachedGeocodeAsync(dto.OriginAddress, originGeocode);
 		}
 
@@ -227,20 +216,19 @@ public class TravelService : ITravelService
 			{
 				throw new InvalidOperationException($"Unable to geocode destination address: {dto.DestinationAddress}");
 			}
-			// 保存到缓存
 			await _cacheService.SetCachedGeocodeAsync(dto.DestinationAddress, destGeocode);
 		}
 
-		// 1.5. PreFlightCheck: 在发送地图请求前进行常识校验（使用直线距离）
+		// 1.5. PreFlightCheck: sanity check before map request (using straight-line distance)
 		var straightLineDistanceKm = CalculateHaversineDistance(
 			originGeocode.Latitude, originGeocode.Longitude,
 			destGeocode.Latitude, destGeocode.Longitude);
 		await PreFlightCheckAsync(dto.TransportMode, originGeocode, destGeocode, straightLineDistanceKm, ct);
 
-		// 2. 获取路线信息（先获取导航距离，用于验证和计算）
+		// 2. Get route (navigation distance for validation and calculation)
 		RouteResult? route = null;
 		
-		// 飞机/轮船：始终使用大圆距离（因为 Google Maps 不支持飞机/轮船路线，驾车路线不准确）
+		// Plane/Ship: use great-circle distance (Google Maps has no plane/ship route)
 		if (dto.TransportMode == TransportMode.Plane || dto.TransportMode == TransportMode.Ship)
 		{
 			var greatCircleMeters = GetGreatCircleDistanceMeters(
@@ -257,7 +245,7 @@ public class TravelService : ITravelService
 		}
 		else
 		{
-			// 其他交通工具使用 Google Maps API 获取路线
+			// Other modes: get route via Google Maps API
 			var travelMode = GetGoogleMapsTravelMode(dto.TransportMode);
 			route = await _googleMapsService.GetRouteAsync(
 				originGeocode.Latitude,
@@ -276,18 +264,17 @@ public class TravelService : ITravelService
 				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
 
-		// 2.5. 验证出行方式的合理性（在获取导航距离之后，使用实际导航距离进行验证）
+		// 2.5. Validate transport mode for route (using actual navigation distance)
 		var navigationDistanceKm = route.DistanceMeters / 1000.0;
 		await ValidateTransportModeForRouteAsync(dto.TransportMode, originGeocode, destGeocode, navigationDistanceKm, ct);
 
-		// 3. 计算碳排放（使用导航距离）
-		// 对于步行和自行车，使用碳减排值（负值），而不是碳排放
+		// 3. Compute carbon emission (walking/bicycle use reduction factor)
 		var distanceKm = (decimal)navigationDistanceKm;
 		decimal totalCarbonEmission;
 		
 		if (dto.TransportMode == TransportMode.Walking || dto.TransportMode == TransportMode.Bicycle)
 		{
-			// 步行和自行车使用碳减排值（负值）
+			// Walking/bicycle use reduction factor
 			var reductionFactor = dto.TransportMode == TransportMode.Walking ? -0.12m : -0.20m;
 			totalCarbonEmission = distanceKm * reductionFactor;
 		}
@@ -301,11 +288,11 @@ public class TravelService : ITravelService
 			totalCarbonEmission = distanceKm * carbonFactor.Co2Factor;
 		}
 
-		// 4. 对于共享交通工具，按乘客数量分摊碳排放（使用默认乘客数量）
+		// 4. Shared transport: allocate emission by passenger count
 		var passengerCount = GetPassengerCount(dto.TransportMode);
 		var carbonEmission = CalculatePerPersonCarbonEmission(dto.TransportMode, totalCarbonEmission, passengerCount);
 
-		// 5. 转换为预览DTO
+		// 5. Build preview DTO
 		return new RoutePreviewDto
 		{
 			OriginAddress = originGeocode.FormattedAddress,
@@ -325,9 +312,7 @@ public class TravelService : ITravelService
 		};
 	}
 
-	/// <summary>
-	/// 获取用户的出行记录列表（支持筛选和分页）
-	/// </summary>
+	/// <summary>Get user travel logs with optional filter and paging.</summary>
 	public async Task<PagedResultDto<TravelLogResponseDto>> GetUserTravelLogsAsync(
 		int userId,
 		GetTravelLogsQueryDto? query = null,
@@ -337,7 +322,7 @@ public class TravelService : ITravelService
 
 		var baseQuery = _db.TravelLogs.Where(t => t.UserId == userId);
 
-		// 日期筛选
+		// Date filter
 		if (query.StartDate.HasValue)
 		{
 			baseQuery = baseQuery.Where(t => t.CreatedAt >= query.StartDate.Value);
@@ -349,16 +334,15 @@ public class TravelService : ITravelService
 			baseQuery = baseQuery.Where(t => t.CreatedAt < endDateInclusive);
 		}
 
-		// 出行方式筛选
+		// Transport mode filter
 		if (query.TransportMode.HasValue)
 		{
 			baseQuery = baseQuery.Where(t => t.TransportMode == query.TransportMode.Value);
 		}
 
-		// 获取总数
 		var totalCount = await baseQuery.CountAsync(ct);
 
-		// 分页查询
+		// Paged query
 		var travelLogs = await baseQuery
 			.OrderByDescending(t => t.CreatedAt)
 			.Skip((query.Page - 1) * query.PageSize)
@@ -376,9 +360,7 @@ public class TravelService : ITravelService
 		};
 	}
 
-	/// <summary>
-	/// 根据ID获取单条出行记录
-	/// </summary>
+	/// <summary>Get a single travel log by ID.</summary>
 	public async Task<TravelLogResponseDto?> GetTravelLogByIdAsync(int id, int userId, CancellationToken ct = default)
 	{
 		var travelLog = await _db.TravelLogs
@@ -390,9 +372,7 @@ public class TravelService : ITravelService
 		return ToResponseDto(travelLog);
 	}
 
-	/// <summary>
-	/// 删除出行记录
-	/// </summary>
+	/// <summary>Delete a travel log.</summary>
 	public async Task<bool> DeleteTravelLogAsync(int id, int userId, CancellationToken ct = default)
 	{
 		var travelLog = await _db.TravelLogs
@@ -404,7 +384,6 @@ public class TravelService : ITravelService
 		_db.TravelLogs.Remove(travelLog);
 		await _db.SaveChangesAsync(ct);
 
-		// 更新用户总碳排放
 		await UpdateUserTotalCarbonEmissionAsync(userId, ct);
 
 		_logger.LogInformation("Travel log deleted successfully: UserId={UserId}, TravelLogId={TravelLogId}", userId, id);
@@ -412,9 +391,7 @@ public class TravelService : ITravelService
 		return true;
 	}
 
-	/// <summary>
-	/// 获取用户的出行记录统计信息
-	/// </summary>
+	/// <summary>Get user travel statistics.</summary>
 	public async Task<TravelStatisticsDto> GetUserTravelStatisticsAsync(
 		int userId,
 		DateTime? startDate = null,
@@ -423,7 +400,7 @@ public class TravelService : ITravelService
 	{
 		var query = _db.TravelLogs.Where(t => t.UserId == userId);
 
-		// 日期筛选
+		// Date filter
 		if (startDate.HasValue)
 		{
 			query = query.Where(t => t.CreatedAt >= startDate.Value);
@@ -431,14 +408,13 @@ public class TravelService : ITravelService
 
 		if (endDate.HasValue)
 		{
-			// 结束日期包含整天，所以加一天并小于
+			// End date inclusive: add one day and use less-than
 			var endDateInclusive = endDate.Value.Date.AddDays(1);
 			query = query.Where(t => t.CreatedAt < endDateInclusive);
 		}
 
 		var travelLogs = await query.ToListAsync(ct);
 
-		// 计算总体统计
 		var statistics = new TravelStatisticsDto
 		{
 			TotalRecords = travelLogs.Count,
@@ -446,7 +422,6 @@ public class TravelService : ITravelService
 			TotalCarbonEmission = travelLogs.Sum(t => t.CarbonEmission)
 		};
 
-		// 按出行方式分组统计
 		var byMode = travelLogs
 			.GroupBy(t => t.TransportMode)
 			.Select(g => new TransportModeStatisticsDto
@@ -465,11 +440,9 @@ public class TravelService : ITravelService
 		return statistics;
 	}
 
-	#region 辅助方法
+	#region Helpers
 
-	/// <summary>
-	/// 将 TravelLog 实体转换为响应DTO
-	/// </summary>
+	/// <summary>Map TravelLog entity to response DTO.</summary>
 	private TravelLogResponseDto ToResponseDto(TravelLog travelLog)
 	{
 		return new TravelLogResponseDto
@@ -496,8 +469,7 @@ public class TravelService : ITravelService
 	}
 
 	/// <summary>
-	/// 获取出行方式的英文名称
-	/// </summary>
+	/// <summary>Get display name for transport mode.</summary>
 	private string GetTransportModeName(TransportMode mode)
 	{
 		return mode switch
@@ -516,12 +488,10 @@ public class TravelService : ITravelService
 		};
 	}
 
-	/// <summary>
-	/// 计算两点间大圆距离（米），用于飞机/轮船在无驾车路线时估算航程
-	/// </summary>
+	/// <summary>Great-circle distance in meters (for plane/ship when no driving route).</summary>
 	private static int GetGreatCircleDistanceMeters(double lat1, double lon1, double lat2, double lon2)
 	{
-		const double R = 6_371_000; // 地球半径（米）
+		const double R = 6_371_000; // Earth radius (m)
 		var dLat = (lat2 - lat1) * Math.PI / 180;
 		var dLon = (lon2 - lon1) * Math.PI / 180;
 		var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
@@ -531,30 +501,26 @@ public class TravelService : ITravelService
 		return (int)(R * c);
 	}
 
-	/// <summary>
-	/// 将 TransportMode 转换为 Google Maps API 的 travel mode 字符串
-	/// </summary>
+	/// <summary>Map TransportMode to Google Maps travel mode string.</summary>
 	private string GetGoogleMapsTravelMode(TransportMode mode)
 	{
 		return mode switch
 		{
 			TransportMode.Walking => "walking",
 			TransportMode.Bicycle => "bicycling",
-			TransportMode.Motorcycle => "driving", // 摩托车
+			TransportMode.Motorcycle => "driving",
 			TransportMode.Subway => "transit",
 			TransportMode.Bus => "transit",
 			TransportMode.Taxi => "driving",
 			TransportMode.CarGasoline => "driving",
 			TransportMode.CarElectric => "driving",
-			TransportMode.Ship => "driving", // 轮船使用driving模式（Google Maps不支持轮船路线）
-			TransportMode.Plane => "driving", // 飞机使用driving模式（Google Maps不支持飞机路线）
+			TransportMode.Ship => "driving",
+			TransportMode.Plane => "driving",
 			_ => "driving"
 		};
 	}
 
-	/// <summary>
-	/// 获取碳排放因子
-	/// </summary>
+	/// <summary>Get carbon emission factor for transport mode.</summary>
 	private async Task<CarbonReference?> GetCarbonFactorAsync(TransportMode mode, CancellationToken ct)
 	{
 		var labelName = GetCarbonReferenceLabelName(mode);
@@ -562,9 +528,7 @@ public class TravelService : ITravelService
 			.FirstOrDefaultAsync(c => c.LabelName == labelName, ct);
 	}
 
-	/// <summary>
-	/// 将 TransportMode 转换为 CarbonReference 的 LabelName
-	/// </summary>
+	/// <summary>Map TransportMode to CarbonReference LabelName.</summary>
 	private string GetCarbonReferenceLabelName(TransportMode mode)
 	{
 		return mode switch
@@ -583,10 +547,7 @@ public class TravelService : ITravelService
 		};
 	}
 
-	/// <summary>
-	/// PreFlightCheck: 在发送地图请求前进行常识校验
-	/// 根据交通工具和直线距离进行校验，区分全球城市级别和新加坡精细级别
-	/// </summary>
+	/// <summary>PreFlightCheck: sanity check before map request; distinguishes Singapore vs global city level.</summary>
 	private async Task PreFlightCheckAsync(
 		TransportMode transportMode,
 		GeocodingResult origin,
@@ -594,37 +555,22 @@ public class TravelService : ITravelService
 		double straightLineDistanceKm,
 		CancellationToken ct)
 	{
-		// 判断是否在新加坡（精细级别校验）
 		var isSingapore = IsInSingapore(origin) && IsInSingapore(destination);
-		
-		// 判断是否是全球主要城市（城市级别校验）
 		var isGlobalCityLevel = IsMajorCity(origin) && IsMajorCity(destination);
 
-		// 根据场景进行不同的校验
 		if (isSingapore)
-		{
-			// 新加坡精细级别校验（街道、邮编级别）
 			ValidateSingaporeLevel(transportMode, origin, destination, straightLineDistanceKm);
-		}
 		else if (isGlobalCityLevel)
-		{
-			// 全球主要城市级别校验
 			ValidateGlobalCityLevel(transportMode, origin, destination, straightLineDistanceKm);
-		}
 		else
-		{
-			// 通用校验（适用于其他情况）
 			ValidateGeneralLevel(transportMode, origin, destination, straightLineDistanceKm);
-		}
 
 		_logger.LogInformation(
 			"PreFlightCheck passed: Mode={TransportMode}, Origin={Origin}, Dest={Dest}, Distance={Distance}km, Singapore={IsSG}, CityLevel={IsCity}",
 			transportMode, SanitizeForLog(origin.FormattedAddress), SanitizeForLog(destination.FormattedAddress), straightLineDistanceKm, isSingapore, isGlobalCityLevel);
 	}
 
-	/// <summary>
-	/// 判断地址是否在新加坡
-	/// </summary>
+	/// <summary>Whether the address is in Singapore.</summary>
 	private bool IsInSingapore(GeocodingResult geocode)
 	{
 		var addressLower = geocode.FormattedAddress?.ToLowerInvariant() ?? string.Empty;
@@ -634,44 +580,40 @@ public class TravelService : ITravelService
 		       countryLower.Contains("新加坡") ||
 		       addressLower.Contains("singapore") || 
 		       addressLower.Contains("新加坡") ||
-		       // 检查新加坡邮编格式（6位数字，如 123456）
-		       System.Text.RegularExpressions.Regex.IsMatch(addressLower, @"\b\d{6}\b");
+		       System.Text.RegularExpressions.Regex.IsMatch(addressLower, @"\b\d{6}\b"); // Singapore postal code (6 digits)
 	}
 
-	/// <summary>
-	/// 判断是否是全球主要城市
-	/// </summary>
+	/// <summary>Whether the address is a major global city (for city-level validation).</summary>
 	private bool IsMajorCity(GeocodingResult geocode)
 	{
-		// 全球主要城市列表（可根据需要扩展）
 		var majorCities = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 		{
-			// 亚洲
+			// Asia
 			"Tokyo", "Tokyo, Japan", "北京", "Beijing", "上海", "Shanghai", "广州", "Guangzhou", "深圳", "Shenzhen",
 			"Hong Kong", "香港", "Seoul", "首尔", "Singapore", "新加坡", "Bangkok", "曼谷", "Kuala Lumpur", "吉隆坡",
 			"Jakarta", "雅加达", "Manila", "马尼拉", "Mumbai", "孟买", "Delhi", "德里", "Bangalore", "班加罗尔",
 			"Chennai", "钦奈", "Kolkata", "加尔各答", "Hyderabad", "海得拉巴", "Dubai", "迪拜", "Riyadh", "利雅得",
 			"Tel Aviv", "特拉维夫", "Istanbul", "伊斯坦布尔",
 			
-			// 欧洲
+			// Europe
 			"London", "伦敦", "Paris", "巴黎", "Berlin", "柏林", "Madrid", "马德里", "Rome", "罗马", "Amsterdam", "阿姆斯特丹",
 			"Brussels", "布鲁塞尔", "Vienna", "维也纳", "Zurich", "苏黎世", "Stockholm", "斯德哥尔摩", "Copenhagen", "哥本哈根",
 			"Oslo", "奥斯陆", "Helsinki", "赫尔辛基", "Dublin", "都柏林", "Warsaw", "华沙", "Prague", "布拉格",
 			"Budapest", "布达佩斯", "Athens", "雅典", "Lisbon", "里斯本", "Moscow", "莫斯科", "Saint Petersburg", "圣彼得堡",
 			
-			// 北美
+			// North America
 			"New York", "纽约", "Los Angeles", "洛杉矶", "Chicago", "芝加哥", "San Francisco", "旧金山", "Boston", "波士顿",
 			"Washington", "华盛顿", "Seattle", "西雅图", "Miami", "迈阿密", "Toronto", "多伦多", "Vancouver", "温哥华",
-			"Montreal", "蒙特利尔", "Mexico City", "墨西哥城",
+			"Montreal", "蒙特利尔", 			"Mexico City", "墨西哥城",
 			
-			// 南美
+			// South America
 			"São Paulo", "圣保罗", "Rio de Janeiro", "里约热内卢", "Buenos Aires", "布宜诺斯艾利斯", "Lima", "利马",
 			"Bogotá", "波哥大", "Santiago", "圣地亚哥",
 			
-			// 大洋洲
-			"Sydney", "悉尼", "Melbourne", "墨尔本", "Auckland", "奥克兰", "Brisbane", "布里斯班", "Perth", "珀斯",
+			// Oceania
+			"Sydney", "悉尼", "Melbourne", "墨尔本", "Auckland", "奥克兰", "Brisbane", "布里斯班", 			"Perth", "珀斯",
 			
-			// 非洲
+			// Africa
 			"Cairo", "开罗", "Johannesburg", "约翰内斯堡", "Cape Town", "开普敦", "Lagos", "拉各斯", "Nairobi", "内罗毕"
 		};
 
@@ -682,247 +624,218 @@ public class TravelService : ITravelService
 		       majorCities.Any(mc => address.Contains(mc, StringComparison.OrdinalIgnoreCase));
 	}
 
-	/// <summary>
-	/// 新加坡精细级别校验（街道、邮编级别）
-	/// </summary>
+	/// <summary>Singapore-level validation (street/postal).</summary>
 	private void ValidateSingaporeLevel(TransportMode transportMode, GeocodingResult origin, GeocodingResult destination, double distanceKm)
 	{
-		// 新加坡内部不允许使用飞机
 		if (transportMode == TransportMode.Plane)
 		{
 			throw new InvalidOperationException(
-				"在新加坡内部不能使用飞机作为出行方式。新加坡是城市国家，请选择地铁、公交、出租车、私家车或其他地面交通工具。");
+				"Plane is not valid within Singapore. Please use MRT, bus, taxi, or car.");
 		}
 
-		// 新加坡内部不允许使用轮船（除非是特定的岛屿间交通，但通常距离很短）
 		if (transportMode == TransportMode.Ship)
 		{
-			if (distanceKm > 5) // 新加坡最大直线距离约50km，但岛屿间轮渡通常很短
+			if (distanceKm > 5)
 			{
 				throw new InvalidOperationException(
-					$"在新加坡内部，距离 {distanceKm:F1} 公里不适合使用轮船。新加坡内部的岛屿间轮渡通常距离很短（<5公里）。请选择地铁、公交或其他地面交通工具。");
+					$"Within Singapore, distance {distanceKm:F1} km is not suitable for ship. Island ferries are usually under 5 km. Please use MRT, bus or other ground transport.");
 			}
 		}
 
-		// 地铁：新加坡地铁系统覆盖全岛，但距离超过50km可能不合理（新加坡最长约50km）
 		if (transportMode == TransportMode.Subway)
 		{
 			if (distanceKm > 50)
 			{
 				throw new InvalidOperationException(
-					$"在新加坡内部，距离 {distanceKm:F1} 公里超过了新加坡地铁系统的合理范围。新加坡最长距离约50公里，请检查地址是否正确。");
+					$"Within Singapore, distance {distanceKm:F1} km exceeds MRT range. Please check the addresses.");
 			}
 		}
 
-		// 巴士：新加坡巴士系统完善，但超过50km可能不合理
 		if (transportMode == TransportMode.Bus)
 		{
 			if (distanceKm > 50)
 			{
 				throw new InvalidOperationException(
-					$"在新加坡内部，距离 {distanceKm:F1} 公里超过了新加坡巴士系统的合理范围。请检查地址是否正确。");
+					$"Within Singapore, distance {distanceKm:F1} km exceeds bus range. Please check the addresses.");
 			}
 		}
 
-		// 步行：新加坡内部步行，超过20km不合理
 		if (transportMode == TransportMode.Walking)
 		{
 			if (distanceKm > 20)
 			{
 				throw new InvalidOperationException(
-					$"在新加坡内部，距离 {distanceKm:F1} 公里不适合步行。即使是长距离步行，在新加坡内部通常也不会超过20公里。请选择地铁、公交或其他交通工具。");
+					$"Within Singapore, distance {distanceKm:F1} km is not suitable for walking. Please use MRT, bus or other transport.");
 			}
 		}
 
-		// 自行车/摩托车：新加坡内部，超过30km不合理
 		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 30)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
+				var modeName = transportMode == TransportMode.Bicycle ? "bicycle" : "motorcycle";
 				throw new InvalidOperationException(
-					$"在新加坡内部，距离 {distanceKm:F1} 公里不适合使用{modeName}。请选择地铁、公交或其他交通工具。");
+					$"Within Singapore, distance {distanceKm:F1} km is not suitable for {modeName}. Please use MRT, bus or other transport.");
 			}
 		}
 
-		// 私家车/出租车：在新加坡内部都可以使用，但距离超过50km需要检查
 		if (transportMode == TransportMode.CarGasoline || transportMode == TransportMode.CarElectric || transportMode == TransportMode.Taxi)
 		{
 			if (distanceKm > 50)
 			{
 				throw new InvalidOperationException(
-					$"在新加坡内部，距离 {distanceKm:F1} 公里超过了新加坡的合理范围。新加坡最长距离约50公里，请检查地址是否正确。");
+					$"Within Singapore, distance {distanceKm:F1} km exceeds reasonable range. Please check the addresses.");
 			}
 		}
 	}
 
 	/// <summary>
-	/// 全球主要城市级别校验
-	/// </summary>
+	/// <summary>Global major-city level validation.</summary>
 	private void ValidateGlobalCityLevel(TransportMode transportMode, GeocodingResult origin, GeocodingResult destination, double distanceKm)
 	{
 		var sameCountry = !string.IsNullOrWhiteSpace(origin.Country) &&
 		                  !string.IsNullOrWhiteSpace(destination.Country) &&
 		                  string.Equals(origin.Country, destination.Country, StringComparison.OrdinalIgnoreCase);
 
-		// 飞机：城市间飞行，通常需要 > 200km
 		if (transportMode == TransportMode.Plane)
 		{
 			if (distanceKm < 200)
 			{
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用飞机。城市间飞行通常需要200公里以上。请选择火车、高铁或其他交通工具。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for plane. Please use train or other transport.");
 			}
 		}
 
-		// 轮船：城市间轮船，需要沿海城市且距离 > 50km
 		if (transportMode == TransportMode.Ship)
 		{
 			if (distanceKm < 50)
 			{
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用轮船。城市间轮船通常需要50公里以上，且需要是沿海城市。请选择其他交通工具。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for ship. Please choose another transport.");
 			}
 		}
 
-		// 地铁：城市间地铁，通常 < 200km 且同一国家
 		if (transportMode == TransportMode.Subway)
 		{
 			if (!sameCountry)
 			{
 				throw new InvalidOperationException(
-					$"地铁不能用于跨国出行。从 {origin.Country} 到 {destination.Country} 请选择飞机、火车或其他交通工具。");
+					$"Subway cannot be used across countries. From {origin.Country} to {destination.Country} please use plane, train or other transport.");
 			}
 			if (distanceKm > 200)
 			{
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用地铁。城市间地铁通常用于200公里以内。请选择高铁、火车或飞机。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for subway. Please use train or plane.");
 			}
 		}
 
-		// 巴士：城市间巴士，通常 < 500km
 		if (transportMode == TransportMode.Bus)
 		{
 			if (distanceKm > 500)
 			{
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用巴士。城市间巴士通常用于500公里以内。请选择火车或飞机。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for bus. Please use train or plane.");
 			}
 		}
 
-		// 步行：城市间步行不合理
 		if (transportMode == TransportMode.Walking)
 		{
 			if (distanceKm > 50)
 			{
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合步行。即使是长距离步行，城市间通常也不会超过50公里。请选择其他交通工具。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for walking. Please choose another transport.");
 			}
 		}
 
-		// 自行车/摩托车：城市间不合理
 		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 100)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
+				var modeName = transportMode == TransportMode.Bicycle ? "bicycle" : "motorcycle";
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用{modeName}。请选择火车、高铁或飞机。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for {modeName}. Please use train or plane.");
 			}
 		}
 
-		// 私家车/出租车：城市间可以，但超长距离不合理
 		if (transportMode == TransportMode.CarGasoline || transportMode == TransportMode.CarElectric || transportMode == TransportMode.Taxi)
 		{
 			if (distanceKm > 1000)
 			{
 				throw new InvalidOperationException(
-					$"主要城市之间，距离 {distanceKm:F1} 公里不适合使用私家车/出租车。超长距离建议选择飞机或火车。");
+					$"Between major cities, distance {distanceKm:F1} km is not suitable for car/taxi. Consider plane or train.");
 			}
 		}
 	}
 
-	/// <summary>
-	/// 通用级别校验（适用于其他情况）
-	/// </summary>
+	/// <summary>General-level validation (other cases).</summary>
 	private void ValidateGeneralLevel(TransportMode transportMode, GeocodingResult origin, GeocodingResult destination, double distanceKm)
 	{
 		var sameCountry = !string.IsNullOrWhiteSpace(origin.Country) &&
 		                  !string.IsNullOrWhiteSpace(destination.Country) &&
 		                  string.Equals(origin.Country, destination.Country, StringComparison.OrdinalIgnoreCase);
 
-		// 飞机：通常需要 > 100km
 		if (transportMode == TransportMode.Plane)
 		{
 			if (distanceKm < 100)
 			{
 				throw new InvalidOperationException(
-					$"距离 {distanceKm:F1} 公里不适合使用飞机。飞机通常用于100公里以上的长途旅行。请选择其他交通工具。");
+					$"Distance {distanceKm:F1} km is not suitable for plane. Plane is typically for 100 km or more. Please choose another transport.");
 			}
 		}
 
-		// 轮船：需要 > 10km 且通常是沿海/岛屿
 		if (transportMode == TransportMode.Ship)
 		{
 			if (distanceKm < 10)
 			{
 				throw new InvalidOperationException(
-					$"距离 {distanceKm:F1} 公里不适合使用轮船。轮船通常用于10公里以上的水上交通。请选择其他交通工具。");
+					$"Distance {distanceKm:F1} km is not suitable for ship. Please choose another transport.");
 			}
 		}
 
-		// 地铁：通常 < 200km 且同一国家
 		if (transportMode == TransportMode.Subway)
 		{
 			if (!sameCountry)
 			{
 				throw new InvalidOperationException(
-					$"地铁不能用于跨国出行。从 {origin.Country} 到 {destination.Country} 请选择飞机、火车或其他交通工具。");
+					$"Subway cannot be used across countries. From {origin.Country} to {destination.Country} please use plane, train or other transport.");
 			}
 			if (distanceKm > 200)
 			{
 				throw new InvalidOperationException(
-					$"距离 {distanceKm:F1} 公里不适合使用地铁。地铁通常用于200公里以内。请选择火车或飞机。");
+					$"Distance {distanceKm:F1} km is not suitable for subway. Please use train or plane.");
 			}
 		}
 
-		// 巴士：通常 < 500km
 		if (transportMode == TransportMode.Bus)
 		{
 			if (distanceKm > 500)
 			{
 				throw new InvalidOperationException(
-					$"距离 {distanceKm:F1} 公里不适合使用巴士。巴士通常用于500公里以内。请选择火车或飞机。");
+					$"Distance {distanceKm:F1} km is not suitable for bus. Please use train or plane.");
 			}
 		}
 
-		// 步行：通常 < 100km
 		if (transportMode == TransportMode.Walking)
 		{
 			if (distanceKm > 100)
 			{
 				throw new InvalidOperationException(
-					$"距离 {distanceKm:F1} 公里不适合步行。即使是长距离步行，通常也不会超过100公里。请选择其他交通工具。");
+					$"Distance {distanceKm:F1} km is not suitable for walking. Please choose another transport.");
 			}
 		}
 
-		// 自行车/摩托车：通常 < 50km
 		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 50)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
+				var modeName = transportMode == TransportMode.Bicycle ? "bicycle" : "motorcycle";
 				throw new InvalidOperationException(
-					$"距离 {distanceKm:F1} 公里不适合使用{modeName}。{modeName}通常用于50公里以内。请选择其他交通工具。");
+					$"Distance {distanceKm:F1} km is not suitable for {modeName}. Please choose another transport.");
 			}
 		}
 	}
 
-	/// <summary>
-	/// 验证出行方式是否适合该路线（异步版本，支持基础设施检查）
-	/// 避免在新加坡内部使用飞机、轮船等不合理的出行方式
-	/// 检查实际交通工具的可用性（如机场、港口）
-	/// </summary>
+	/// <summary>Validate transport mode for route (async; checks infrastructure e.g. airport/port).</summary>
 	private async Task ValidateTransportModeForRouteAsync(
 		TransportMode transportMode, 
 		GeocodingResult origin, 
@@ -930,10 +843,8 @@ public class TravelService : ITravelService
 		double navigationDistanceKm,
 		CancellationToken ct)
 	{
-		// 使用导航距离而不是直线距离进行验证
 		var distanceKm = navigationDistanceKm;
 
-		// 检查地址中是否包含新加坡关键词（即使 Country 字段为空也能检测）
 		var originAddressLower = origin.FormattedAddress?.ToLowerInvariant() ?? string.Empty;
 		var destAddressLower = destination.FormattedAddress?.ToLowerInvariant() ?? string.Empty;
 		var originCountryLower = origin.Country?.ToLowerInvariant() ?? string.Empty;
@@ -944,7 +855,6 @@ public class TravelService : ITravelService
 		                          (destAddressLower.Contains("singapore") || destAddressLower.Contains("新加坡") ||
 		                           destCountryLower.Contains("singapore") || destCountryLower.Contains("新加坡"));
 
-		// 检查是否在同一国家（特别是新加坡）
 		var sameCountry = !string.IsNullOrWhiteSpace(origin.Country) &&
 		                  !string.IsNullOrWhiteSpace(destination.Country) &&
 		                  string.Equals(origin.Country, destination.Country, StringComparison.OrdinalIgnoreCase);
@@ -954,51 +864,36 @@ public class TravelService : ITravelService
 		                   string.Equals(origin.Country, "新加坡", StringComparison.OrdinalIgnoreCase))) ||
 		                 hasSingaporeKeyword;
 
-		// 验证规则：
-		// 1. 如果距离为 0 或非常小（< 1 公里），不允许使用飞机和轮船
-		// 2. 如果都在新加坡，不允许使用飞机和轮船（短距离）
-		// 3. 如果距离小于100公里，不允许使用飞机
-		// 4. 如果距离小于10公里，不允许使用轮船
-
 		if (transportMode == TransportMode.Plane)
 		{
-			// 首先检查距离是否为 0 或非常小
 			if (distanceKm < 1)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过短（{distanceKm:F2} 公里），不能使用飞机。请选择其他出行方式。");
+					$"Origin and destination are too close ({distanceKm:F2} km). Plane is not suitable. Please choose another transport.");
 			}
 
-			// 检查是否在新加坡内部
 			if (isSingapore)
 			{
 				throw new InvalidOperationException(
-					"在新加坡内部不能使用飞机作为出行方式。请选择其他出行方式，如地铁、公交、出租车或私家车。");
+					"Plane is not valid within Singapore. Please use MRT, bus, taxi or car.");
 			}
 
-			// 检查距离是否足够长
 			if (distanceKm < 100)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过短（{distanceKm:F1} 公里），不适合使用飞机。飞机通常用于长途旅行（100公里以上）。请选择其他出行方式。");
+					$"Origin and destination are too close ({distanceKm:F1} km) for plane. Please choose another transport.");
 			}
 
-			// 检查出发地和目的地附近是否有机场（使用 Google Places API）
-			// 策略：
-			// 1. 超长途飞行（>1000公里，通常是跨洲/跨国家）：搜索半径200公里，API失败时允许（大城市通常都有国际机场）
-			// 2. 长途飞行（500-1000公里）：搜索半径150公里，API失败时允许（主要城市通常都有机场）
-			// 3. 中短途飞行（100-500公里）：搜索半径100公里，严格检查（必须找到机场）
 			var isVeryLongDistance = distanceKm > 1000;
 			var isLongDistance = distanceKm > 500;
 			var searchRadius = isVeryLongDistance ? 200000 : (isLongDistance ? 150000 : 100000);
-			var strictMode = !isLongDistance; // 只有中短途飞行使用严格模式
+			var strictMode = !isLongDistance;
 			
 			var originHasAirport = await HasNearbyInfrastructureAsync(
 				origin.Latitude, origin.Longitude, "airport", searchRadius, ct, strict: strictMode);
 			var destHasAirport = await HasNearbyInfrastructureAsync(
 				destination.Latitude, destination.Longitude, "airport", searchRadius, ct, strict: strictMode);
 
-			// 对于长途/超长途飞行，如果API调用失败但距离足够长，允许继续（假设主要城市都有机场）
 			if (!originHasAirport)
 			{
 				if (isLongDistance)
@@ -1012,7 +907,7 @@ public class TravelService : ITravelService
 				else
 				{
 					throw new InvalidOperationException(
-						$"出发地附近（{searchRadius / 1000}公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+						$"No airport found within {searchRadius / 1000} km of origin. Plane is not suitable. Please choose another transport.");
 				}
 			}
 
@@ -1029,37 +924,31 @@ public class TravelService : ITravelService
 				else
 				{
 					throw new InvalidOperationException(
-						$"目的地附近（{searchRadius / 1000}公里内）没有找到机场，无法使用飞机作为出行方式。请选择其他出行方式。");
+						$"No airport found within {searchRadius / 1000} km of destination. Plane is not suitable. Please choose another transport.");
 				}
 			}
 		}
 
 		if (transportMode == TransportMode.Ship)
 		{
-			// 首先检查距离是否为 0 或非常小
 			if (distanceKm < 1)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过短（{distanceKm:F2} 公里），不能使用轮船。请选择其他出行方式。");
+					$"Origin and destination are too close ({distanceKm:F2} km). Ship is not suitable. Please choose another transport.");
 			}
 
-			// 检查是否在新加坡内部短距离
 			if (isSingapore && distanceKm < 50)
 			{
-				// 新加坡是岛国，但内部短距离不应该用轮船
 				throw new InvalidOperationException(
-					"在新加坡内部短距离出行不适合使用轮船。请选择其他出行方式，如地铁、公交、出租车或私家车。");
+					"Ship is not suitable for short trips within Singapore. Please use MRT, bus, taxi or car.");
 			}
 
-			// 检查距离是否足够长
 			if (distanceKm < 10)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过短（{distanceKm:F1} 公里），不适合使用轮船。请选择其他出行方式。");
+					$"Origin and destination are too close ({distanceKm:F1} km) for ship. Please choose another transport.");
 			}
 
-			// 检查出发地和目的地附近是否有港口/码头（使用 Google Places API）
-			// 对于轮船，必须严格检查，如果 API 调用失败，应该拒绝而不是允许
 			var originHasPort = await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "port", 30000, ct, strict: true) ||
 			                    await HasNearbyInfrastructureAsync(origin.Latitude, origin.Longitude, "ferry terminal", 30000, ct, strict: true);
 			var destHasPort = await HasNearbyInfrastructureAsync(destination.Latitude, destination.Longitude, "port", 30000, ct, strict: true) ||
@@ -1068,64 +957,56 @@ public class TravelService : ITravelService
 			if (!originHasPort)
 			{
 				throw new InvalidOperationException(
-					$"出发地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。轮船只能用于有港口或码头的沿海城市或岛屿。请选择其他出行方式。");
+					"No port or ferry terminal found within 30 km of origin. Ship is only for coastal/ island locations. Please choose another transport.");
 			}
 
 			if (!destHasPort)
 			{
 				throw new InvalidOperationException(
-					$"目的地附近（30公里内）没有找到港口或码头，无法使用轮船作为出行方式。轮船只能用于有港口或码头的沿海城市或岛屿。请选择其他出行方式。");
+					"No port or ferry terminal found within 30 km of destination. Please choose another transport.");
 			}
 		}
 
-		// 验证地铁：地铁通常只在城市内部或相邻城市之间运行，不适合超长距离
 		if (transportMode == TransportMode.Subway)
 		{
-			// 地铁通常用于城市内部或相邻城市，超过 200 公里可能不合理
 			if (distanceKm > 200)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用地铁。地铁通常用于城市内部或相邻城市之间的短距离出行（200公里以内）。请选择其他出行方式，如飞机、火车或长途巴士。");
+					$"Distance {distanceKm:F1} km is too long for subway. Please use plane, train or long-distance bus.");
 			}
 
-			// 如果跨国家，地铁通常不可行
 			if (!sameCountry && !string.IsNullOrWhiteSpace(origin.Country) && !string.IsNullOrWhiteSpace(destination.Country))
 			{
 				throw new InvalidOperationException(
-					$"地铁不能用于跨国出行。从 {origin.Country} 到 {destination.Country} 请选择其他出行方式，如飞机或火车。");
+					$"Subway cannot be used across countries. From {origin.Country} to {destination.Country} please use plane or train.");
 			}
 		}
 
-		// 验证巴士：巴士可以用于中短距离，但超长距离可能不合理
 		if (transportMode == TransportMode.Bus)
 		{
-			// 巴士通常用于中短距离，超过 500 公里可能不合理（虽然技术上可行，但通常有更好的选择）
 			if (distanceKm > 500)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用巴士。巴士通常用于中短距离出行（500公里以内）。对于超长距离，建议选择飞机或火车。请选择其他出行方式。");
+					$"Distance {distanceKm:F1} km is too long for bus. Please use plane or train.");
 			}
 		}
 
-		// 验证步行：步行可以用于较长距离（支持背包客等长距离步行）
 		if (transportMode == TransportMode.Walking)
 		{
-			// 放宽限制以支持背包客等长距离步行，但超过 100 公里仍然不合理
 			if (distanceKm > 100)
 			{
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合步行。即使是长距离步行，通常也不会超过 100 公里。请选择其他出行方式。");
+					$"Distance {distanceKm:F1} km is too long for walking. Please choose another transport.");
 			}
 		}
 
-		// 验证自行车/摩托车：适合短到中距离
 		if (transportMode == TransportMode.Bicycle || transportMode == TransportMode.Motorcycle)
 		{
 			if (distanceKm > 50)
 			{
-				var modeName = transportMode == TransportMode.Bicycle ? "自行车" : "摩托车";
+				var modeName = transportMode == TransportMode.Bicycle ? "bicycle" : "motorcycle";
 				throw new InvalidOperationException(
-					$"出发地和目的地距离过长（{distanceKm:F1} 公里），不适合使用{modeName}。{modeName}通常用于短到中距离出行（50公里以内）。请选择其他出行方式。");
+					$"Distance {distanceKm:F1} km is too long for {modeName}. Please choose another transport.");
 			}
 		}
 
@@ -1134,15 +1015,13 @@ public class TravelService : ITravelService
 			transportMode, origin.Country, destination.Country, distanceKm);
 	}
 
-	/// <summary>
-	/// 检查指定位置附近是否有特定类型的基础设施（如机场、港口）
-	/// </summary>
-	/// <param name="latitude">纬度</param>
-	/// <param name="longitude">经度</param>
-	/// <param name="keyword">搜索关键词（如 "airport", "port"）</param>
-	/// <param name="radiusMeters">搜索半径（米）</param>
-	/// <param name="ct">取消令牌</param>
-	/// <param name="strict">是否严格模式：如果为 true，API 调用失败时返回 false（拒绝）；如果为 false，API 调用失败时返回 true（允许，避免阻塞用户）</param>
+	/// <summary>Check if infrastructure (e.g. airport, port) exists near the given location.</summary>
+	/// <param name="latitude">Latitude.</param>
+	/// <param name="longitude">Longitude.</param>
+	/// <param name="keyword">Search keyword (e.g. "airport", "port").</param>
+	/// <param name="radiusMeters">Search radius in meters.</param>
+	/// <param name="ct">Cancellation token.</param>
+	/// <param name="strict">If true, API failure returns false; if false, returns true to avoid blocking user.</param>
 	private async Task<bool> HasNearbyInfrastructureAsync(
 		double latitude, 
 		double longitude, 
@@ -1170,27 +1049,19 @@ public class TravelService : ITravelService
 		{
 			_logger.LogWarning(ex, "Error checking for {Infrastructure} near {Lat}, {Lng}", keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 			
-			// 严格模式：对于飞机和轮船，如果 API 调用失败，应该拒绝（返回 false）
-			// 这样可以避免在没有基础设施的情况下错误地允许使用这些交通工具
 			if (strict)
 			{
 				_logger.LogError(ex, "Strict mode: Infrastructure check failed for {Infrastructure} near {Lat}, {Lng}, rejecting transport mode", keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 				return false;
 			}
-			
-			// 非严格模式：对于其他交通工具，如果 API 调用失败，返回 true（允许使用）
-			// 这样可以避免因为 API 调用失败而阻止合理的出行方式
 			return true;
 		}
 	}
 
-	/// <summary>
-	/// 使用 Haversine 公式计算两点间的直线距离（公里）
-	/// 注意：此方法仅用于辅助计算，实际距离验证应使用导航距离
-	/// </summary>
+	/// <summary>Haversine formula: straight-line distance in km (for auxiliary use; validation should use navigation distance).</summary>
 	private double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
 	{
-		const double earthRadiusKm = 6371.0; // 地球半径（公里）
+		const double earthRadiusKm = 6371.0;
 
 		var dLat = ToRadians(lat2 - lat1);
 		var dLon = ToRadians(lon2 - lon1);
@@ -1203,17 +1074,13 @@ public class TravelService : ITravelService
 		return earthRadiusKm * c;
 	}
 
-	/// <summary>
-	/// 将角度转换为弧度
-	/// </summary>
+	/// <summary>Convert degrees to radians.</summary>
 	private static double ToRadians(double degrees)
 	{
 		return degrees * Math.PI / 180.0;
 	}
 
-	/// <summary>
-	/// 格式化时间显示（秒转换为可读字符串）
-	/// </summary>
+	/// <summary>Format duration in seconds as readable string.</summary>
 	private string? FormatDuration(int? seconds)
 	{
 		if (seconds == null)
@@ -1231,48 +1098,34 @@ public class TravelService : ITravelService
 		return $"{secs}s";
 	}
 
-	/// <summary>
-	/// 获取乘客数量（使用默认值）
-	/// </summary>
+	/// <summary>Get default passenger count for shared transport.</summary>
 	private int GetPassengerCount(TransportMode transportMode)
 	{
-		// 对于共享交通工具，使用默认乘客数量
 		return transportMode switch
 		{
-			TransportMode.Plane => 150,   // 飞机平均载客量
-			TransportMode.Ship => 200,    // 轮船平均载客量
-			TransportMode.Bus => 40,      // 巴士平均载客量
-			TransportMode.Subway => 200,  // 地铁平均载客量
-			_ => 1  // 其他交通工具（步行、自行车、私家车等）按1人计算
+			TransportMode.Plane => 150,
+			TransportMode.Ship => 200,
+			TransportMode.Bus => 40,
+			TransportMode.Subway => 200,
+			_ => 1
 		};
 	}
 
-	/// <summary>
-	/// 计算每人分摊的碳排放量
-	/// 对于共享交通工具（飞机、轮船、巴士、地铁），按乘客数量分摊
-	/// 对于其他交通工具，直接返回总碳排放
-	/// </summary>
+	/// <summary>Per-person carbon emission; shared transport divided by passenger count.</summary>
 	private decimal CalculatePerPersonCarbonEmission(TransportMode transportMode, decimal totalCarbonEmission, int passengerCount)
 	{
-		// 共享交通工具需要按乘客数量分摊
 		var isSharedTransport = transportMode == TransportMode.Plane ||
 		                         transportMode == TransportMode.Ship ||
 		                         transportMode == TransportMode.Bus ||
 		                         transportMode == TransportMode.Subway;
 
 		if (isSharedTransport && passengerCount > 0)
-		{
-			// 按乘客数量分摊：总碳排放 / 乘客数量
 			return totalCarbonEmission / passengerCount;
-		}
 
-		// 其他交通工具（步行、自行车、私家车等）不需要分摊，直接返回总碳排放
 		return totalCarbonEmission;
 	}
 
-	/// <summary>
-	/// 更新用户总碳排放（从 ActivityLogs、TravelLogs、UtilityBills 汇总）
-	/// </summary>
+	/// <summary>Update user total carbon emission from ActivityLogs, TravelLogs, UtilityBills.</summary>
 	private async Task UpdateUserTotalCarbonEmissionAsync(int userId, CancellationToken ct)
 	{
 		try
@@ -1297,8 +1150,7 @@ public class TravelService : ITravelService
 		}
 		catch (Exception ex)
 		{
-			// 记录错误但不影响主流程
-			_logger.LogError(ex, "Failed to update TotalCarbonEmission for user {UserId}", userId);
+				_logger.LogError(ex, "Failed to update TotalCarbonEmission for user {UserId}", userId);
 		}
 	}
 

@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace EcoLens.Api.Services;
 
 /// <summary>
-/// Google Maps API 服务实现
+/// Google Maps API service implementation.
 /// </summary>
 public class GoogleMapsService : IGoogleMapsService
 {
@@ -49,7 +49,7 @@ public class GoogleMapsService : IGoogleMapsService
 	private static string MaskCoordinateForLog(double coord) => Math.Round(coord, 2).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
 
 	/// <summary>
-	/// 地理编码：将地址转换为经纬度坐标
+	/// Geocode address to lat/lng.
 	/// </summary>
 	public async Task<GeocodingResult?> GeocodeAsync(string address, CancellationToken ct = default)
 	{
@@ -78,7 +78,7 @@ public class GoogleMapsService : IGoogleMapsService
 			if (location == null)
 				return null;
 
-			// 提取地址组件（国家、城市等）
+			// Extract address components (country, city, etc.)
 			var addressComponents = result.AddressComponents ?? new List<AddressComponent>();
 			var country = addressComponents.FirstOrDefault(c => c.Types?.Contains("country") == true)?.LongName;
 			var city = addressComponents.FirstOrDefault(c => c.Types?.Contains("locality") == true || c.Types?.Contains("administrative_area_level_1") == true)?.LongName;
@@ -133,7 +133,7 @@ public class GoogleMapsService : IGoogleMapsService
 	}
 
 	/// <summary>
-	/// 计算两点间的距离（米）和行驶时间
+	/// Calculate distance (meters) and duration between two points.
 	/// </summary>
 	public async Task<DistanceResult?> CalculateDistanceAsync(
 		double originLat, double originLng,
@@ -182,7 +182,7 @@ public class GoogleMapsService : IGoogleMapsService
 	}
 
 	/// <summary>
-	/// 搜索附近的地点
+	/// Search nearby places.
 	/// </summary>
 	public async Task<PlacesSearchResult?> SearchNearbyAsync(
 		double latitude, double longitude,
@@ -203,7 +203,7 @@ public class GoogleMapsService : IGoogleMapsService
 			
 			if (isAirport)
 			{
-				// 使用 type=airport 更精确地搜索机场
+				// Use type=airport for airport search
 				url += $"&type=airport";
 			}
 			else if (isPort)
@@ -246,7 +246,7 @@ public class GoogleMapsService : IGoogleMapsService
 	}
 
 	/// <summary>
-	/// 获取路线详情（包括polyline用于地图绘制）
+	/// Get route details (including polyline for map).
 	/// </summary>
 	public async Task<RouteResult?> GetRouteAsync(
 		double originLat, double originLng,
@@ -295,7 +295,7 @@ public class GoogleMapsService : IGoogleMapsService
 		}
 	}
 
-	#region Google API 响应模型（内部类，用于JSON反序列化）
+	#region Google API response DTOs (for JSON deserialization)
 
 	private class GoogleGeocodingResponse
 	{
@@ -470,7 +470,7 @@ public class GoogleMapsService : IGoogleMapsService
 			return $"{trimmed} Singapore";
 		}
 
-		// 仅对已知新加坡本地简称追加 " Singapore"，避免把北京、东京等误判为新加坡
+		// Known Singapore short names only (avoid false match for other cities)
 		var singaporeShortNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 		{
 			"NUS", "NTU", "SMU", "SUTD", "SIT", "SUSS", "SIM",
