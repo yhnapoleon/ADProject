@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -24,6 +25,25 @@ public class GoogleMapsService : IGoogleMapsService
 	}
 
 	/// <summary>
+	/// Sanitize user input before writing to logs to prevent log forging. Removes newlines and control characters.
+	/// </summary>
+	private static string SanitizeForLog(string? value)
+	{
+		if (string.IsNullOrEmpty(value)) return string.Empty;
+		var sb = new StringBuilder(value.Length);
+		foreach (char c in value)
+		{
+			if (char.IsControl(c) && c != '\t')
+				sb.Append(' ');
+			else if (c == '\r' || c == '\n')
+				sb.Append(' ');
+			else
+				sb.Append(c);
+		}
+		return sb.ToString().Trim();
+	}
+
+	/// <summary>
 	/// 地理编码：将地址转换为经纬度坐标
 	/// </summary>
 	public async Task<GeocodingResult?> GeocodeAsync(string address, CancellationToken ct = default)
@@ -43,7 +63,7 @@ public class GoogleMapsService : IGoogleMapsService
 
 			if (response?.Status != "OK" || response.Results == null || response.Results.Count == 0)
 			{
-				_logger.LogWarning("Geocoding failed: {Status}, Address: {Address}", response?.Status, address);
+				_logger.LogWarning("Geocoding failed: {Status}, Address: {Address}", response?.Status, SanitizeForLog(address));
 				return null;
 			}
 
@@ -69,7 +89,7 @@ public class GoogleMapsService : IGoogleMapsService
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, "Geocoding error: {Address}", address);
+			_logger.LogError(ex, "Geocoding error: {Address}", SanitizeForLog(address));
 			return null;
 		}
 	}
@@ -441,7 +461,7 @@ public class GoogleMapsService : IGoogleMapsService
 		// 新加坡邮编：6位数字
 		if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\d{6}$"))
 		{
-			_logger.LogDebug("Detected Singapore postal code: {PostalCode}, adding 'Singapore' suffix", trimmed);
+			_logger.LogDebug("Detected Singapore postal code: {PostalCode}, adding 'Singapore' suffix", SanitizeForLog(trimmed));
 			return $"{trimmed} Singapore";
 		}
 
@@ -454,7 +474,7 @@ public class GoogleMapsService : IGoogleMapsService
 		};
 		if (singaporeShortNames.Contains(trimmed))
 		{
-			_logger.LogDebug("Singapore short name detected: {Address}, adding 'Singapore'", trimmed);
+			_logger.LogDebug("Singapore short name detected: {Address}, adding 'Singapore'", SanitizeForLog(trimmed));
 			return $"{trimmed} Singapore";
 		}
 

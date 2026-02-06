@@ -31,7 +31,7 @@ public class TravelService : ITravelService
 	}
 
 	/// <summary>
-	/// 净化用户输入再写入日志，防止日志伪造（log forging）。移除换行与控制字符。
+	/// Sanitize user input before writing to logs to prevent log forging. Removes newlines and control characters.
 	/// </summary>
 	private static string SanitizeForLog(string? value)
 	{
