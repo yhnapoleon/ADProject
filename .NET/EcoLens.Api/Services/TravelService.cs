@@ -1,3 +1,4 @@
+using System.Text;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs.Travel;
 using EcoLens.Api.Models;
@@ -27,6 +28,25 @@ public class TravelService : ITravelService
 		_googleMapsService = googleMapsService;
 		_cacheService = cacheService;
 		_logger = logger;
+	}
+
+	/// <summary>
+	/// 净化用户输入再写入日志，防止日志伪造（log forging）。移除换行与控制字符。
+	/// </summary>
+	private static string SanitizeForLog(string? value)
+	{
+		if (string.IsNullOrEmpty(value)) return string.Empty;
+		var sb = new StringBuilder(value.Length);
+		foreach (char c in value)
+		{
+			if (char.IsControl(c) && c != '\t')
+				sb.Append(' ');
+			else if (c == '\r' || c == '\n')
+				sb.Append(' ');
+			else
+				sb.Append(c);
+		}
+		return sb.ToString().Trim();
 	}
 
 	/// <summary>
@@ -104,7 +124,7 @@ public class TravelService : ITravelService
 		if (route == null)
 		{
 			_logger.LogWarning("GetRouteAsync returned null for Origin={Origin}, Dest={Dest}, Mode={Mode}",
-				dto.OriginAddress, dto.DestinationAddress, dto.TransportMode);
+				SanitizeForLog(dto.OriginAddress), SanitizeForLog(dto.DestinationAddress), dto.TransportMode);
 			throw new InvalidOperationException(
 				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
@@ -246,7 +266,7 @@ public class TravelService : ITravelService
 		if (route == null)
 		{
 			_logger.LogWarning("GetRouteAsync returned null (preview) for Origin={Origin}, Dest={Dest}, Mode={Mode}",
-				dto.OriginAddress, dto.DestinationAddress, dto.TransportMode);
+				SanitizeForLog(dto.OriginAddress), SanitizeForLog(dto.DestinationAddress), dto.TransportMode);
 			throw new InvalidOperationException(
 				"No route found for the selected transport mode between these locations. For international or long-distance travel (e.g. London to New York), please select Plane.");
 		}
@@ -594,7 +614,7 @@ public class TravelService : ITravelService
 
 		_logger.LogInformation(
 			"PreFlightCheck passed: Mode={TransportMode}, Origin={Origin}, Dest={Dest}, Distance={Distance}km, Singapore={IsSG}, CityLevel={IsCity}",
-			transportMode, origin.FormattedAddress, destination.FormattedAddress, straightLineDistanceKm, isSingapore, isGlobalCityLevel);
+			transportMode, SanitizeForLog(origin.FormattedAddress), SanitizeForLog(destination.FormattedAddress), straightLineDistanceKm, isSingapore, isGlobalCityLevel);
 	}
 
 	/// <summary>
