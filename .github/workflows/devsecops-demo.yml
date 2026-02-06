@@ -103,12 +103,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.10.0
+      - name: DAST - OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
         with:
-          target: 'https://ecolens-demo-environment.azurewebsites.net'
-          rules_file_name: ''
-          cmd_options: '-a'
+          target: 'https://ecolens-demo-environment-bbcxhdd3gseagvag.southeastasia-01.azurewebsites.net'
+          allow_issue_writing: false
 
       - name: Upload ZAP reports
         if: always()
