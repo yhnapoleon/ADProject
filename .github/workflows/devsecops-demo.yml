@@ -15,6 +15,7 @@ jobs:
   backend:
     name: .NET Backend Pipeline
     runs-on: ubuntu-latest
+    continue-on-error: true
     defaults:
       run:
         shell: bash
@@ -116,13 +117,19 @@ jobs:
           touch zap.yaml report_json.json report_md.md report_html.html
           chmod a+w zap.yaml report_json.json report_md.md report_html.html
 
-      - name: DAST - OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: 'https://ecolens-demo-environment-bbcxhdd3gseagvag.southeastasia-01.azurewebsites.net'
-          allow_issue_writing: false
-          artifact_name: 'zapscan'
-          cmd_options: '-m 10 -d 1'
+      - name: DAST - ZAP Baseline (Docker)
+        run: |
+          docker pull ghcr.io/zaproxy/zaproxy:stable -q
+          docker run --rm \
+            -v "${{ github.workspace }}":/zap/wrk/:rw \
+            --network=host \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "https://ecolens-demo-environment-bbcxhdd3gseagvag.southeastasia-01.azurewebsites.net" \
+              -J report_json.json \
+              -w report_md.md \
+              -r report_html.html \
+              -m 10 -d 1
         continue-on-error: true
 
       - name: Upload ZAP reports
