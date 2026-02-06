@@ -28,13 +28,18 @@ jobs:
           dotnet-version: '8.x'
 
       - name: Dependency Check (SCA)
-        uses: jeremylong/DependencyCheck_Action@v4.1.0
-        with:
-          project: 'EcoLens.Api'
-          path: '.NET'
-          format: 'HTML'
-          out: 'reports/dependency-check'
-          failOnCVSS: '11'
+        run: |
+          mkdir -p reports/dependency-check odc-data
+          docker run --rm \
+            -v "${{ github.workspace }}":/src \
+            -v "${{ github.workspace }}/odc-data":/usr/share/dependency-check/data \
+            -v "${{ github.workspace }}/reports/dependency-check":/report \
+            owasp/dependency-check:latest \
+            --scan /src/.NET \
+            --format HTML \
+            --out /report \
+            --project "EcoLens.Api" \
+            --failOnCVSS 11
         continue-on-error: true
 
       - name: Upload SCA report
