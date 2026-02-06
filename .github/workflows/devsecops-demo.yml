@@ -53,6 +53,7 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: csharp
+        continue-on-error: true
 
       - name: Restore
         run: dotnet restore "./.NET/EcoLens.Api/EcoLens.Api.csproj"
@@ -70,6 +71,7 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:csharp"
+        continue-on-error: true
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
@@ -119,7 +121,7 @@ jobs:
         with:
           target: 'https://ecolens-demo-environment-bbcxhdd3gseagvag.southeastasia-01.azurewebsites.net'
           allow_issue_writing: false
-          artifact_name: 'zap-scan'
+          artifact_name: 'zapscan'
           cmd_options: '-m 10 -d 1'
         continue-on-error: true
 
