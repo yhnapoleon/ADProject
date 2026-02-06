@@ -1,3 +1,4 @@
+using System.Text;
 using EcoLens.Api.Services;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -19,12 +20,31 @@ public class GeocodingCacheService : IGeocodingCacheService
 		_logger = logger;
 	}
 
+	/// <summary>
+	/// Sanitize user input before writing to logs to prevent log forging. Removes newlines and control characters.
+	/// </summary>
+	private static string SanitizeForLog(string? value)
+	{
+		if (string.IsNullOrEmpty(value)) return string.Empty;
+		var sb = new StringBuilder(value.Length);
+		foreach (char c in value)
+		{
+			if (char.IsControl(c) && c != '\t')
+				sb.Append(' ');
+			else if (c == '\r' || c == '\n')
+				sb.Append(' ');
+			else
+				sb.Append(c);
+		}
+		return sb.ToString().Trim();
+	}
+
 	public Task<GeocodingResult?> GetCachedGeocodeAsync(string address)
 	{
 		var cacheKey = GetCacheKey(address);
 		if (_cache.TryGetValue(cacheKey, out GeocodingResult? cachedResult))
 		{
-			_logger.LogDebug("Getting geocode from cache: {Address}", address);
+			_logger.LogDebug("Getting geocode from cache: {Address}", SanitizeForLog(address));
 			return Task.FromResult<GeocodingResult?>(cachedResult);
 		}
 
@@ -41,7 +61,7 @@ public class GeocodingCacheService : IGeocodingCacheService
 		};
 
 		_cache.Set(cacheKey, result, cacheOptions);
-		_logger.LogDebug("Saving geocode to cache: {Address}", address);
+		_logger.LogDebug("Saving geocode to cache: {Address}", SanitizeForLog(address));
 
 		return Task.CompletedTask;
 	}
