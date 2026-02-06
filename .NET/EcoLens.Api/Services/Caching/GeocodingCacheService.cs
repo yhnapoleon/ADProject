@@ -5,8 +5,7 @@ using Microsoft.Extensions.Caching.Memory;
 namespace EcoLens.Api.Services.Caching;
 
 /// <summary>
-/// 地址转坐标缓存服务实现
-/// 使用内存缓存，减少 Google Maps API 调用次数
+/// In-memory geocoding cache to reduce Google Maps API calls.
 /// </summary>
 public class GeocodingCacheService : IGeocodingCacheService
 {
@@ -57,7 +56,7 @@ public class GeocodingCacheService : IGeocodingCacheService
 		var cacheOptions = new MemoryCacheEntryOptions
 		{
 			AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(CacheExpirationMinutes),
-			SlidingExpiration = TimeSpan.FromHours(12) // 如果12小时内没有被访问，则过期
+			SlidingExpiration = TimeSpan.FromHours(12) // Sliding 12h
 		};
 
 		_cache.Set(cacheKey, result, cacheOptions);
@@ -68,7 +67,7 @@ public class GeocodingCacheService : IGeocodingCacheService
 
 	private static string GetCacheKey(string address)
 	{
-		// 使用地址作为缓存键（转换为小写并去除空格，确保一致性）
+		// Cache key: normalized address
 		return $"geocode:{address.ToLowerInvariant().Trim()}";
 	}
 }
