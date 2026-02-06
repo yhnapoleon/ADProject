@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Microsoft.Extensions.Options;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,9 @@ var configuration = builder.Configuration;
 
 // Controllers
 builder.Services.AddControllers();
+
+// Application Insights (reads connection string from environment/config automatically)
+builder.Services.AddApplicationInsightsTelemetry();
 
 // CORS (Allow all for development)
 const string AllowAllCorsPolicy = "AllowAll";
@@ -261,6 +265,10 @@ app.UseStaticFiles();
 
 // 显式路由（确保 CORS 能正确拦截）
 app.UseRouting();
+
+// Prometheus metrics - expose /metrics and collect HTTP request metrics
+app.UseMetricServer();
+app.UseHttpMetrics();
 
 // CORS 必须在 Authentication 之前
 app.UseCors(AllowAllCorsPolicy);
