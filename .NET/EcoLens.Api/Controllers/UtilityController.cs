@@ -61,12 +61,12 @@ public class UtilityController : ControllerBase
 		}
 		catch (Exception ex)
 		{
-			return StatusCode(StatusCodes.Status502BadGateway, $"AI 调用失败: {ex.Message}");
+			return StatusCode(StatusCodes.Status502BadGateway, $"AI call failed: {ex.Message}");
 		}
 
 		if (string.IsNullOrWhiteSpace(aiText))
 		{
-			return StatusCode(StatusCodes.Status502BadGateway, "AI 返回空结果。");
+			return StatusCode(StatusCodes.Status502BadGateway, "AI returned empty result.");
 		}
 
 		// 容错：剔除可能的 ```json/``` 包裹，并提取花括号中的 JSON 片段
@@ -104,7 +104,7 @@ public class UtilityController : ControllerBase
 		}
 		catch (JsonException)
 		{
-			return StatusCode(StatusCodes.Status502BadGateway, "AI 返回非 JSON 格式或解析失败。");
+			return StatusCode(StatusCodes.Status502BadGateway, "AI returned invalid or non-JSON response.");
 		}
 
 		static decimal Normalize(decimal value)

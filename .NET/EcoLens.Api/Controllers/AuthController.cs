@@ -59,7 +59,7 @@ public class AuthController : ControllerBase
 		var sensitiveWord = _sensitiveWordService.ContainsSensitiveWord(dto.Username);
 		if (sensitiveWord != null)
 		{
-			return BadRequest($"用户名包含不当内容，无法注册。");
+			return BadRequest("Username contains inappropriate content. Registration denied.");
 		}
 
 		var exists = await _db.ApplicationUsers.AnyAsync(u => u.Email == dto.Email || u.Username == dto.Username, ct);

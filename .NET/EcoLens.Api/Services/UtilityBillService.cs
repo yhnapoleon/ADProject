@@ -56,7 +56,7 @@ public class UtilityBillService : IUtilityBillService
 			if (ocrResult == null || string.IsNullOrWhiteSpace(ocrResult.Text))
 			{
 				_logger.LogWarning("OCR recognition failed or returned empty text for user {UserId}", userId);
-				throw new InvalidOperationException("无法识别账单，请确保图片清晰或使用手动输入");
+				throw new InvalidOperationException("Unable to recognize bill. Please ensure the image is clear or use manual input.");
 			}
 
 			_logger.LogInformation("OCR completed: {TextLength} characters, Confidence: {Confidence}", ocrResult.Text.Length, ocrResult.Confidence);
@@ -71,7 +71,7 @@ public class UtilityBillService : IUtilityBillService
 					string.Join(", ", classificationResult.MatchedKeywords));
 
 				throw new InvalidOperationException(
-					classificationResult.ErrorMessage ?? "上传的图片不是水电账单，请上传新加坡的电费、水费或燃气账单");
+					classificationResult.ErrorMessage ?? "The uploaded image is not a utility bill. Please upload a Singapore electricity, water or gas bill.");
 			}
 
 			_logger.LogInformation(
@@ -83,14 +83,14 @@ public class UtilityBillService : IUtilityBillService
 			if (extractedData == null)
 			{
 				_logger.LogWarning("Failed to extract bill data from OCR text for user {UserId}", userId);
-				throw new InvalidOperationException("无法从账单中提取数据，请使用手动输入");
+				throw new InvalidOperationException("Unable to extract data from bill. Please use manual input.");
 			}
 
 			// 5. 验证提取的数据
 			if (!extractedData.BillPeriodStart.HasValue || !extractedData.BillPeriodEnd.HasValue)
 			{
 				_logger.LogWarning("Missing bill period dates in extracted data for user {UserId}", userId);
-				throw new InvalidOperationException("无法提取账单周期，请使用手动输入");
+				throw new InvalidOperationException("Unable to extract bill period. Please use manual input.");
 			}
 			
 			// 验证日期范围（确保年份在2000-2100范围内）
@@ -104,7 +104,7 @@ public class UtilityBillService : IUtilityBillService
 			{
 				_logger.LogError("CRITICAL: Invalid date range detected! Start={StartDate} (Year: {StartYear}), End={EndDate} (Year: {EndYear})", 
 					extractedData.BillPeriodStart.Value, startYear, extractedData.BillPeriodEnd.Value, endYear);
-				throw new InvalidOperationException($"提取的账单周期日期无效（开始年份: {startYear}, 结束年份: {endYear}），请使用手动输入");
+				throw new InvalidOperationException($"Invalid bill period dates (start year: {startYear}, end year: {endYear}). Please use manual input.");
 			}
 
 			// 6. 计算碳排放
@@ -166,7 +166,7 @@ public class UtilityBillService : IUtilityBillService
 			// 1. 验证输入数据
 			if (dto.BillPeriodStart >= dto.BillPeriodEnd)
 			{
-				throw new ArgumentException("账单周期开始日期必须早于结束日期");
+				throw new ArgumentException("Bill period start date must be earlier than end date.");
 			}
 
 			// 2. 检查重复账单（同一用户、相同账单周期、相同类型、相同用量）
@@ -192,7 +192,7 @@ public class UtilityBillService : IUtilityBillService
 			{
 				_logger.LogWarning("Duplicate bill detected for user {UserId}: BillId={BillId}, Period={Start} to {End}, Type={Type}",
 					userId, existingBill.Id, dto.BillPeriodStart, dto.BillPeriodEnd, dto.BillType);
-				throw new InvalidOperationException($"检测到重复账单。该账单已存在（账单ID: {existingBill.Id}，账单周期: {dto.BillPeriodStart:yyyy-MM-dd} 至 {dto.BillPeriodEnd:yyyy-MM-dd}）。请勿重复输入相同账单。");
+				throw new InvalidOperationException($"Duplicate bill detected. This bill already exists (ID: {existingBill.Id}, period: {dto.BillPeriodStart:yyyy-MM-dd} to {dto.BillPeriodEnd:yyyy-MM-dd}). Do not add the same bill again.");
 			}
 
 			// 3. 计算碳排放
@@ -425,13 +425,13 @@ public class UtilityBillService : IUtilityBillService
 	{
 		if (file == null || file.Length == 0)
 		{
-			throw new ArgumentException("文件不能为空");
+			throw new ArgumentException("File cannot be empty.");
 		}
 
 		// 文件大小限制（10MB）
 		if (file.Length > 10 * 1024 * 1024)
 		{
-			throw new ArgumentException("文件大小不能超过10MB");
+			throw new ArgumentException("File size must not exceed 10MB.");
 		}
 
 		// 文件类型验证
@@ -441,7 +441,7 @@ public class UtilityBillService : IUtilityBillService
 		var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
 		if (!allowedExtensions.Contains(extension))
 		{
-			throw new ArgumentException($"不支持的文件类型。支持的类型：{string.Join(", ", allowedExtensions)}");
+			throw new ArgumentException($"Unsupported file type. Supported types: {string.Join(", ", allowedExtensions)}");
 		}
 	}
 
@@ -480,10 +480,10 @@ public class UtilityBillService : IUtilityBillService
 	{
 		return billType switch
 		{
-			UtilityBillType.Electricity => "电费",
-			UtilityBillType.Water => "水费",
-			UtilityBillType.Gas => "燃气费",
-			UtilityBillType.Combined => "综合账单",
+			UtilityBillType.Electricity => "Electricity",
+			UtilityBillType.Water => "Water",
+			UtilityBillType.Gas => "Gas",
+			UtilityBillType.Combined => "Combined",
 			_ => billType.ToString()
 		};
 	}
@@ -495,8 +495,8 @@ public class UtilityBillService : IUtilityBillService
 	{
 		return inputMethod switch
 		{
-			InputMethod.Auto => "自动识别",
-			InputMethod.Manual => "手动输入",
+			InputMethod.Auto => "Auto",
+			InputMethod.Manual => "Manual",
 			_ => inputMethod.ToString()
 		};
 	}

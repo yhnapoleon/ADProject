@@ -82,7 +82,7 @@ public class DocumentTypeClassifier : IDocumentTypeClassifier
 			{
 				DocumentType = DocumentType.Unknown,
 				ConfidenceScore = 0,
-				ErrorMessage = "OCR 文本为空，无法识别文档类型"
+				ErrorMessage = "OCR text is empty. Unable to identify document type."
 			});
 		}
 
@@ -110,22 +110,22 @@ public class DocumentTypeClassifier : IDocumentTypeClassifier
 		else if (flightScore >= 2)
 		{
 			documentType = DocumentType.FlightTicket;
-			errorMessage = "上传的图片是机票/登机牌，不是水电账单。请上传新加坡的电费、水费或燃气账单。";
+			errorMessage = "The uploaded image is a flight ticket/boarding pass, not a utility bill. Please upload a Singapore electricity, water or gas bill.";
 		}
 		else if (receiptScore >= 3)
 		{
 			documentType = DocumentType.Receipt;
-			errorMessage = "上传的图片是收据，不是水电账单。请上传新加坡的电费、水费或燃气账单。";
+			errorMessage = "The uploaded image is a receipt, not a utility bill. Please upload a Singapore electricity, water or gas bill.";
 		}
 		else if (invoiceScore >= 2)
 		{
 			documentType = DocumentType.Invoice;
-			errorMessage = "上传的图片是发票，不是水电账单。请上传新加坡的电费、水费或燃气账单。";
+			errorMessage = "The uploaded image is an invoice, not a utility bill. Please upload a Singapore electricity, water or gas bill.";
 		}
 		else
 		{
 			documentType = DocumentType.Unknown;
-			errorMessage = "无法识别上传的图片类型。请确保上传的是新加坡的电费、水费或燃气账单。";
+			errorMessage = "Unable to identify the uploaded image type. Please ensure you upload a Singapore electricity, water or gas bill.";
 		}
 
 		var result = new DocumentTypeClassificationResult

@@ -35,12 +35,12 @@ public class GeminiService : IAiService
 		var baseUrl = _settings.BaseUrl?.TrimEnd('/') ?? string.Empty;
 		if (string.IsNullOrWhiteSpace(baseUrl))
 		{
-			throw new InvalidOperationException("AiSettings.BaseUrl 未配置。");
+			throw new InvalidOperationException("AiSettings.BaseUrl is not configured.");
 		}
 
 		if (string.IsNullOrWhiteSpace(_settings.ApiKey))
 		{
-			throw new InvalidOperationException("AiSettings.ApiKey 未配置。");
+			throw new InvalidOperationException("AiSettings.ApiKey is not configured.");
 		}
 
 		var targetUrl = $"{baseUrl}/chat/completions";
@@ -65,7 +65,7 @@ public class GeminiService : IAiService
 
 		if (!response.IsSuccessStatusCode)
 		{
-			throw new HttpRequestException($"AI 调用失败: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
+			throw new HttpRequestException($"AI call failed: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
 		}
 
 		try
@@ -85,18 +85,18 @@ public class GeminiService : IAiService
 	{
 		if (image == null || image.Length == 0)
 		{
-			throw new ArgumentException("上传图片为空。", nameof(image));
+			throw new ArgumentException("Uploaded image is empty.", nameof(image));
 		}
 
 		var baseUrl = _settings.BaseUrl?.TrimEnd('/') ?? string.Empty;
 		if (string.IsNullOrWhiteSpace(baseUrl))
 		{
-			throw new InvalidOperationException("AiSettings.BaseUrl 未配置。");
+			throw new InvalidOperationException("AiSettings.BaseUrl is not configured.");
 		}
 
 		if (string.IsNullOrWhiteSpace(_settings.ApiKey))
 		{
-			throw new InvalidOperationException("AiSettings.ApiKey 未配置。");
+			throw new InvalidOperationException("AiSettings.ApiKey is not configured.");
 		}
 
 		var contentType = string.IsNullOrWhiteSpace(image.ContentType) ? "image/jpeg" : image.ContentType;
@@ -149,7 +149,7 @@ public class GeminiService : IAiService
 
 			if (!response.IsSuccessStatusCode)
 			{
-				throw new HttpRequestException($"AI 调用失败: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
+				throw new HttpRequestException($"AI call failed: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
 			}
 
 			try
@@ -197,7 +197,7 @@ public class GeminiService : IAiService
 
 			if (!response.IsSuccessStatusCode)
 			{
-				throw new HttpRequestException($"AI 调用失败: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
+				throw new HttpRequestException($"AI call failed: {(int)response.StatusCode} {response.ReasonPhrase}. Body: {responseText}");
 			}
 
 			try

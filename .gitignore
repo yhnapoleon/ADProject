@@ -40,3 +40,6 @@ node_modules
 __pycache__/
 *.pyc
 .env
+
+# 本地 xuwenzhe 分支专用文档（仅本地保留，禁止上传远程）
+docs/sequence-diagrams-PB004-PB005.md

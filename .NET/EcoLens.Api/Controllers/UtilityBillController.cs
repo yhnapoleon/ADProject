@@ -237,7 +237,7 @@ public class UtilityBillController : ControllerBase
 			    fullText.Contains("cannot insert duplicate", StringComparison.OrdinalIgnoreCase))
 			{
 				_logger.LogWarning(ex, "Duplicate bill or constraint: UserId={UserId}", userId);
-				return BadRequest(new { error = "该账单已存在，请勿重复添加。" });
+				return BadRequest(new { error = "This bill already exists. Do not add duplicate." });
 			}
 			// 因子未找到等业务错误也返回 400
 			if (msg.Contains("factor", StringComparison.OrdinalIgnoreCase) || msg.Contains("因子", StringComparison.Ordinal) ||
