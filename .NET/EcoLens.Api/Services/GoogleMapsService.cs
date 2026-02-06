@@ -44,6 +44,11 @@ public class GoogleMapsService : IGoogleMapsService
 	}
 
 	/// <summary>
+	/// Mask coordinates for logging to avoid exposure of precise location. Rounds to 2 decimal places (~1.1 km precision).
+	/// </summary>
+	private static string MaskCoordinateForLog(double coord) => Math.Round(coord, 2).ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+
+	/// <summary>
 	/// 地理编码：将地址转换为经纬度坐标
 	/// </summary>
 	public async Task<GeocodingResult?> GeocodeAsync(string address, CancellationToken ct = default)
@@ -106,7 +111,7 @@ public class GoogleMapsService : IGoogleMapsService
 
 			if (response?.Status != "OK" || response.Results == null || response.Results.Count == 0)
 			{
-				_logger.LogWarning("Reverse geocoding failed: {Status}, Coordinates: {Lat}, {Lng}", response?.Status, latitude, longitude);
+				_logger.LogWarning("Reverse geocoding failed: {Status}, Coordinates: {Lat}, {Lng}", response?.Status, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 				return null;
 			}
 
@@ -122,7 +127,7 @@ public class GoogleMapsService : IGoogleMapsService
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, "Reverse geocoding error: {Lat}, {Lng}", latitude, longitude);
+			_logger.LogError(ex, "Reverse geocoding error: {Lat}, {Lng}", MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 			return null;
 		}
 	}
@@ -218,7 +223,7 @@ public class GoogleMapsService : IGoogleMapsService
 			if (response?.Status != "OK" || response.Results == null)
 			{
 				_logger.LogWarning("Places search failed: {Status}, Keyword: {Keyword}, Location: {Lat}, {Lng}", 
-					response?.Status, keyword, latitude, longitude);
+					response?.Status, keyword, MaskCoordinateForLog(latitude), MaskCoordinateForLog(longitude));
 				return null;
 			}
 
