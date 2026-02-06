@@ -46,7 +46,7 @@ jobs:
         - language: actions
           build-mode: none
         - language: csharp
-          build-mode: none
+          build-mode: manual
         - language: javascript-typescript
           build-mode: none
         - language: python
@@ -83,21 +83,17 @@ jobs:
         # For more details on CodeQL's query packs, refer to: https://docs.github.com/en/code-security/code-scanning/automatically-scanning-your-code-for-vulnerabilities-and-errors/configuring-code-scanning#using-queries-in-ql-packs
         # queries: security-extended,security-and-quality
 
-    - name: Build
-      run: |
-        cd .NET/EcoLens.Api
-        dotnet build
-
     - name: Run manual build steps
       if: matrix.build-mode == 'manual'
       shell: bash
       run: |
-        echo 'If you are using a "manual" build mode for one or more of the' \
-          'languages you are analyzing, replace this with the commands to build' \
-          'your code, for example:'
-        echo '  make bootstrap'
-        echo '  make release'
-        exit 1
+        if [ "${{ matrix.language }}" = "csharp" ]; then
+          cd .NET/EcoLens.Api
+          dotnet build
+        else
+          echo 'No manual build defined for this language'
+          exit 1
+        fi
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4
