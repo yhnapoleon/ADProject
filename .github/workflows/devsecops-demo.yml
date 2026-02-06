@@ -28,7 +28,7 @@ jobs:
           dotnet-version: '8.x'
 
       - name: Dependency Check (SCA)
-        uses: dependency-check/Dependency-Check_Action@v4.1.0
+        uses: jeremylong/DependencyCheck_Action@v4.1.0
         with:
           project: 'EcoLens.Api'
           path: '.NET'
