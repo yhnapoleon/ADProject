@@ -3,7 +3,11 @@ name: DevSecOps Demo
 on:
   push:
     branches:
+      - main
       - devsecops-demo
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
