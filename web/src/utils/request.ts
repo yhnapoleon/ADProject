@@ -13,7 +13,7 @@ type TimedConfig = InternalAxiosRequestConfig & {
 // Cloud backend (e.g. Azure) can be slow on cold start; use 60s to avoid false timeouts
 const service: AxiosInstance = axios.create({
   baseURL,
-  timeout: 60000, // 60s，兼容海外/跨区 API（如 Azure）较慢的情况
+  timeout: 60000,
 });
 
 service.interceptors.request.use(

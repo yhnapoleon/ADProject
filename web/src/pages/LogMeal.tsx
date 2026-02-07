@@ -517,7 +517,7 @@ const LogMeal = () => {
           }
         }
       } else {
-        // 没有识别到条形码，尝试食物识别
+        // no barcode detected, try food recognition
         setDetectionType('food');
         const reasonHint = barcodeFailureReason === 'decode_failed'
           ? 'Barcode detected but could not decode. '
@@ -529,7 +529,7 @@ const LogMeal = () => {
         const foodInfo = await recognizeFood(file as unknown as File);
         if (foodInfo) {
           setDetectedInfo({ type: 'food', data: foodInfo });
-          // 识别出的食物名称覆盖当前 Food name（覆盖用户已输入的名称）
+          // detected food name overrides current Food name (overwrites user input)
           form.setFieldsValue({ foodName: foodInfo.label });
           const factorResult = await fetchEmissionFactorByFoodName(foodInfo.label);
           if (factorResult) {
@@ -583,7 +583,7 @@ const LogMeal = () => {
       const amount = typeof values.amount === 'number' ? values.amount : Number(values.amount);
       const factor = values.co2Factor ?? formCo2Factor ?? (detectedInfo?.type === 'barcode' ? (detectedInfo.data as BarcodeResponse).co2Factor : null);
       if (factor == null || amount == null || amount <= 0) {
-        message.error('请填写完整的数量和碳排放因子');
+        message.error('Please fill in the amount and carbon emission factor');
         return;
       }
       const emission = (amount / 1000) * (typeof factor === 'number' ? factor : Number(factor));
@@ -600,7 +600,7 @@ const LogMeal = () => {
     } catch (err: any) {
       if (err.errorFields) return; // 表单验证失败
       console.error('[LogMeal] Save failed:', err);
-      message.error(err?.response?.data?.error ?? err?.message ?? '保存失败，请重试');
+      message.error(err?.response?.data?.error ?? err?.message ?? 'Failed to log meal， please try again');
     } finally {
       setSaveLoading(false);
     }
