@@ -89,7 +89,7 @@ const Dashboard = () => {
     fetchTodayRanking();
   }, []);
 
-  const targetEmissions = 100.0;
+  const targetEmissions = 200.0;
   const thisMonthEmissions = stats.total;
   const progressPercent = targetEmissions > 0 ? Math.min(100, (thisMonthEmissions / targetEmissions) * 100) : 0;
   const foodEmissions = stats.food;
@@ -112,7 +112,7 @@ const Dashboard = () => {
 
               <Col span={12}>
                 <div style={{ marginBottom: '12px', textAlign: 'right' }}>
-                  <div style={{ fontSize: '20px', opacity: '0.9', marginBottom: '8px' }}>Target</div>
+                  <div style={{ fontSize: '20px', opacity: '0.9', marginBottom: '8px' }}>Recommended Monthly Carbon Footprint</div>
                   <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '12px' }}>{targetEmissions.toFixed(2)} kg</div>
                 </div>
               </Col>
