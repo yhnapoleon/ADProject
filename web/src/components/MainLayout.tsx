@@ -71,7 +71,6 @@ const MainLayout: React.FC = () => {
     { key: 'log-meal', icon: <CoffeeOutlined />, label: 'Food' },
     { key: 'log-travel', icon: <CarOutlined />, label: 'Travel' },
     { key: 'log-utility', icon: <BulbOutlined />, label: 'Utility' },
-    { key: 'profile', icon: <UserOutlined />, label: 'Profile' },
   ];
 
   const menuItems = isLoggingPage ? groupBItems : groupAItems;
