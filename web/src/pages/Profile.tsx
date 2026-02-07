@@ -175,7 +175,7 @@ const Profile = () => {
         if (isTimeout(e) && !cancelled) {
           if (!warnedSlow) {
             warnedSlow = true;
-            message.warning('后端响应较慢（可能在冷启动），正在后台重试加载个人信息…');
+            message.warning('backend is taking unusually long to respond, retrying in background...');
           }
           if (meTimeoutRetries < maxMeTimeoutRetries) {
             meTimeoutRetries += 1;
@@ -187,7 +187,7 @@ const Profile = () => {
             }, delayMs);
           } else if (!meRetryStoppedNotified) {
             meRetryStoppedNotified = true;
-            message.error('后端持续无响应（可能宕机/冷启动过久）。已停止重试，请稍后刷新或切换到本地后端。');
+            message.error('backend is unresponsive (possibly crashed or cold-starting too long). Stopped retrying, please refresh or switch to local backend.');
           }
         }
         return null;
