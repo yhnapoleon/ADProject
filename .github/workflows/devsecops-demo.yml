@@ -26,6 +26,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: manual
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -33,14 +39,8 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: java-kotlin
-          build-mode: manual
-
       - name: Build Android (manual)
-        working-directory: mobile/AD
+        working-directory: ./mobile/AD
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
