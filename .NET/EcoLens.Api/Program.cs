@@ -188,6 +188,7 @@ EcoLens 是一个帮助用户追踪和管理个人碳排放的应用系统。
 
 // Memory Cache
 builder.Services.AddMemoryCache();
+builder.Services.AddResponseCaching();
 
 // File upload configuration
 builder.Services.Configure<FormOptions>(options =>
@@ -272,6 +273,7 @@ app.UseHttpMetrics();
 
 // CORS 必须在 Authentication 之前
 app.UseCors(AllowAllCorsPolicy);
+app.UseResponseCaching(); 
 
 app.UseAuthentication();
 app.UseAuthorization();
