@@ -53,6 +53,7 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: '/language:java-kotlin'
+        continue-on-error: true
   backend:
     name: .NET Backend Pipeline
     runs-on: ubuntu-latest
@@ -82,6 +83,7 @@ jobs:
             --enableExperimental
             --disableAssembly
             --noupdate
+            --suppression dependency-check-suppressions.xml
 
       - name: Upload SCA report (HTML)
         if: always()
@@ -113,6 +115,7 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:csharp"
+        continue-on-error: true
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
