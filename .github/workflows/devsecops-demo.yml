@@ -79,17 +79,18 @@ jobs:
             owasp/dependency-check:latest \
             --scan /src/.NET \
             --format HTML \
-            --out /report \
+            --out /report/dependency-check-report.html \
             --project "EcoLens.Api" \
             --failOnCVSS 11
         continue-on-error: true
 
-      - name: Upload SCA report
+      - name: Upload SCA report (HTML)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report
-          path: reports/dependency-check
+          name: dependency-check-report.html
+          path: reports/dependency-check/dependency-check-report.html
+          retention-days: 7
 
       - name: Initialize CodeQL (C#)
         uses: github/codeql-action/init@v3
