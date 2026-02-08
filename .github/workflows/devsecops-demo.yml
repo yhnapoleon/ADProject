@@ -79,7 +79,7 @@ jobs:
             owasp/dependency-check:latest \
             --scan /src/.NET \
             --format HTML \
-            --out /report/dependency-check-report.html \
+            --out /report \
             --project "EcoLens.Api" \
             --failOnCVSS 11
         continue-on-error: true
