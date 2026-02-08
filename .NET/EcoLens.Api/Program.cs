@@ -260,7 +260,8 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 // HTTPS 重定向
 app.UseHttpsRedirection();
 
-// 安全响应头：防止点击劫持（仍保留 X-Frame-Options 兼容旧浏览器，同时使用 CSP）
+// 安全响应头中间件（为演示安全扫描，暂时禁用）
+/*
 app.Use(async (context, next) =>
 {
 	// 对所有响应设置安全相关的响应头
@@ -275,6 +276,7 @@ app.Use(async (context, next) =>
 	}
 	await next();
 });
+*/
 
 // 静态文件（用于访问 wwwroot/uploads）
 app.UseStaticFiles();
