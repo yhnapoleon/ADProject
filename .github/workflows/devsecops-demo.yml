@@ -70,26 +70,27 @@ jobs:
           dotnet-version: '8.x'
 
       - name: Dependency Check (SCA)
-        run: |
-          mkdir -p reports/dependency-check odc-data
-          docker run --rm \
-            -v "${{ github.workspace }}":/src \
-            -v "${{ github.workspace }}/odc-data":/usr/share/dependency-check/data \
-            -v "${{ github.workspace }}/reports/dependency-check":/report \
-            owasp/dependency-check:latest \
-            --scan /src/.NET \
-            --format HTML \
-            --out /report \
-            --project "EcoLens.Api" \
+        uses: dependency-check/Dependency-Check_Action@main
+        id: Depcheck
+        with:
+          project: 'EcoLens'
+          path: './.NET'
+          format: 'HTML'
+          out: 'reports'
+          # 为避免演示时下载 NVD 数据库超时，加入 --noupdate
+          args: >
             --failOnCVSS 11
+            --enableExperimental
+            --disableAssembly
+            --noupdate
         continue-on-error: true
 
       - name: Upload SCA report (HTML)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report.html
-          path: reports/dependency-check/dependency-check-report.html
+          name: dependency-check-report
+          path: reports/dependency-check-report.html
           retention-days: 7
 
       - name: Initialize CodeQL (C#)
