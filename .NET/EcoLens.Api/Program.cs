@@ -260,6 +260,22 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 // HTTPS 重定向
 app.UseHttpsRedirection();
 
+// 安全响应头：防止点击劫持（仍保留 X-Frame-Options 兼容旧浏览器，同时使用 CSP）
+app.Use(async (context, next) =>
+{
+	// 对所有响应设置安全相关的响应头
+	if (!context.Response.Headers.ContainsKey("X-Frame-Options"))
+	{
+		context.Response.Headers.Append("X-Frame-Options", "DENY");
+	}
+	// 使用 CSP 的 frame-ancestors 作为现代替代
+	if (!context.Response.Headers.ContainsKey("Content-Security-Policy"))
+	{
+		context.Response.Headers.Append("Content-Security-Policy", "frame-ancestors 'none'");
+	}
+	await next();
+});
+
 // 静态文件（用于访问 wwwroot/uploads）
 app.UseStaticFiles();
 
