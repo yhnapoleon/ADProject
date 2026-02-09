@@ -34,8 +34,8 @@ jobs:
     # 3. 授予执行权限并编译
     # 💡 注意：如果你的 gradlew 在子目录，请先执行 cd <目录名>
     - name: Build with Gradle
+      working-directory: ./mobile
       run: |
-        cd ADProject/mobile
         chmod +x gradlew
         ./gradlew assembleDebug
 
