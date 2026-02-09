@@ -69,11 +69,22 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Run unit tests (Debug)
+      - name: Mobile Dependency Check (SCA)
+        uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: ""
+          JAVA_HOME_17_X64: ""
+        with:
+          project: 'EcoLens-Mobile'
+          path: './mobile/AD'
+          format: 'HTML'
+          out: 'mobile_reports/sca'
+
+      - name: Android Lint & Unit Tests (Debug)
         working-directory: ./mobile/AD
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest --no-daemon
+          ./gradlew lintDebug testDebugUnitTest --no-daemon
 
       - name: Build Android (manual)
         working-directory: ./mobile/AD
@@ -86,6 +97,18 @@ jobs:
         with:
           category: '/language:java-kotlin'
         continue-on-error: true
+
+      - name: Upload Android comprehensive reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-comprehensive-reports
+          path: |
+            mobile_reports/sca/*.html
+            mobile/AD/app/build/reports/lint-results-debug.html
+            mobile/AD/app/build/reports/tests/testDebugUnitTest/**
+            mobile/AD/Android_Error_Mapping.md
+          retention-days: 7
 
       - name: Upload Android debug APK
         if: always()
@@ -127,12 +150,15 @@ jobs:
             --noupdate
             --suppression dependency-check-suppressions.xml
 
-      - name: Upload SCA report (HTML)
+      - name: Upload Backend Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dependency-check-report
-          path: reports/dependency-check-report.html
+          name: backend-comprehensive-reports
+          path: |
+            reports/dependency-check-report.html
+            test_reports/*.trx
+            Backend_Error_Codes.md
           retention-days: 7
 
       - name: Initialize CodeQL (C#)
@@ -148,7 +174,23 @@ jobs:
         run: dotnet build "./.NET/EcoLens.Api/EcoLens.Api.csproj" -c Release --no-restore --nologo
 
       - name: Test
-        run: dotnet test "./.NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --no-build --nologo
+        run: dotnet test "./.NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports
+
+      - name: Verify Error Documentation Generated
+        run: |
+          if [ -f "Backend_Error_Codes.md" ]; then
+            echo "Backend_Error_Codes.md found at repo root."
+          else
+            FOUND_PATH="$(find . -type f -name Backend_Error_Codes.md | head -n 1)"
+            if [ -n "$FOUND_PATH" ]; then
+              echo "Found at $FOUND_PATH, copying to repo root..."
+              cp "$FOUND_PATH" "Backend_Error_Codes.md"
+            else
+              echo "Backend_Error_Codes.md not found after tests."
+              find . -name Backend_Error_Codes.md || true
+              exit 1
+            fi
+          fi
 
       - name: Publish
         run: dotnet publish "./.NET/EcoLens.Api/EcoLens.Api.csproj" -c Release -o "./.NET/EcoLens.Api/publish" --nologo
