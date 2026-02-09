@@ -2,7 +2,7 @@ name: "Android Security Analysis"
 
 on:
   push:
-    branches: [ "zhaojiayi" ] # 仅在你当前的分支触发
+    branches: [ "zhaojiayi" ] 
   pull_request:
     branches: [ "zhaojiayi" ]
 
@@ -11,13 +11,12 @@ jobs:
     name: Analyze Android
     runs-on: ubuntu-latest
     permissions:
-      security-events: write # 必须有权限将报告写入 GitHub Security 模板
+      security-events: write 
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 1. 设置 Java 环境（Android 编译核心）
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -25,29 +24,25 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # 2. 初始化 CodeQL (用于发现代码里的 SQL 注入、硬编码密码等)
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: 'java-kotlin'
 
-    # 3. 授予执行权限并编译
-    # 💡 注意：如果你的 gradlew 在子目录，请先执行 cd <目录名>
     - name: Build with Gradle
-      working-directory: ./mobile
+      working-directory: ./mobile  # 🌟 已正确指向 mobile 文件夹
       run: |
         chmod +x gradlew
-        ./gradlew assembleDebug
+        ./gradlew clean assembleDebug # 添加 clean 确保编译环境纯净
 
-    # 4. 执行 CodeQL 分析并生成报告
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
 
-    # 5. (可选) 增加依赖项漏洞扫描
+    # 修改 path 确保只扫描 Android 的依赖
     - name: OWASP Dependency Check
       uses: dependency-check/Dependency-Check_Action@main
       with:
         project: 'EcoLens-Android'
-        path: '.'
+        path: './mobile' # 🌟 指向 mobile 文件夹
         format: 'SARIF'
         out: 'reports'
