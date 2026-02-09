@@ -30,7 +30,7 @@ jobs:
         languages: 'java-kotlin'
 
     - name: Build with Gradle
-      working-directory: ./mobile  # 🌟 已正确指向 mobile 文件夹
+      working-directory: ./mobile/AD  # 🌟 已正确指向 mobile 文件夹
       run: |
         chmod +x gradlew
         ./gradlew clean assembleDebug # 添加 clean 确保编译环境纯净
