@@ -11,6 +11,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Microsoft.Extensions.Options;
 using Prometheus;
+using EcoLens.Api.Common.Errors;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -270,6 +272,30 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 
 // HTTPS 重定向
 app.UseHttpsRedirection();
+
+// 全局异常处理中间件
+app.Use(async (context, next) =>
+{
+	try
+	{
+		await next();
+	}
+	catch (Exception ex)
+	{
+		var descriptor = ErrorRegistry.MapExceptionToDescriptor(ex);
+		context.Response.ContentType = "application/json; charset=utf-8";
+		context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+		var payload = new
+		{
+			errorCode = descriptor.ErrorCode,
+			message = descriptor.UserMessage,
+			technical = descriptor.TechnicalMessage
+		};
+
+		await context.Response.WriteAsync(JsonSerializer.Serialize(payload), Encoding.UTF8);
+	}
+});
 
 // 安全响应头中间件（为演示安全扫描，暂时禁用）
 /*
