@@ -163,11 +163,11 @@ public class LeaderboardController : ControllerBase
 			.ToList();
 
 		var ordered = string.Equals(period, "today", StringComparison.OrdinalIgnoreCase)
-			? list.OrderByDescending(x => x.pointsToday).ThenBy(x => x.username).Take(limit).ToList()
+			? list.OrderByDescending(x => x.pointsToday).ThenByDescending(x => x.pointsTotal).ThenBy(x => x.username).Take(limit).ToList()
 			: string.Equals(period, "week", StringComparison.OrdinalIgnoreCase)
-				? list.OrderByDescending(x => x.pointsWeek).ThenBy(x => x.username).Take(limit).ToList()
+				? list.OrderByDescending(x => x.pointsWeek).ThenByDescending(x => x.pointsTotal).ThenBy(x => x.username).Take(limit).ToList()
 				: string.Equals(period, "month", StringComparison.OrdinalIgnoreCase)
-					? list.OrderByDescending(x => x.pointsMonth).ThenBy(x => x.username).Take(limit).ToList()
+					? list.OrderByDescending(x => x.pointsMonth).ThenByDescending(x => x.pointsTotal).ThenBy(x => x.username).Take(limit).ToList()
 					: list.OrderByDescending(x => x.pointsTotal).ThenBy(x => x.username).Take(limit).ToList();
 
 		var ranked = ordered.Select((x, i) => new
