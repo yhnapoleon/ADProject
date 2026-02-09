@@ -3,4 +3,5 @@
 name: "Frontend Security Extended"
 disable-default-queries: false
 queries:
-  - use: security-extended
+  - name: Frontend security extended
+    uses: security-extended
