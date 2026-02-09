@@ -29,6 +29,7 @@ public class ApplicationDbContext : DbContext
 	public DbSet<SystemSettings> SystemSettings => Set<SystemSettings>();
 	public DbSet<FoodRecord> FoodRecords => Set<FoodRecord>();
 	public DbSet<DietRecord> DietRecords => Set<DietRecord>();
+	public DbSet<PointAwardLog> PointAwardLogs => Set<PointAwardLog>();
 
 	public override int SaveChanges()
 	{
@@ -278,10 +279,13 @@ public class ApplicationDbContext : DbContext
 			.IsUnique(); // 邮箱必须唯一且加索引
 
 		modelBuilder.Entity<ApplicationUser>()
-			.HasIndex(u => u.CurrentPoints); // 加速排行榜排序
+			.HasIndex(u => u.CurrentPoints); // Speed up leaderboard sorting
 
 		modelBuilder.Entity<ApplicationUser>()
-			.HasIndex(u => u.TotalCarbonSaved); // 加速总减排量排序
+			.HasIndex(u => u.TotalCarbonSaved); // Speed up total carbon saved sorting
+
+		modelBuilder.Entity<PointAwardLog>()
+			.HasIndex(p => new { p.UserId, p.AwardedAt }); // Leaderboard today/monthly points aggregation
 
 		// Seed data for CarbonReferences
 		modelBuilder.Entity<CarbonReference>().HasData(

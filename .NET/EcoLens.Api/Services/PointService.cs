@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using EcoLens.Api.Data;
+using EcoLens.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EcoLens.Api.Services;
@@ -19,11 +20,11 @@ public class PointService : IPointService
 
 	public async Task CheckAndAwardPointsAsync(int userId, DateTime date)
 	{
-		// 统一使用 UTC 日期的 [date, date+1) 区间
+		// Use UTC date range [date, date+1) uniformly
 		var dayStart = date.Date;
 		var dayEnd = dayStart.AddDays(1);
 
-		// 同步读取当日食物与出行记录
+		// Synchronously read food and travel records for the day
 		var foodQuery = _db.FoodRecords
 			.Where(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd);
 		var travelQuery = _db.TravelLogs
@@ -45,20 +46,20 @@ public class PointService : IPointService
 			return;
 		}
 
-		// 加载用户并进行防重复奖励与连击逻辑
+		// Load user and apply duplicate prevention and streak logic
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId);
 		if (user is null)
 		{
 			return;
 		}
 
-		// 当日已奖励则忽略
+		// Skip if already awarded today
 		if (user.LastNeutralDate.HasValue && user.LastNeutralDate.Value.Date == dayStart)
 		{
 			return;
 		}
 
-		// 连续天数：如果昨天是最后一次，则 +1；否则重置为 1
+		// Consecutive days: if yesterday was the last time, +1; otherwise reset to 1
 		if (user.LastNeutralDate.HasValue && user.LastNeutralDate.Value.Date == dayStart.AddDays(-1))
 		{
 			user.ContinuousNeutralDays = Math.Max(0, user.ContinuousNeutralDays) + 1;
@@ -68,13 +69,27 @@ public class PointService : IPointService
 			user.ContinuousNeutralDays = 1;
 		}
 
-		// 基础奖励 +10
+		// Base reward +10
 		user.CurrentPoints += 10;
+		await _db.PointAwardLogs.AddAsync(new PointAwardLog
+		{
+			UserId = userId,
+			Points = 10,
+			AwardedAt = dayStart,
+			Source = "DailyNeutral"
+		});
 
-		// 每满 7 天额外 +50（7、14、21...）
+		// Every 7 days additional +50 (7, 14, 21...)
 		if (user.ContinuousNeutralDays % 7 == 0)
 		{
 			user.CurrentPoints += 50;
+			await _db.PointAwardLogs.AddAsync(new PointAwardLog
+			{
+				UserId = userId,
+				Points = 50,
+				AwardedAt = dayStart,
+				Source = "WeeklyBonus"
+			});
 		}
 
 		user.LastNeutralDate = dayStart;
@@ -95,7 +110,15 @@ public class PointService : IPointService
 			return;
 		}
 
-		user.CurrentPoints += treesPlantedCount * PointsPerTree;
+		var points = treesPlantedCount * PointsPerTree;
+		user.CurrentPoints += points;
+		await _db.PointAwardLogs.AddAsync(new PointAwardLog
+		{
+			UserId = userId,
+			Points = points,
+			AwardedAt = DateTime.UtcNow,
+			Source = "TreePlanting"
+		});
 		await _db.SaveChangesAsync();
 	}
 
@@ -104,7 +127,7 @@ public class PointService : IPointService
 		var dayStart = date.Date;
 		var dayEnd = dayStart.AddDays(1);
 
-		// 基础存在性检查
+		// Basic existence check
 		var hasFood = await _db.FoodRecords.AnyAsync(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd);
 		var hasTravel = await _db.TravelLogs.AnyAsync(r => r.UserId == userId && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd);
 		var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId && r.RecordDate == dayStart);
@@ -131,7 +154,7 @@ public class PointService : IPointService
 
 	public async Task RecalculateTotalCarbonSavedAsync(int userId)
 	{
-		// 收集该用户所有参与计算的日期（来自步数、食物与出行）
+		// Collect all dates for this user that participate in calculation (from steps, food, and travel)
 		var stepDates = await _db.StepRecords.Where(r => r.UserId == userId).Select(r => r.RecordDate.Date).Distinct().ToListAsync();
 		var foodDates = await _db.FoodRecords.Where(r => r.UserId == userId).Select(r => r.CreatedAt.Date).Distinct().ToListAsync();
 		var travelDates = await _db.TravelLogs.Where(r => r.UserId == userId).Select(r => r.CreatedAt.Date).Distinct().ToListAsync();
@@ -152,8 +175,21 @@ public class PointService : IPointService
 		var user = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId);
 		if (user is null) return;
 
-		// TotalCarbonSaved 列精度为 (18,2)，此处四舍五入到 2 位
+		// TotalCarbonSaved column precision is (18,2), round to 2 decimal places here
 		user.TotalCarbonSaved = decimal.Round(total, 2, MidpointRounding.AwayFromZero);
+		await _db.SaveChangesAsync();
+	}
+
+	public async Task LogPointAwardAsync(int userId, int points, DateTime awardedAt, string source)
+	{
+		if (points <= 0) return;
+		await _db.PointAwardLogs.AddAsync(new PointAwardLog
+		{
+			UserId = userId,
+			Points = points,
+			AwardedAt = awardedAt.Date,
+			Source = source
+		});
 		await _db.SaveChangesAsync();
 	}
 }

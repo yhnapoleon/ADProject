@@ -56,6 +56,7 @@ public class StepController : ControllerBase
 			user.LastStepUsageDate = date;
 		}
 
+		int pointsToLog;
 		if (record is null)
 		{
 			record = new Models.StepRecord
@@ -69,6 +70,7 @@ public class StepController : ControllerBase
 
 			user.TotalCarbonSaved += newOffset;
 			user.CurrentPoints += pointsDelta;
+			pointsToLog = pointsDelta;
 		}
 		else
 		{
@@ -83,20 +85,33 @@ public class StepController : ControllerBase
 
 			user.TotalCarbonSaved += deltaOffset;
 			user.CurrentPoints += deltaPoints;
+			pointsToLog = deltaPoints;
 		}
 
 		await _db.SaveChangesAsync(ct);
 
+		if (pointsToLog != 0)
+		{
+			try
+			{
+				await _pointService.LogPointAwardAsync(userId.Value, pointsToLog, date, "Step");
+			}
+			catch
+			{
+				// Logging failure does not affect main step sync flow
+			}
+		}
+
 		var total = record.StepCount;
 
-		// 重算总碳减排（基于每日净碳值）
+		// Recalculate total carbon saved (based on daily net carbon value)
 		try
 		{
 			await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
 		}
 		catch
 		{
-			// 忽略错误，不影响步数同步主流程
+			// Ignore error, does not affect main step sync flow
 		}
 		var used = Math.Max(0, user.StepsUsedToday);
 		var available = Math.Max(0, total - used);

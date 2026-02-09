@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import type { LeaderboardEntry } from '../types';
 import { TrophyFilled } from '@ant-design/icons';
+import { getPoints } from '../utils/points';
 import './Leaderboard.module.css';
 import request from '../utils/request';
 
@@ -44,7 +45,7 @@ const Leaderboard = () => {
     fetchLeaderboard(period);
   }, [period]);
 
-  // 页面重新获得焦点时刷新（如从 Records 删除后返回）
+  // Refresh when page regains focus (e.g., returning from Records after deletion)
   useEffect(() => {
     const onFocus = () => fetchLeaderboard(period);
     window.addEventListener('focus', onFocus);
@@ -97,26 +98,26 @@ const Leaderboard = () => {
       dataIndex: 'nickname',
       key: 'user',
       render: (_: string, row: any) => {
-        // 1. 获取原始数据 (兼容 avatarUrl 或 avatar 字段)
+        // 1. Get raw data (compatible with avatarUrl or avatar field)
         const avatarRaw = row.avatarUrl ?? row.avatar;
 
-        // 2. 处理 URL 的函数
+        // 2. URL normalization function
         const normalizeUrl = (url?: string | null) => {
-          if (!url) return undefined; // 返回 undefined 会让 Avatar 组件自动显示名字首字母
+          if (!url) return undefined; // Returning undefined lets Avatar component auto-display initials
 
           const str = String(url);
 
-          // ✅ 你的情况：如果是完整 URL (http 或 https 开头)，直接返回，不做任何修改
+          // ✅ If it's a full URL (starts with http or https), return as-is without modification
           if (str.startsWith('http') || str.startsWith('https')) {
             return str;
           }
 
-          // 🔄 兼容旧数据：如果是 Base64，直接返回
+          // 🔄 Compatible with old data: if Base64, return as-is
           if (str.startsWith('data:image')) {
             return str;
           }
 
-          // 🔗 兜底：如果是相对路径 (如 /uploads/xxx)，才尝试拼接域名
+          // 🔗 Fallback: if relative path (e.g., /uploads/xxx), try to prepend domain
           return `${import.meta.env.VITE_API_URL || ''}${str}`;
         };
 
@@ -140,7 +141,8 @@ const Leaderboard = () => {
       key: 'points',
       width: 160,
       render: (_: unknown, row: any) => {
-        const points = row.pointsTotal ?? 0;
+        const pointsPeriod = period === 'today' ? 'today' : period === 'month' ? 'month' : 'all';
+        const points = getPoints(row as LeaderboardEntry, pointsPeriod);
         const emissions = row.emissionsTotal ?? row.emissions ?? 0;
         return (
           <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
