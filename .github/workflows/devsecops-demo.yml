@@ -281,4 +281,58 @@ jobs:
             report_html.html
             report_md.md
             report_json.json
+          retention-days: 7
+
+  dast-frontend:
+    name: DAST Pipeline (Frontend Web)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install and build frontend
+        working-directory: ./web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Prepare ZAP writable files (frontend)
+        run: |
+          touch zap_frontend.yaml report_frontend_json.json report_frontend_md.md report_frontend_html.html
+          chmod a+w zap_frontend.yaml report_frontend_json.json report_frontend_md.md report_frontend_html.html
+
+      - name: Serve frontend and run ZAP (Frontend DAST)
+        run: |
+          npx --yes serve -s web/dist -l 3000 &
+          sleep 5
+          docker pull ghcr.io/zaproxy/zaproxy:stable -q
+          docker run --rm \
+            -v "${{ github.workspace }}":/zap/wrk/:rw \
+            --network=host \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://127.0.0.1:3000 \
+              -J report_frontend_json.json \
+              -w report_frontend_md.md \
+              -r report_frontend_html.html \
+              -m 5 -d 1
+        continue-on-error: true
+
+      - name: Upload frontend DAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dast-reports
+          path: |
+            report_frontend_html.html
+            report_frontend_md.md
+            report_frontend_json.json
+          retention-days: 7
 
