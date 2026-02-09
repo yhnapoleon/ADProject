@@ -16,6 +16,32 @@ permissions:
   security-events: write
 
 jobs:
+  codeql-javascript:
+    name: CodeQL (JavaScript/TypeScript Frontend)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL (Frontend)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          # JavaScript/TypeScript are interpreted; no build, analyze source directly
+          build-mode: none
+          # Use security-extended query set (XSS, open redirect, sensitive data, CORS, etc.)
+          config-file: ./.github/codeql/codeql-config-frontend.yml
+
+      - name: Perform CodeQL Analysis (Frontend)
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript'
+        continue-on-error: true
+
   codeql-java-kotlin:
     name: CodeQL (Java/Kotlin)
     runs-on: ubuntu-latest
@@ -112,7 +138,7 @@ jobs:
           path: './.NET'
           format: 'HTML'
           out: 'reports'
-          # 为避免演示时下载 NVD 数据库超时，加入 --noupdate
+          # Use --noupdate to avoid NVD DB download timeout during demo
           args: >
             --failOnCVSS 7
             --enableExperimental

@@ -44,7 +44,7 @@ public class AboutController : ControllerBase
 		var endMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
 		var startMonth = endMonth.AddMonths(-11);
 
-		// 取出这 12 个月内与当前用户相关的各类记录（含边界）
+		// Fetch records for the current user in these 12 months (inclusive of boundaries)
 		var userActivityLogs = await _db.ActivityLogs
 			.Where(l => l.UserId == userId.Value && l.CreatedAt >= startMonth && l.CreatedAt < endMonth.AddMonths(1))
 			.Select(l => new { l.TotalEmission, l.CreatedAt, Category = l.CarbonReference!.Category })
@@ -60,13 +60,13 @@ public class AboutController : ControllerBase
 			.Select(t => new { t.CarbonEmission, t.CreatedAt })
 			.ToListAsync(ct);
 
-		// Utility 按账单结束月份统计，避免与为展示而生成的 ActivityLog 双算
+		// Utility aggregated by bill end month to avoid double-counting with ActivityLog generated for display
 		var userUtilityBills = await _db.UtilityBills
 			.Where(b => b.UserId == userId.Value && b.BillPeriodEnd >= startMonth && b.BillPeriodEnd < endMonth.AddMonths(1))
 			.Select(b => new { b.TotalCarbonEmission, b.BillPeriodEnd })
 			.ToListAsync(ct);
 
-		// 所有用户在该时间窗的记录（用于计算“所有用户的平均碳排放（按月、按人均）”）
+		// All users' records in this time window (for calculating average carbon emission per user per month)
 		var allActivityLogs = await _db.ActivityLogs
 			.Where(l => l.CreatedAt >= startMonth && l.CreatedAt < endMonth.AddMonths(1))
 			.Select(l => new { l.UserId, l.TotalEmission, l.CreatedAt, Category = l.CarbonReference!.Category })
@@ -90,7 +90,7 @@ public class AboutController : ControllerBase
 			var mStart = startMonth.AddMonths(i);
 			var mEnd = mStart.AddMonths(1);
 
-			// 当前用户：食物 = Activity(Food) + FoodRecords
+			// Current user: Food = Activity(Food) + FoodRecords
 			var userFoodFromActivities = userActivityLogs
 				.Where(l => l.CreatedAt >= mStart && l.CreatedAt < mEnd && l.Category == CarbonCategory.Food)
 				.Sum(l => l.TotalEmission);
@@ -99,7 +99,7 @@ public class AboutController : ControllerBase
 				.Sum(f => f.Emission);
 			decimal food = userFoodFromActivities + userFoodFromRecords;
 
-			// 当前用户：出行 = Activity(Transport) + TravelLogs
+			// Current user: Transport = Activity(Transport) + TravelLogs
 			var userTransportFromActivities = userActivityLogs
 				.Where(l => l.CreatedAt >= mStart && l.CreatedAt < mEnd && l.Category == CarbonCategory.Transport)
 				.Sum(l => l.TotalEmission);
@@ -108,14 +108,14 @@ public class AboutController : ControllerBase
 				.Sum(t => t.CarbonEmission);
 			decimal transport = userTransportFromActivities + userTransportFromTravels;
 
-			// 当前用户：公用事业 = UtilityBills（避免与为展示而生成的 ActivityLog 双算）
+			// Current user: Utility = UtilityBills (avoid double-counting with ActivityLog generated for display)
 			decimal utility = userUtilityBills
 				.Where(b => b.BillPeriodEnd >= mStart && b.BillPeriodEnd < mEnd)
 				.Sum(b => b.TotalCarbonEmission);
 
-			// 计算该月“所有用户的平均碳排放”：先按用户汇总当月总排放（Activity 仅计入 Food/Transport），再对用户总排放取平均
+			// Calculate average carbon emission for all users this month: aggregate total emission per user (Activity counts Food/Transport only), then average across users
 			var perUser = new Dictionary<int, decimal>();
-			// Activity（仅 Food/Transport）
+			// Activity (Food/Transport only)
 			foreach (var a in allActivityLogs.Where(l => l.CreatedAt >= mStart && l.CreatedAt < mEnd && l.Category != CarbonCategory.Utility))
 			{
 				perUser[a.UserId] = perUser.GetValueOrDefault(a.UserId) + a.TotalEmission;
@@ -130,7 +130,7 @@ public class AboutController : ControllerBase
 			{
 				perUser[t.UserId] = perUser.GetValueOrDefault(t.UserId) + t.CarbonEmission;
 			}
-			// UtilityBills（按账单结束月计入）
+			// UtilityBills (counted by bill end month)
 			foreach (var u in allUtilityBills.Where(b => b.BillPeriodEnd >= mStart && b.BillPeriodEnd < mEnd))
 			{
 				perUser[u.UserId] = perUser.GetValueOrDefault(u.UserId) + u.TotalCarbonEmission;
