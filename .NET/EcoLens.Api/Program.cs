@@ -253,9 +253,9 @@ var app = builder.Build();
 // --- DevSecOps Remediation: Fix Security Headers ---
 app.Use(async (context, next) =>
 {
-	// 防止点击劫持攻击 (Clickjacking)
+	// Clickjacking
 	context.Response.Headers.Append("X-Frame-Options", "DENY");
-	// 防止 MIME 类型嗅探 (MIME-Sniffing)
+	// MIME-Sniffing
 	context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
 	await next();
 });
