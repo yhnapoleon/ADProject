@@ -17,17 +17,25 @@ public class ErrorDocumentationGeneratorTest
 			sb.AppendLine($"| {e.ErrorCode} | {e.TechnicalMessage} | {e.UserMessage} |");
 		}
 
-		var repoRoot = FindRepoRoot();
+		var repoRoot = GetWorkspaceRoot();
 		var target = Path.Combine(repoRoot, "Backend_Error_Codes.md");
 		File.WriteAllText(target, sb.ToString(), Encoding.UTF8);
 	}
 
-	private static string FindRepoRoot()
+	private static string GetWorkspaceRoot()
 	{
-		var dir = AppContext.BaseDirectory;
-		for (var i = 0; i < 10; i++)
+		// 1) 优先使用 GitHub Actions 的工作区环境变量
+		var workspace = Environment.GetEnvironmentVariable("GITHUB_WORKSPACE");
+		if (!string.IsNullOrWhiteSpace(workspace) && Directory.Exists(workspace))
 		{
-			if (Directory.Exists(Path.Combine(dir, ".github")))
+			return workspace;
+		}
+
+		// 2) 回退：向上查找包含 .github 或 .git 的目录
+		var dir = AppContext.BaseDirectory;
+		for (var i = 0; i < 15; i++)
+		{
+			if (Directory.Exists(Path.Combine(dir, ".github")) || Directory.Exists(Path.Combine(dir, ".git")))
 			{
 				return dir;
 			}
@@ -35,7 +43,7 @@ public class ErrorDocumentationGeneratorTest
 			if (parent == null) break;
 			dir = parent.FullName;
 		}
-		// fallback: current working directory
+		// 3) 最后回退到当前工作目录
 		return Directory.GetCurrentDirectory();
 	}
 }

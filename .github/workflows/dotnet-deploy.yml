@@ -36,8 +36,14 @@ jobs:
 
       - name: Verify Error Documentation Generated
         run: |
-          if [ ! -f "Backend_Error_Codes.md" ]; then
+          if [ -f "Backend_Error_Codes.md" ]; then
+            echo "Backend_Error_Codes.md found at repo root."
+          elif [ -f ".NET/EcoLens.Tests/Backend_Error_Codes.md" ]; then
+            echo "Found in tests project, copying to repo root..."
+            cp ".NET/EcoLens.Tests/Backend_Error_Codes.md" "Backend_Error_Codes.md"
+          else
             echo "Backend_Error_Codes.md not found after tests."
+            find . -name Backend_Error_Codes.md || true
             exit 1
           fi
 
