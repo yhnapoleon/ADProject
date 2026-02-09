@@ -26,5 +26,9 @@
     "@vitejs/plugin-react": "^4.0.0",
     "typescript": "^5.0.2",
     "vite": "^7.3.1"
+    
+  },
+  "overrides": {
+    "d3-color": "^3.1.0"
   }
 }

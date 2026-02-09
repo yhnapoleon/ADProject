@@ -24,7 +24,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState<MainPageStats>({ total: 0, food: 0, transport: 0, utility: 0 });
   const [stepCount, setStepCount] = useState<number>(0);
   const [stepsLoading, setStepsLoading] = useState(true);
-  const [todayRanking, setTodayRanking] = useState<{ nickname?: string; username?: string; pointsTotal?: number; pointsToday?: number }[]>([]);
+  const [todayRanking, setTodayRanking] = useState<{ nickname?: string; username?: string; emissionsTotal?: number; pointsTotal?: number; pointsToday?: number }[]>([]);
   const [todayRankingLoading, setTodayRankingLoading] = useState(true);
 
   useEffect(() => {
@@ -322,7 +322,7 @@ const Dashboard = () => {
                       <span>{user.nickname ?? user.username ?? '-'}</span>
                     </div>
                     <span style={{ fontWeight: 700, color: '#674fa3' }}>
-                      {numberFormatter.format(user.pointsToday ?? user.pointsTotal ?? 0)} pts
+                      {numberFormatter.format(user.emissionsTotal ?? 0)} kg
                     </span>
                   </div>
                 ))
