@@ -202,6 +202,19 @@ jobs:
           touch zap.yaml report_json.json report_md.md report_html.html
           chmod a+w zap.yaml report_json.json report_md.md report_html.html
 
+      # Warm up target URL to avoid "Read timed out" (e.g. Azure app cold start)
+      - name: Warm up target URL
+        run: |
+          url="${{ needs.backend.outputs.webapp-url }}"
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sf --connect-timeout 15 --max-time 30 "$url" -o /dev/null; then
+              echo "Target responded successfully."
+              break
+            fi
+            echo "Attempt $i failed or timed out, retrying in 10s..."
+            sleep 10
+          done
+
       - name: DAST - ZAP Baseline (Docker)
         run: |
           docker pull ghcr.io/zaproxy/zaproxy:stable -q
