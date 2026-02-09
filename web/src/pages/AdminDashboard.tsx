@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 // @ts-ignore - GeoJSON 文件导入
@@ -298,28 +298,58 @@ const AdminDashboard: React.FC = () => {
       .catch((e) => console.error('Failed to load region stats by range:', e));
   }, [regionTrendsRange]);
 
-  // 根据区域数据获取颜色
-  const getRegionColor = (regionCode: string): string => {
-    if (!regionCode) return '#e0e0e0'; // 默认灰色（无区域代码）
-    
-    const data = regionData[regionCode];
-    if (!data) {
-      console.warn(`No data found for region: ${regionCode}`);
-      return '#e0e0e0'; // 默认灰色（无数据）
+  // 根据当前 regionData 动态计算颜色分档范围，便于区分不同地区
+  const regionColorScale = useMemo(() => {
+    const values = Object.values(regionData)
+      .map((r) => (typeof r.carbonReduced === 'number' ? r.carbonReduced : 0))
+      .filter((v) => v >= 0);
+    if (values.length === 0) {
+      return {
+        min: 0,
+        max: 0,
+        thresholds: [0, 0, 0, 0, 0] as [number, number, number, number, number],
+        labels: ['Very Low (<0)', 'Low (0-0)', 'Medium (0-0)', 'High (≥0)'] as const,
+      };
     }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = Math.max(max - min, 0);
+    const t0 = min;
+    const t1 = min + range * 0.25;
+    const t2 = min + range * 0.5;
+    const t3 = min + range * 0.75;
+    const t4 = max;
+    const fmt = (n: number) => (Number.isInteger(n) ? n.toFixed(0) : n.toFixed(1));
+    const labels: [string, string, string, string] =
+      range === 0
+        ? [`${fmt(min)}`, `${fmt(min)}`, `${fmt(min)}`, `≥${fmt(max)}`]
+        : [
+            `Very Low (<${fmt(t1)})`,
+            `Low (${fmt(t1)}-${fmt(t2)})`,
+            `Medium (${fmt(t2)}-${fmt(t3)})`,
+            `High (≥${fmt(t3)})`,
+          ];
+    return {
+      min,
+      max,
+      thresholds: [t0, t1, t2, t3, t4] as [number, number, number, number, number],
+      labels,
+    };
+  }, [regionData]);
 
-    // 根据碳减排量设置颜色强度
-    const carbonReduced = data.carbonReduced;
-    
-    if (carbonReduced > 1750) {
-      return '#2E7D32'; // 深绿色 - 高减排 (>1750)
-    } else if (carbonReduced > 1000) {
-      return '#4CAF50'; // 中绿色 (1000-1750)
-    } else if (carbonReduced > 500) {
-      return '#81C784'; // 浅绿色 (500-1000)
-    } else {
-      return '#C8E6C9'; // 很浅的绿色 (<500)
+  const getRegionColor = (regionCode: string): string => {
+    if (!regionCode) return '#e0e0e0';
+    const data = regionData[regionCode];
+    if (!data) return '#e0e0e0';
+    const v = typeof data.carbonReduced === 'number' ? data.carbonReduced : 0;
+    const [t0, t1, t2, t3] = regionColorScale.thresholds;
+    if (regionColorScale.max === regionColorScale.min) {
+      return '#81C784'; // 所有区域同值时的统一绿色
     }
+    if (v >= t3) return '#2E7D32'; // High - 深绿
+    if (v >= t2) return '#4CAF50'; // Medium - 中绿
+    if (v >= t1) return '#81C784'; // Low - 浅绿
+    return '#C8E6C9'; // Very Low - 很浅绿
   };
 
 
@@ -377,7 +407,7 @@ const AdminDashboard: React.FC = () => {
         <div className="chart-card">
           <div className="chart-card-header-with-tabs">
             <h3>Regional Reduction Trends (Singapore)</h3>
-            <div className="region-trends-tabs" role="tablist" aria-label="时间范围">
+            <div className="region-trends-tabs" role="tablist" aria-label="Time range">
               <button
                 type="button"
                 role="tab"
@@ -385,7 +415,7 @@ const AdminDashboard: React.FC = () => {
                 className={`region-trends-tab ${regionTrendsRange === '7' ? 'active' : ''}`}
                 onClick={() => setRegionTrendsRange('7')}
               >
-                近7天
+                Last 7 days
               </button>
               <button
                 type="button"
@@ -394,7 +424,7 @@ const AdminDashboard: React.FC = () => {
                 className={`region-trends-tab ${regionTrendsRange === '30' ? 'active' : ''}`}
                 onClick={() => setRegionTrendsRange('30')}
               >
-                近30天
+                Last 30 days
               </button>
             </div>
           </div>
@@ -541,21 +571,21 @@ const AdminDashboard: React.FC = () => {
                     {tooltip.data ? (
                       <div className="tooltip-content">
                         <div className="tooltip-item">
-                          <span className="tooltip-label">碳减排量:</span>
+                          <span className="tooltip-label">Carbon reduced:</span>
                           <span className="tooltip-value">{tooltip.data.carbonReduced.toFixed(2)} kg CO₂</span>
                         </div>
                         <div className="tooltip-item">
-                          <span className="tooltip-label">用户数量:</span>
+                          <span className="tooltip-label">Users:</span>
                           <span className="tooltip-value">{tooltip.data.userCount.toLocaleString()}</span>
                         </div>
                         <div className="tooltip-item">
-                          <span className="tooltip-label">减排率:</span>
+                          <span className="tooltip-label">Reduction rate:</span>
                           <span className="tooltip-value">{tooltip.data.reductionRate.toFixed(1)}%</span>
                         </div>
                       </div>
                     ) : (
                       <div className="tooltip-content">
-                        <div className="tooltip-item">暂无数据</div>
+                        <div className="tooltip-item">No data</div>
                       </div>
                     )}
                   </div>
@@ -571,19 +601,19 @@ const AdminDashboard: React.FC = () => {
               <div className="legend-items">
                 <div className="legend-item">
                   <span className="legend-color" style={{ backgroundColor: '#2E7D32' }}></span>
-                  <span>High (&gt;1750)</span>
+                  <span>{regionColorScale.labels[3]}</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-color" style={{ backgroundColor: '#4CAF50' }}></span>
-                  <span>Medium (1000-1750)</span>
+                  <span>{regionColorScale.labels[2]}</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-color" style={{ backgroundColor: '#81C784' }}></span>
-                  <span>Low (500-1000)</span>
+                  <span>{regionColorScale.labels[1]}</span>
                 </div>
                 <div className="legend-item">
                   <span className="legend-color" style={{ backgroundColor: '#C8E6C9' }}></span>
-                  <span>Very Low (&lt;500)</span>
+                  <span>{regionColorScale.labels[0]}</span>
                 </div>
               </div>
             </div>
