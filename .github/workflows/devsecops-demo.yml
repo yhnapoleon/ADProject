@@ -71,9 +71,6 @@ jobs:
 
       - name: Mobile Dependency Check (SCA)
         uses: dependency-check/Dependency-Check_Action@main
-        env:
-          JAVA_HOME: ""
-          JAVA_HOME_17_X64: ""
         with:
           project: 'EcoLens-Mobile'
           path: './mobile/AD'
