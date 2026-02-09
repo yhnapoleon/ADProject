@@ -32,19 +32,22 @@ jobs:
 
       # 3.5 运行单元测试（生成错误文档与 TRX 报告）
       - name: Test
-        run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --no-build --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports
+        run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports
 
       - name: Verify Error Documentation Generated
         run: |
           if [ -f "Backend_Error_Codes.md" ]; then
             echo "Backend_Error_Codes.md found at repo root."
-          elif [ -f ".NET/EcoLens.Tests/Backend_Error_Codes.md" ]; then
-            echo "Found in tests project, copying to repo root..."
-            cp ".NET/EcoLens.Tests/Backend_Error_Codes.md" "Backend_Error_Codes.md"
           else
-            echo "Backend_Error_Codes.md not found after tests."
-            find . -name Backend_Error_Codes.md || true
-            exit 1
+            FOUND_PATH="$(find . -type f -name Backend_Error_Codes.md | head -n 1)"
+            if [ -n "$FOUND_PATH" ]; then
+              echo "Found at $FOUND_PATH, copying to repo root..."
+              cp "$FOUND_PATH" "Backend_Error_Codes.md"
+            else
+              echo "Backend_Error_Codes.md not found after tests."
+              find . -name Backend_Error_Codes.md || true
+              exit 1
+            fi
           fi
 
       - name: Upload Backend Error Codes (Artifact)
