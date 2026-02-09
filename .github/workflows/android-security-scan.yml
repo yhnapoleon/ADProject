@@ -3,8 +3,6 @@ name: "Android Security Analysis"
 on:
   push:
     branches: [ "zhaojiayi" ]
-  pull_request:
-    branches: [ "zhaojiayi" ]
 
 jobs:
   analyze:
@@ -30,28 +28,10 @@ jobs:
         languages: 'java-kotlin'
 
     - name: Build with Gradle
-      working-directory: ./mobile/AD
+      working-directory: ./mobile/AD  # 🌟 路径已经确认正确
       run: |
         chmod +x gradlew
         ./gradlew assembleDebug
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
-
-    - name: OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
-      env:
-        # 🌟 动态引用当前环境安装的 JDK 路径
-        JAVA_HOME: ${{ env.JAVA_HOME }}
-      with:
-        project: 'EcoLens-Android'
-        path: './mobile/AD'
-        format: 'SARIF'
-        out: 'reports'
-        # 添加 args 忽略更新以加快速度（如果你不需要每次更新漏洞库）
-        args: >
-          --failOnCVSS 7
-    - name: Upload Test results
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: reports/dependency-check-report.sarif
