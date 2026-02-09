@@ -189,15 +189,13 @@ const AdminDashboard: React.FC = () => {
           setBounds(calculatedBounds);
         }
 
-        // 全量区域统计 → 仅用于顶部 Carbon Reduced / Total Eco-Users 卡片
+        // 全量区域统计 → 仅用于顶部 Total Eco-Users 卡片（总用户数）
         if (regionsRes.status === 'fulfilled') {
           const regions: RegionData[] = regionsRes.value || [];
           const totalUsers = regions.reduce((sum, r) => sum + (r.userCount || 0), 0);
-          const totalCarbonReduced = regions.reduce((sum, r) => sum + (r.carbonReduced || 0), 0);
           setStats(prev => ({
             ...prev,
             totalUsers,
-            totalCarbonReduced: Math.round(totalCarbonReduced),
           }));
         } else {
           console.error('Failed to load regions stats:', regionsRes.reason);
@@ -213,6 +211,17 @@ const AdminDashboard: React.FC = () => {
             }
           });
           setRegionData(regionDataMap);
+
+          // 顶部 Carbon Reduced 卡片应显示当前时间范围内（默认近30天）的总减排量，
+          // 即热力图所有区域的 carbonReduced 之和。
+          const totalCarbonReduced = regions.reduce(
+            (sum, r) => sum + (r.carbonReduced || 0),
+            0
+          );
+          setStats(prev => ({
+            ...prev,
+            totalCarbonReduced: Math.round(totalCarbonReduced),
+          }));
         } else {
           console.error('Failed to load region map stats:', regionMapRes.reason);
         }
@@ -274,6 +283,17 @@ const AdminDashboard: React.FC = () => {
           if (r.regionCode) regionDataMap[r.regionCode] = r;
         });
         setRegionData(regionDataMap);
+
+        // 当用户在「近7天 / 近30天」之间切换时，保持顶部 Carbon Reduced 与当前热力图
+        // 时间范围一致：使用当前返回列表的 total carbonReduced 之和。
+        const totalCarbonReduced = list.reduce(
+          (sum: number, r: RegionData) => sum + (r.carbonReduced || 0),
+          0
+        );
+        setStats(prev => ({
+          ...prev,
+          totalCarbonReduced: Math.round(totalCarbonReduced),
+        }));
       })
       .catch((e) => console.error('Failed to load region stats by range:', e));
   }, [regionTrendsRange]);

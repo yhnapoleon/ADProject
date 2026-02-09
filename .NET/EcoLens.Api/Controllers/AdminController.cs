@@ -440,38 +440,30 @@ public class AdminController : ControllerBase
 	}
 
 	/// <summary>
-	/// 基于 ActivityLogs 在给定时间范围内（[from, to)）按 Region 聚合统计。
-	/// - 若 to 传入的是当天日期，将自动按整天上限转为次日零点的开区间。
-	/// - 若 from/to 任一为空，则按存在的条件过滤。
+	/// 按用户累计的 TotalCarbonSaved（总碳减排量）在各 Region 间进行聚合统计。
+	/// 注意：当前实现不再按时间范围切分 from/to/days，而是始终使用用户表中的累计值，
+	/// 以保证与顶部 Carbon Reduced 卡片语义一致。
 	/// </summary>
 	private async Task<List<RegionStatItem>> ComputeRegionStatsByDateRange(DateTime? fromInclusiveUtc, DateTime? toExclusiveUtc, CancellationToken ct)
 	{
-		// 预先取出各 Region 的用户数（用于保持返回结构一致）
-		var regionUsers = await _db.ApplicationUsers
+		// 先按用户原始 Region 进行分组，汇总每个 Region 的总减排量与用户数
+		var groups = await _db.ApplicationUsers
 			.Where(u => u.Region != null && u.Region != string.Empty)
 			.GroupBy(u => u.Region!)
-			.Select(g => new { Region = g.Key, UserCount = g.Count() })
+			.Select(g => new
+			{
+				Region = g.Key,
+				TotalSaved = g.Sum(x => x.TotalCarbonSaved),
+				UserCount = g.Count()
+			})
 			.ToListAsync(ct);
-
-		// 在给定时间窗口内聚合 ActivityLogs，并关联用户以获取 Region
-		var logs = _db.ActivityLogs.AsQueryable();
-		if (fromInclusiveUtc.HasValue)
-			logs = logs.Where(l => l.CreatedAt >= fromInclusiveUtc.Value);
-		if (toExclusiveUtc.HasValue)
-			logs = logs.Where(l => l.CreatedAt < toExclusiveUtc.Value);
-
-		var aggregated = await (from l in logs
-								join u in _db.ApplicationUsers on l.UserId equals u.Id
-								where u.Region != null && u.Region != string.Empty
-								group l by u.Region! into g
-								select new { Region = g.Key, Emission = g.Sum(x => x.TotalEmission) })
-							.ToListAsync(ct);
 
 		// 将不同写法的 Region 合并到统一的 REGION_C 代码上
 		var userCountByCode = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+		var savedByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 		var nameByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-		foreach (var g in regionUsers)
+		foreach (var g in groups)
 		{
 			var norm = NormalizeRegion(g.Region);
 			if (string.IsNullOrEmpty(norm.Code)) continue;
@@ -479,38 +471,28 @@ public class AdminController : ControllerBase
 			if (!userCountByCode.TryAdd(norm.Code, g.UserCount))
 				userCountByCode[norm.Code] += g.UserCount;
 
-			if (!string.IsNullOrWhiteSpace(norm.Name))
-				nameByCode[norm.Code] = norm.Name;
-		}
-
-		var emissionByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-		foreach (var x in aggregated)
-		{
-			var norm = NormalizeRegion(x.Region);
-			if (string.IsNullOrEmpty(norm.Code)) continue;
-
-			if (!emissionByCode.TryAdd(norm.Code, x.Emission))
-				emissionByCode[norm.Code] += x.Emission;
+			if (!savedByCode.TryAdd(norm.Code, g.TotalSaved))
+				savedByCode[norm.Code] += g.TotalSaved;
 
 			if (!string.IsNullOrWhiteSpace(norm.Name))
 				nameByCode[norm.Code] = norm.Name;
 		}
 
-		var total = emissionByCode.Values.Sum();
+		var totalSaved = savedByCode.Values.Sum();
 
 		var items = userCountByCode.Select(kvp =>
 		{
 			var code = kvp.Key;
-			emissionByCode.TryGetValue(code, out var emission);
+			savedByCode.TryGetValue(code, out var saved);
 			nameByCode.TryGetValue(code, out var name);
 
 			return new RegionStatItem
 			{
 				RegionCode = code,
 				RegionName = string.IsNullOrWhiteSpace(name) ? code : name,
-				CarbonReduced = emission,
+				CarbonReduced = saved,
 				UserCount = kvp.Value,
-				ReductionRate = total > 0 ? Math.Round(emission * 100m / total, 2) : 0m
+				ReductionRate = totalSaved > 0 ? Math.Round(saved * 100m / totalSaved, 2) : 0m
 			};
 		}).ToList();
 
