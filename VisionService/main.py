@@ -35,7 +35,11 @@ class FoodClassifier:
     - source_model: 采用结果的来源模型名称（字符串）
     """
 
-    def __init__(self, asian_labels_path: str = "asian_food_labels.txt", asia_score_weight: float = 1.1) -> None:
+    def __init__(
+        self,
+        asian_labels_path: str = "asian_food_labels.txt",
+        asia_score_weight: float = 1.1,
+    ) -> None:
         # 模型名称常量
         self.western_model_name: str = "prithivMLmods/Food-101-93M"
         self.asian_model_name: str = "openai/clip-vit-base-patch32"
@@ -50,7 +54,10 @@ class FoodClassifier:
         # 设备自动检测（优先 CUDA，其次 MPS，最后 CPU）
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
-        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():  # macOS Metal
+        elif (
+            hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):  # macOS Metal
             self.device = torch.device("mps")
         else:
             self.device = torch.device("cpu")
@@ -143,7 +150,11 @@ class FoodClassifier:
 
         # --- 亚洲模型（CLIP）推理：图像-文本相似度 ---
         a_inputs = self.asian_processor(
-            text=self.asian_labels, images=image, return_tensors="pt", padding=True)
+            text=self.asian_labels,
+            images=image,
+            return_tensors="pt",
+            padding=True,
+        )
         a_inputs = {k: v.to(self.device) for k, v in a_inputs.items()}
         a_outputs = self.asian_model(**a_inputs)
         # logits_per_image 形状：[batch=1, num_texts]，越大越相似
@@ -159,7 +170,11 @@ class FoodClassifier:
         asia_weighted = a_top_score * self.asia_score_weight
         # 打印原始与加权分值，便于调试（不影响接口）
         print(
-            f"[FoodClassifier] Compare -> west: {w_top_score:.6f}, asia_raw: {a_top_score:.6f}, asia_weighted({self.asia_score_weight:.2f}x): {asia_weighted:.6f}")
+            "[FoodClassifier] Compare -> "
+            f"west: {w_top_score:.6f}, "
+            f"asia_raw: {a_top_score:.6f}, "
+            f"asia_weighted({self.asia_score_weight:.2f}x): {asia_weighted:.6f}"
+        )
 
         if w_top_score > asia_weighted:
             return {
@@ -239,7 +254,6 @@ async def predict_image(file: UploadFile = File(...)):
     - 调用已加载的全局 FoodClassifier 执行预测
     """
     # 校验全局模型是否已就绪
-    global CLASSIFIER
     if CLASSIFIER is None:
         raise HTTPException(status_code=500, detail="服务未就绪：模型尚未加载完成。")
 
