@@ -1,0 +1,6 @@
+# CodeQL frontend (JavaScript/TypeScript) security analysis config
+# Uses security-extended query set (XSS, open redirect, sensitive data, CORS, etc.)
+name: "Frontend Security Extended"
+disable-default-queries: false
+queries:
+  - use: security-extended
