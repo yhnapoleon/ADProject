@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tv_travel_value).text = String.format("%.2f kg", data.transport)
         findViewById<TextView>(R.id.tv_utility_value).text = String.format("%.2f kg", data.utility)
 
-        val target = 5.0
+        val target = 200.0
         val progressPercent = ((data.total / target) * 100).toInt()
         findViewById<ProgressBar>(R.id.carbon_progress).progress = progressPercent.coerceAtMost(100)
     }

@@ -32,7 +32,9 @@
                     android:id="@+id/avatar"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:src="@drawable/ic_launcher_foreground"
+                    android:src="@drawable/splash"
+                    android:scaleType="centerInside"
+                    android:adjustViewBounds="true"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
@@ -113,7 +115,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Target: 5.00 kgCO₂e"
+                                android:text="Recommended: 200.00 kgCO₂e"
                                 android:textColor="@android:color/white"/>
                         </LinearLayout>
 

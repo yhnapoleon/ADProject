@@ -28,8 +28,9 @@ class LeaderboardActivity : AppCompatActivity() {
     private lateinit var tvAllTime: TextView
     private lateinit var adapter: LeaderboardAdapter
 
-    // 🌟 后端 Base URL
-    private val BASE_URL = "https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net"
+    // 🌟 这里的端口需与后端 launchSettings.json 中的 http 端口一致
+    private val BASE_URL = "http://10.0.2.2:5133/"
+    //private val BASE_URL = "https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net/"
 
     private enum class RankingType { DAILY, MONTHLY, TOTAL }
 
@@ -112,22 +113,28 @@ class LeaderboardActivity : AppCompatActivity() {
             tvName.text = data.nickname ?: data.username
             tvValue.text = "${String.format("%.1f", data.emissionsTotal)} kg"
 
-            // 🌟 核心：处理 URL 拼接逻辑
             var avatarPath = data.avatarUrl ?: ""
-            val fullAvatarUrl = if (avatarPath.isNotEmpty()) {
-                // 如果后端已经给出了完整 URL (包含 http)，直接使用
-                // 此时 avatarPath 已经包含了 ?v=xxx
-                if (avatarPath.startsWith("http")) avatarPath
-                else "$BASE_URL${avatarPath.replace("\\", "/")}"
+            var fullAvatarUrl = if (avatarPath.isNotEmpty()) {
+                if (avatarPath.startsWith("http")) {
+                    avatarPath.replace("localhost", "10.0.2.2")
+                } else {
+                    "$BASE_URL${avatarPath.replace("\\", "/").removePrefix("/")}"
+                }
             } else null
 
-            // 🌟 性能优化核心：利用版本号进行缓存
+            // 🌟 核心修复：添加时间戳 Cache Buster
+            if (fullAvatarUrl != null) {
+                fullAvatarUrl = if (fullAvatarUrl.contains("?")) "$fullAvatarUrl&t=${System.currentTimeMillis()}"
+                else "$fullAvatarUrl?t=${System.currentTimeMillis()}"
+            }
+
             Glide.with(this)
                 .load(fullAvatarUrl)
                 .apply(RequestOptions.circleCropTransform())
-                // 🌟 修改：由于 URL 包含版本号，我们可以安全地开启缓存
-                .skipMemoryCache(false)
-                .diskCacheStrategy(DiskCacheStrategy.ALL) // 🌟 缓存所有版本的图片
+                // 🌟 修改：不要使用 DISK_CACHE_ALL，或者配合 signature 使用
+                .signature(com.bumptech.glide.signature.ObjectKey(System.currentTimeMillis().toString()))
+                .skipMemoryCache(true) // 建议在开发阶段先禁用缓存
+                .diskCacheStrategy(DiskCacheStrategy.NONE)
                 .placeholder(R.drawable.ic_avatar_placeholder)
                 .error(R.drawable.ic_avatar_placeholder)
                 .into(ivAvatar)

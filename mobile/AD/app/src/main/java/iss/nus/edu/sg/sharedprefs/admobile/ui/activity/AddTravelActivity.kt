@@ -164,7 +164,7 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
             TransportMode(6, "Car (Gasoline)", R.raw.transport_sedan, 0.2),
             TransportMode(7, "Car (Electric)", R.raw.transport_sedan2, 0.05),
             TransportMode(4, "Bus", R.raw.transport_bus, 0.05),
-            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.02),
+            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.12),
             TransportMode(3, "Subway", R.raw.transport_train, 0.03),
             TransportMode(5, "Ship", R.raw.transport_ship, 0.03),
             TransportMode(9, "Airplane", R.raw.transport_airplane, 0.25)

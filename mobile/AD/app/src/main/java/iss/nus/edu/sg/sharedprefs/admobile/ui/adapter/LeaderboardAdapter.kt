@@ -15,7 +15,8 @@ import iss.nus.edu.sg.sharedprefs.admobile.data.model.LeaderboardItem
 class LeaderboardAdapter(private var items: List<LeaderboardItem>) :
     RecyclerView.Adapter<LeaderboardAdapter.ViewHolder>() {
 
-    private val BASE_URL = "https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net"
+    //private val BASE_URL = "https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net"
+    private val BASE_URL = "http://10.0.2.2:5133/"
 
     fun updateData(newItems: List<LeaderboardItem>) {
         this.items = newItems
@@ -34,19 +35,24 @@ class LeaderboardAdapter(private var items: List<LeaderboardItem>) :
         holder.tvName.text = item.nickname ?: item.username
         holder.tvValue.text = String.format("%.2f kg", item.emissionsTotal)
 
-        // 🌟 处理 URL 拼接：此时 item.avatarUrl 已包含 ?v=xxx
+        // 🌟 核心修复逻辑：处理 URL 拼接与 localhost 替换
         val avatarPath = item.avatarUrl ?: ""
         val fullAvatarUrl = if (avatarPath.isNotEmpty()) {
-            if (avatarPath.startsWith("http")) avatarPath
-            else "$BASE_URL${avatarPath.replace("\\", "/")}"
+            if (avatarPath.startsWith("http")) {
+                // 🌟 将后端返回的 localhost 替换为模拟器可识别的 10.0.2.2
+                avatarPath.replace("localhost", "10.0.2.2")
+            } else {
+                // 兼容处理：如果返回的是相对路径，则手动拼接并清理多余斜杠
+                "$BASE_URL${avatarPath.replace("\\", "/").removePrefix("/")}"
+            }
         } else null
 
-        // 🌟 性能优化：启用缓存以实现流畅滑动
+        // 🌟 性能优化：Glide 会利用 URL 里的 ?v=xxx 自动处理缓存刷新
         Glide.with(holder.itemView.context)
             .load(fullAvatarUrl)
             .apply(RequestOptions.circleCropTransform())
-            .skipMemoryCache(false) // 🌟 允许内存缓存：滑动回看时瞬间加载
-            .diskCacheStrategy(DiskCacheStrategy.ALL) // 🌟 允许磁盘缓存：下次打开 App 免下载
+            .skipMemoryCache(false) // 允许内存缓存，提升滑动流畅度
+            .diskCacheStrategy(DiskCacheStrategy.ALL) // 允许磁盘缓存，减少重复下载
             .placeholder(R.drawable.ic_avatar_placeholder)
             .error(R.drawable.ic_avatar_placeholder)
             .into(holder.ivAvatar)
