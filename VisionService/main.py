@@ -173,7 +173,8 @@ class FoodClassifier:
             "[FoodClassifier] Compare -> "
             f"west: {w_top_score:.6f}, "
             f"asia_raw: {a_top_score:.6f}, "
-            f"asia_weighted({self.asia_score_weight:.2f}x): {asia_weighted:.6f}"
+            f"asia_weighted({self.asia_score_weight:.2f}x): "
+            f"{asia_weighted:.6f}"
         )
 
         if w_top_score > asia_weighted:
