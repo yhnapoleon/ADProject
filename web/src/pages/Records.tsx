@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, Table, Select, Button, Modal, message, Row, Col, Tag } from 'antd';
 import { DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { Record, EmissionType } from '../types/index';
+import { Record as AppRecord, EmissionType } from '../types/index';
 import './Records.module.css';
 import mainEatIcon from '../assets/icons/main_eat.svg';
 import mainTravelIcon from '../assets/icons/main_travel.svg';
@@ -9,7 +9,7 @@ import mainWaterIcon from '../assets/icons/main_water.svg';
 import request from '../utils/request';
 
 /** 内部记录类型，包含原始 ID、来源类型和 API 返回的 notes */
-interface InternalRecord extends Record {
+interface InternalRecord extends AppRecord {
   _source: 'food' | 'travel' | 'utility';
   _originalId: number;
   notes?: string;
