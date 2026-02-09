@@ -36,7 +36,7 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 上传活动记录：根据标签查找参考，计算排放并保存。
+	/// Upload activity record: find reference by label, calculate emission and save.
 	/// </summary>
 	[HttpPost("upload")]
 	public async Task<ActionResult<ActivityLogResponseDto>> Upload([FromForm] CreateActivityLogDto dto, CancellationToken ct)
@@ -44,7 +44,7 @@ public class ActivityController : ControllerBase
 		var userId = GetUserId();
 		if (userId is null) return Unauthorized();
 
-		// 针对 Utility 类别按 Region 优先匹配，否则按 LabelName 直接匹配
+		// For Utility category match by Region first, otherwise by LabelName
 		CarbonReference? carbonRef = null;
 		if (dto.Category is CarbonCategory.Utility)
 		{
@@ -53,7 +53,7 @@ public class ActivityController : ControllerBase
 				.Select(u => u.Region)
 				.FirstOrDefaultAsync(ct);
 
-			// 优先匹配 (Label, Utility, userRegion)，否则回退 (Label, Utility, Region == null)
+			// Prefer (Label, Utility, userRegion), else fallback to (Label, Utility, Region == null)
 			if (!string.IsNullOrWhiteSpace(userRegion))
 			{
 				carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(
@@ -71,28 +71,28 @@ public class ActivityController : ControllerBase
 			carbonRef = await _db.CarbonReferences.FirstOrDefaultAsync(c => c.LabelName == dto.Label, ct);
 		}
 
-		// 如果本地未找到碳参考数据，尝试从 Climatiq API 获取
+		// If no local carbon reference found, try fetching from Climatiq API
 		if (carbonRef is null)
 		{
-			// 这里需要一个逻辑来将 dto.Label 和 dto.Category 映射到 Climatiq 的 activityId
-			// 暂时使用一个示例 activityId，实际应用中需要根据您的深度学习模型输出进行映射
-			var climatiqActivityId = "consumer_goods-type_snack_foods"; // 示例 Climatiq Activity ID
+			// Logic needed to map dto.Label and dto.Category to Climatiq activityId
+			// Using sample activityId for now; in production map from your model output
+			var climatiqActivityId = "consumer_goods-type_snack_foods"; // Sample Climatiq Activity ID
 			var climatiqRegion = await _db.ApplicationUsers
 				.Where(u => u.Id == userId.Value)
 				.Select(u => u.Region)
-				.FirstOrDefaultAsync(ct) ?? "US"; // 默认使用美国地区
+				.FirstOrDefaultAsync(ct) ?? "US"; // Default to US region
 
 			var climatiqEstimate = await _climatiqService.GetCarbonEmissionEstimateAsync(
 				climatiqActivityId, dto.Quantity, dto.Unit, climatiqRegion);
 
 			if (climatiqEstimate is not null && dto.Category.HasValue)
 			{
-				// 将 Climatiq 结果保存到本地 CarbonReference 数据库，方便下次使用
+				// Save Climatiq result to local CarbonReference DB for reuse
 				carbonRef = new CarbonReference
 				{
 					LabelName = dto.Label,
-					Category = dto.Category.Value, // 使用 .Value 因为已经检查了 HasValue
-					Co2Factor = climatiqEstimate.Co2e / dto.Quantity, // Climatiq 返回总排放，这里计算因子
+					Category = dto.Category.Value, // Use .Value since HasValue was checked
+					Co2Factor = climatiqEstimate.Co2e / dto.Quantity, // Climatiq returns total emission; here we compute factor
 					Unit = dto.Unit,
 					Region = climatiqRegion,
 					Source = "Climatiq",
@@ -123,17 +123,17 @@ public class ActivityController : ControllerBase
 		await _db.ActivityLogs.AddAsync(log, ct);
 		await _db.SaveChangesAsync(ct);
 
-		// 更新用户总碳排放
+		// Update user total carbon emission
 		await UpdateUserTotalCarbonEmissionAsync(userId.Value, ct);
 
-		// 重算总碳减排（基于每日净碳值）
+		// Recalculate total carbon saved (based on daily net value)
 		try
 		{
 			await _pointService.RecalculateTotalCarbonSavedAsync(userId.Value);
 		}
 		catch
 		{
-			// 不影响主流程
+			// Do not affect main flow
 		}
 
 		var result = new ActivityLogResponseDto
@@ -154,7 +154,7 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 更新用户总碳排放（从 ActivityLogs、TravelLogs、UtilityBills 汇总）
+	/// Update user total carbon emission (aggregate from ActivityLogs, TravelLogs, UtilityBills).
 	/// </summary>
 	private async Task UpdateUserTotalCarbonEmissionAsync(int userId, CancellationToken ct)
 	{
@@ -180,21 +180,21 @@ public class ActivityController : ControllerBase
 		}
 		catch (Exception ex)
 		{
-			// 记录错误但不影响主流程
-			// 注意：如果 logger 未注入，这里会静默失败，但不影响主流程
+			// Log error but do not affect main flow
+			// Note: if logger is not injected, this fails silently without affecting main flow
 			try
 			{
 				_logger?.LogError(ex, "Failed to update TotalCarbonEmission for user {UserId}", userId);
 			}
 			catch
 			{
-				// 忽略 logger 错误
+				// Ignore logger error
 			}
 		}
 	}
 
 	/// <summary>
-	/// 仪表盘数据：近 7 天排放趋势、当日碳中和差值（目标 10kg/天）、等效植树数（按 TotalCarbonSaved/20）。
+	/// Dashboard data: last 7 days emission trend, today's carbon neutrality gap (target 10kg/day), equivalent trees (TotalCarbonSaved/20).
 	/// </summary>
 	[HttpGet("dashboard")]
 	public async Task<ActionResult<DashboardDto>> Dashboard(CancellationToken ct)
@@ -211,7 +211,7 @@ public class ActivityController : ControllerBase
 			.Select(g => new { Day = g.Key, Total = g.Sum(x => x.TotalEmission) })
 			.ToListAsync(ct);
 
-		// 过去 7 天，按日期顺序组装列表（缺失日期补 0）
+		// Last 7 days, build list in date order (fill missing dates with 0)
 		var weeklyTrend = new List<decimal>(7);
 		for (var i = 0; i < 7; i++)
 		{
@@ -242,7 +242,7 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 获取当前用户的活动日志列表。
+	/// Get current user's activity log list.
 	/// </summary>
 	[HttpGet("my-logs")]
 	public async Task<ActionResult<IEnumerable<ActivityLogResponseDto>>> MyLogs(CancellationToken ct)
@@ -273,7 +273,7 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 获取当前用户的统计信息（总排放/记录数量/折算树木/全服排名）。
+	/// Get current user's stats (total emission, record count, equivalent trees, global rank).
 	/// </summary>
 	[HttpGet("stats")]
 	public async Task<ActionResult<ActivityStatsDto>> Stats(CancellationToken ct)
@@ -286,10 +286,10 @@ public class ActivityController : ControllerBase
 		var totalItems = await query.CountAsync(ct);
 		var totalEmission = await query.SumAsync(l => (decimal?)l.TotalEmission, ct) ?? 0m;
 
-		// 折算树木数量：1 棵树/年 ≈ 20kg CO2
+		// Equivalent trees: 1 tree/year ≈ 20kg CO2
 		var treesSaved = totalEmission / 20m;
 
-		// 计算用户全服排名（按 TotalCarbonSaved 倒序）
+		// Compute user global rank (by TotalCarbonSaved descending)
 		var me = await _db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == userId.Value, ct);
 		if (me is null) return NotFound();
 		var rank = await _db.ApplicationUsers.CountAsync(u => u.TotalCarbonSaved > me.TotalCarbonSaved, ct) + 1;
@@ -306,8 +306,8 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 当日净碳值：若当日缺少（食物记录、出行记录、步数>0）任一项，则严格返回 0。
-	/// 公式：DailyNetValue = (Steps * 0.0001) + (Benchmark - DailyTotalEmission)。
+	/// Daily net value: if today lacks any of (food record, travel record, steps &gt; 0), return 0.
+	/// Formula: DailyNetValue = (Steps * 0.0001) + (Benchmark - DailyTotalEmission).
 	/// </summary>
 	[HttpGet("daily-net-value")]
 	public async Task<ActionResult<DailyNetValueResponseDto>> DailyNetValue(CancellationToken ct)
@@ -319,14 +319,14 @@ public class ActivityController : ControllerBase
 		var dayStart = today;
 		var dayEnd = today.AddDays(1);
 
-		// 检查当日三项是否齐全
+		// Check if all three items for today are present
 		var hasFood = await _db.FoodRecords.AnyAsync(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd, ct);
 		var hasTravel = await _db.TravelLogs.AnyAsync(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd, ct);
 		var stepRecord = await _db.StepRecords.FirstOrDefaultAsync(r => r.UserId == userId.Value && r.RecordDate == dayStart, ct);
 		var steps = stepRecord?.StepCount ?? 0;
 		var isQualified = hasFood && hasTravel && steps > 0;
 
-		// 组成分解数据
+		// Build breakdown data
 		var foodEmission = await _db.FoodRecords
 			.Where(r => r.UserId == userId.Value && r.CreatedAt >= dayStart && r.CreatedAt < dayEnd)
 			.SumAsync(r => (decimal?)r.Emission, ct) ?? 0m;
@@ -338,9 +338,9 @@ public class ActivityController : ControllerBase
 		const decimal stepFactor = 0.0001m;
 		var stepSaving = (decimal)steps * stepFactor;
 
-		const decimal benchmark = 15.0m; // 与 PointService.DailyBenchmark 保持一致
+		const decimal benchmark = 15.0m; // Keep in sync with PointService.DailyBenchmark
 
-		// 值计算（调用服务实现）
+		// Value calculation (delegate to service)
 		var value = await _pointService.CalculateDailyNetValueAsync(userId.Value, today);
 
 		var dto = new DailyNetValueResponseDto
@@ -359,7 +359,7 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 获取过去 N 天的每日碳排放总量（当前用户）。
+	/// Get daily total carbon emission for the past N days (current user).
 	/// </summary>
 	[HttpGet("chart-data")]
 	public async Task<ActionResult<IEnumerable<ChartDataPointDto>>> ChartData([FromQuery] int days = 7, CancellationToken ct = default)
@@ -373,14 +373,14 @@ public class ActivityController : ControllerBase
 		var startDate = todayUtc.AddDays(-(days - 1));
 		var endDate = todayUtc.AddDays(1);
 
-		// 聚合当前用户在时间窗口内的每日排放
+		// Aggregate current user's daily emission in time window
 		var grouped = await _db.ActivityLogs
 			.Where(l => l.UserId == userId.Value && l.CreatedAt >= startDate && l.CreatedAt < endDate)
 			.GroupBy(l => l.CreatedAt.Date)
 			.Select(g => new { Date = g.Key, Emission = g.Sum(x => x.TotalEmission) })
 			.ToListAsync(ct);
 
-		// 填充缺失日期为 0
+		// Fill missing dates with 0
 		var dict = grouped.ToDictionary(x => x.Date, x => x.Emission);
 		var result = new List<ChartDataPointDto>(days);
 		for (var d = 0; d < days; d++)
@@ -398,7 +398,7 @@ public class ActivityController : ControllerBase
 	}
 
 	/// <summary>
-	/// 按 Region 统计总碳减排量（基于用户的 TotalCarbonSaved）。
+	/// Aggregate total carbon saved by Region (based on user TotalCarbonSaved).
 	/// </summary>
 	[HttpGet("heatmap")]
 	public async Task<ActionResult<IEnumerable<RegionHeatmapDto>>> Heatmap(CancellationToken ct)
