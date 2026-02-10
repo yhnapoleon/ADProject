@@ -250,5 +250,56 @@ public class TravelServiceTests
         Assert.Equal(15, busStats.TotalDistanceKilometers);
         Assert.Equal(8, busStats.TotalCarbonEmission);
     }
+
+    [Fact]
+    public async Task ValidateTransportMode_ShouldThrow_ForPlane_BetweenMajorCities_WhenTooShort()
+    {
+        await using var db = CreateInMemoryDb();
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        var origin = new GeocodingResult { City = "Tokyo", Country = "Japan", FormattedAddress = "Tokyo, Japan" };
+        var dest = new GeocodingResult { City = "Tokyo", Country = "Japan", FormattedAddress = "Tokyo, Japan" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeValidateTransportModeAsync(svc, TransportMode.Plane, origin, dest, distanceKm: 150));
+    }
+
+    [Fact]
+    public async Task ValidateTransportMode_ShouldThrow_ForPlane_GeneralLevel_WhenTooShort()
+    {
+        await using var db = CreateInMemoryDb();
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        var origin = new GeocodingResult { City = "SmallTownA", Country = "CountryX", FormattedAddress = "SmallTownA, CountryX" };
+        var dest = new GeocodingResult { City = "SmallTownB", Country = "CountryX", FormattedAddress = "SmallTownB, CountryX" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeValidateTransportModeAsync(svc, TransportMode.Plane, origin, dest, distanceKm: 50));
+    }
+
+    [Fact]
+    public async Task ValidateTransportMode_ShouldThrow_ForSubway_BetweenCountries()
+    {
+        await using var db = CreateInMemoryDb();
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        var origin = new GeocodingResult { City = "London", Country = "United Kingdom", FormattedAddress = "London, UK" };
+        var dest = new GeocodingResult { City = "Paris", Country = "France", FormattedAddress = "Paris, France" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeValidateTransportModeAsync(svc, TransportMode.Subway, origin, dest, distanceKm: 300));
+    }
 }
 

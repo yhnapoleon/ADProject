@@ -53,5 +53,32 @@ public class UtilityBillParserTests
         Assert.Equal(new DateTime(2024, 1, 1), result!.BillPeriodStart);
         Assert.Equal(new DateTime(2024, 1, 31), result.BillPeriodEnd);
     }
+
+	[Fact]
+	public async Task ParseBillDataAsync_ShouldReturnNull_WhenOcrTextEmpty()
+	{
+		var parser = CreateParser();
+
+		var result = await parser.ParseBillDataAsync(string.Empty, UtilityBillType.Electricity);
+
+		Assert.Null(result);
+	}
+
+	[Fact]
+	public async Task ParseBillDataAsync_ShouldNotSetPeriod_WhenYearOutOfRange()
+	{
+		var parser = CreateParser();
+		var ocrText = """
+			Utility Bill Statement
+			Billing Period: 05 Nov 1899 - 05 Dec 1899
+			Total usage: 123 kWh
+			""";
+
+		var result = await parser.ParseBillDataAsync(ocrText, UtilityBillType.Electricity);
+
+		Assert.NotNull(result);
+		Assert.Null(result!.BillPeriodStart);
+		Assert.Null(result.BillPeriodEnd);
+	}
 }
 
