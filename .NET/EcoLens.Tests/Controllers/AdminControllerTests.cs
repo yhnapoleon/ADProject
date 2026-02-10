@@ -178,4 +178,155 @@ public class AdminControllerTests
 		var imported = Assert.IsType<int>(importedProp!.GetValue(ok.Value)!);
 		Assert.Equal(0, imported);
 	}
+
+	private static ApplicationDbContext CreateDbWithUsers(out ApplicationUser admin, out ApplicationUser user)
+	{
+		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+			.UseInMemoryDatabase(Guid.NewGuid().ToString())
+			.Options;
+		var db = new ApplicationDbContext(options);
+
+		admin = new ApplicationUser
+		{
+			Username = "admin",
+			Email = "admin@test.com",
+			PasswordHash = "x",
+			Role = UserRole.Admin,
+			Region = "West Region",
+			BirthDate = DateTime.UtcNow.AddYears(-30),
+			IsActive = true,
+			TotalCarbonSaved = 10m
+		};
+
+		user = new ApplicationUser
+		{
+			Username = "user1",
+			Email = "user1@test.com",
+			PasswordHash = "x",
+			Role = UserRole.User,
+			Region = "East Region",
+			BirthDate = DateTime.UtcNow.AddYears(-20),
+			IsActive = true,
+			TotalCarbonSaved = 20m
+		};
+
+		db.ApplicationUsers.AddRange(admin, user);
+		db.SaveChanges();
+
+		return db;
+	}
+
+	private static void SetAdminUser(ControllerBase controller, int adminId)
+	{
+		var identity = new ClaimsIdentity();
+		identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, adminId.ToString()));
+		identity.AddClaim(new Claim(ClaimTypes.Role, "Admin"));
+		controller.ControllerContext = new ControllerContext
+		{
+			HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) }
+		};
+	}
+
+	[Fact]
+	public async Task RegionStats_ShouldAggregateByUserTotalCarbonSaved_WhenNoDateRange()
+	{
+		var db = CreateDbWithUsers(out var admin, out var user);
+		var controller = new AdminController(db);
+		SetAdminUser(controller, admin.Id);
+
+		var result = await controller.RegionStats(null, null, null, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var items = Assert.IsAssignableFrom<IEnumerable<AdminController.RegionStatItem>>(ok.Value);
+
+		// West/East 两个区域的统计都应出现
+		Assert.True(items.Any(i => i.RegionCode == "WR" || i.RegionCode == "ER"));
+	}
+
+	[Fact]
+	public async Task WeeklyImpact_ShouldReturnFiveWeeksOfData()
+	{
+		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+			.UseInMemoryDatabase(Guid.NewGuid().ToString())
+			.Options;
+		await using var db = new ApplicationDbContext(options);
+
+		// 种几条 ActivityLogs 覆盖最近几周
+		var today = DateTime.UtcNow.Date;
+		db.ActivityLogs.Add(new ActivityLog { UserId = 1, CreatedAt = today.AddDays(-3), TotalEmission = 1 });
+		db.ActivityLogs.Add(new ActivityLog { UserId = 1, CreatedAt = today.AddDays(-10), TotalEmission = 2 });
+		db.ActivityLogs.Add(new ActivityLog { UserId = 1, CreatedAt = today.AddDays(-20), TotalEmission = 3 });
+		await db.SaveChangesAsync();
+
+		var controller = new AdminController(db);
+
+		var result = await controller.WeeklyImpact(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var list = Assert.IsAssignableFrom<IEnumerable<object>>(ok.Value);
+		// 约定 5 周的聚合结果
+		Assert.Equal(5, list.Count());
+	}
+
+	[Fact]
+	public async Task AdminUsers_ShouldReturnPagedList()
+	{
+		var db = CreateDbWithUsers(out var admin, out var user);
+		var controller = new AdminController(db);
+		SetAdminUser(controller, admin.Id);
+
+		var result = await controller.AdminUsers(null, page: 1, pageSize: 10, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		Assert.NotNull(ok.Value);
+	}
+
+	[Fact]
+	public async Task GetUserEmissionStats_ShouldReturnNotFound_WhenUserMissing()
+	{
+		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+			.UseInMemoryDatabase(Guid.NewGuid().ToString())
+			.Options;
+		await using var db = new ApplicationDbContext(options);
+		var controller = new AdminController(db);
+
+		var result = await controller.GetUserEmissionStats(999, null, null, null, CancellationToken.None);
+
+		var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+		Assert.Contains("User not found", notFound.Value!.ToString());
+	}
+
+	[Fact]
+	public async Task GetUserEmissionStats_ShouldAggregateEmissions_WhenUserExists()
+	{
+		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+			.UseInMemoryDatabase(Guid.NewGuid().ToString())
+			.Options;
+		await using var db = new ApplicationDbContext(options);
+
+		var user = new ApplicationUser
+		{
+			Username = "u1",
+			Email = "u1@test.com",
+			PasswordHash = "x",
+			Role = UserRole.User,
+			Region = "SG",
+			BirthDate = DateTime.UtcNow.AddYears(-20),
+			IsActive = true
+		};
+		db.ApplicationUsers.Add(user);
+		await db.SaveChangesAsync();
+
+		db.ActivityLogs.Add(new ActivityLog { UserId = user.Id, CreatedAt = DateTime.UtcNow.AddDays(-1), TotalEmission = 1 });
+		db.TravelLogs.Add(new TravelLog { UserId = user.Id, CreatedAt = DateTime.UtcNow.AddDays(-1), CarbonEmission = 2 });
+		db.UtilityBills.Add(new UtilityBill { UserId = user.Id, CreatedAt = DateTime.UtcNow.AddDays(-1), TotalCarbonEmission = 3 });
+		await db.SaveChangesAsync();
+
+		var controller = new AdminController(db);
+
+		var result = await controller.GetUserEmissionStats(user.Id, days: 7, from: null, to: null, ct: CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		Assert.NotNull(ok.Value);
+	}
 }
