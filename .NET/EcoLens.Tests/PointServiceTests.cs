@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using EcoLens.Api.Data;
 using EcoLens.Api.Models;
 using EcoLens.Api.Services;
+using EcoLens.Api.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EcoLens.Tests;
@@ -78,6 +79,171 @@ public class PointServiceTests
         var reloadedUser = await db.ApplicationUsers.FirstAsync(u => u.Id == 1);
         Assert.Equal(10, reloadedUser.CurrentPoints);
         Assert.Empty(await db.PointAwardLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CheckAndAwardPointsAsync_ShouldAwardPoints_WhenDailyEmissionBelowBenchmark()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDb();
+        var day = DateTime.UtcNow.Date;
+
+        var user = new ApplicationUser
+        {
+            Id = 1,
+            Username = "test-user",
+            Email = "test@example.com",
+            PasswordHash = "hash",
+            Region = "SG",
+            BirthDate = DateTime.UtcNow.Date,
+            CurrentPoints = 0,
+            ContinuousNeutralDays = 0
+        };
+        db.ApplicationUsers.Add(user);
+
+        db.FoodRecords.Add(new FoodRecord
+        {
+            UserId = 1,
+            Name = "Salad",
+            Amount = 1,
+            EmissionFactor = 5m,
+            Emission = 5m
+        });
+        db.TravelLogs.Add(new TravelLog
+        {
+            UserId = 1,
+            TransportMode = TransportMode.Bus,
+            OriginAddress = "A",
+            DestinationAddress = "B",
+            OriginLatitude = 0,
+            OriginLongitude = 0,
+            DestinationLatitude = 0,
+            DestinationLongitude = 0,
+            DistanceMeters = 1000,
+            DistanceKilometers = 1,
+            CarbonEmission = 5m
+        });
+
+        await db.SaveChangesAsync();
+        var service = new PointService(db);
+
+        // Act
+        await service.CheckAndAwardPointsAsync(userId: 1, date: day);
+
+        // Assert
+        var reloadedUser = await db.ApplicationUsers.FirstAsync(u => u.Id == 1);
+        Assert.Equal(10, reloadedUser.CurrentPoints);
+        Assert.Equal(1, reloadedUser.ContinuousNeutralDays);
+        Assert.Equal(day.Date, reloadedUser.LastNeutralDate);
+
+        var logs = await db.PointAwardLogs.ToListAsync();
+        Assert.Single(logs);
+        Assert.Equal(10, logs[0].Points);
+        Assert.Equal("DailyNeutral", logs[0].Source);
+    }
+
+    [Fact]
+    public async Task CheckAndAwardPointsAsync_ShouldNotAward_WhenEmissionAboveBenchmark()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDb();
+        var day = DateTime.UtcNow.Date;
+
+        var user = new ApplicationUser
+        {
+            Id = 1,
+            Username = "test-user",
+            Email = "test@example.com",
+            PasswordHash = "hash",
+            Region = "SG",
+            BirthDate = DateTime.UtcNow.Date,
+            CurrentPoints = 0
+        };
+        db.ApplicationUsers.Add(user);
+
+        db.FoodRecords.Add(new FoodRecord
+        {
+            UserId = 1,
+            Name = "Steak",
+            Amount = 1,
+            EmissionFactor = 20m,
+            Emission = 20m
+        });
+        db.TravelLogs.Add(new TravelLog
+        {
+            UserId = 1,
+            TransportMode = TransportMode.CarGasoline,
+            OriginAddress = "A",
+            DestinationAddress = "B",
+            OriginLatitude = 0,
+            OriginLongitude = 0,
+            DestinationLatitude = 0,
+            DestinationLongitude = 0,
+            DistanceMeters = 1000,
+            DistanceKilometers = 1,
+            CarbonEmission = 1m
+        });
+
+        await db.SaveChangesAsync();
+        var service = new PointService(db);
+
+        // Act
+        await service.CheckAndAwardPointsAsync(userId: 1, date: day);
+
+        // Assert
+        var reloadedUser = await db.ApplicationUsers.FirstAsync(u => u.Id == 1);
+        Assert.Equal(0, reloadedUser.CurrentPoints);
+        Assert.Null(reloadedUser.LastNeutralDate);
+        Assert.Equal(0, reloadedUser.ContinuousNeutralDays);
+        Assert.Empty(await db.PointAwardLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task CalculateDailyNetValueAsync_ShouldReturnExpectedNetValue()
+    {
+        // Arrange
+        await using var db = CreateInMemoryDb();
+        var day = DateTime.UtcNow.Date;
+
+        db.FoodRecords.Add(new FoodRecord
+        {
+            UserId = 1,
+            Name = "Food",
+            Amount = 1,
+            EmissionFactor = 5m,
+            Emission = 5m
+        });
+        db.TravelLogs.Add(new TravelLog
+        {
+            UserId = 1,
+            TransportMode = TransportMode.Bus,
+            OriginAddress = "A",
+            DestinationAddress = "B",
+            OriginLatitude = 0,
+            OriginLongitude = 0,
+            DestinationLatitude = 0,
+            DestinationLongitude = 0,
+            DistanceMeters = 1000,
+            DistanceKilometers = 1,
+            CarbonEmission = 3m
+        });
+        db.StepRecords.Add(new StepRecord
+        {
+            UserId = 1,
+            StepCount = 10_000,
+            RecordDate = day.Date,
+            CarbonOffset = 0 // not used in calculation
+        });
+
+        await db.SaveChangesAsync();
+        var service = new PointService(db);
+
+        // Act
+        var net = await service.CalculateDailyNetValueAsync(userId: 1, date: day);
+
+        // Assert
+        // DailyBenchmark(15) - emissions(5+3) + steps(10000 * 0.0001) = 7 + 1 = 8
+        Assert.Equal(8m, net);
     }
 }
 
