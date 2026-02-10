@@ -240,7 +240,7 @@ public class AdminControllerTests
 		var items = Assert.IsAssignableFrom<IEnumerable<AdminController.RegionStatItem>>(ok.Value);
 
 		// West/East 两个区域的统计都应出现
-		Assert.True(items.Any(i => i.RegionCode == "WR" || i.RegionCode == "ER"));
+		Assert.Contains(items, i => i.RegionCode == "WR" || i.RegionCode == "ER");
 	}
 
 	[Fact]

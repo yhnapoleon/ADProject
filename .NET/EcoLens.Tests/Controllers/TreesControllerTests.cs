@@ -13,6 +13,20 @@ namespace EcoLens.Tests.Controllers;
 
 public class TreesControllerTests
 {
+	/// <summary>与 TreesController 的「今天」一致（新加坡时区或 UTC），保证 CI/本地都能查到今日步数。</summary>
+	private static DateTime GetTodayForSteps()
+	{
+		try
+		{
+			var tz = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+			return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+		}
+		catch
+		{
+			return DateTime.UtcNow.Date;
+		}
+	}
+
 	private static ApplicationDbContext CreateDb(bool withUser = false, int? todaySteps = null)
 	{
 		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -38,7 +52,7 @@ public class TreesControllerTests
 			db.SaveChanges();
 			if (todaySteps.HasValue && todaySteps.Value > 0)
 			{
-				var today = DateTime.UtcNow.Date;
+				var today = GetTodayForSteps();
 				db.StepRecords.Add(new StepRecord
 				{
 					UserId = user.Id,
