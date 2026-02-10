@@ -157,7 +157,7 @@ jobs:
           name: backend-comprehensive-reports
           path: |
             reports/dependency-check-report.html
-            test_reports/*.trx
+            test_reports/**
             Backend_Error_Codes.md
           retention-days: 7
 
@@ -174,7 +174,7 @@ jobs:
         run: dotnet build "./.NET/EcoLens.Api/EcoLens.Api.csproj" -c Release --no-restore --nologo
 
       - name: Test
-        run: dotnet test "./.NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports
+        run: dotnet test "./.NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports --collect "XPlat Code Coverage"
 
       - name: Verify Error Documentation Generated
         run: |

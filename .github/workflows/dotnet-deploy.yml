@@ -32,7 +32,7 @@ jobs:
 
       # 3.5 运行单元测试（生成错误文档与 TRX 报告）
       - name: Test
-        run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports
+        run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports --collect "XPlat Code Coverage"
 
       - name: Verify Error Documentation Generated
         run: |
@@ -57,7 +57,7 @@ jobs:
           name: backend-error-codes
           path: |
             Backend_Error_Codes.md
-            test_reports/*.trx
+            test_reports/**
           retention-days: 7
 
       # 4. 发布 (Publish)
