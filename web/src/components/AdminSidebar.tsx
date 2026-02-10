@@ -12,7 +12,6 @@ const AdminSidebar: React.FC = () => {
     { path: '/admin/emission-factors', label: 'Emission Factors' },
     { path: '/admin/community-analytics', label: 'Community Analytics' },
     { path: '/admin/user-emissions', label: 'User Emissions' },
-    // { path: '/admin/settings', label: 'Settings' }, // 隐藏
   ];
 
   const handleLogout = (e: React.MouseEvent) => {
