@@ -47,3 +47,4 @@ public class ErrorDocumentationGeneratorTest
 		return Directory.GetCurrentDirectory();
 	}
 }
+

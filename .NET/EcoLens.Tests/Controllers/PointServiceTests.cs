@@ -2,8 +2,8 @@ using System;
 using System.Threading.Tasks;
 using EcoLens.Api.Data;
 using EcoLens.Api.Models;
-using EcoLens.Api.Services;
 using EcoLens.Api.Models.Enums;
+using EcoLens.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace EcoLens.Tests;
@@ -440,4 +440,3 @@ public class PointServiceTests
         Assert.Empty(await db.PointAwardLogs.ToListAsync());
     }
 }
-

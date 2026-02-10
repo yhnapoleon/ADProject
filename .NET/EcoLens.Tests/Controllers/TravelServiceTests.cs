@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using EcoLens.Api.Data;
@@ -58,6 +59,40 @@ public class TravelServiceTests
     private readonly ILogger<TravelService> _nullLogger =
         new LoggerFactory().CreateLogger<TravelService>();
 
+    private static async Task InvokeValidateTransportModeAsync(
+        TravelService svc,
+        TransportMode mode,
+        GeocodingResult origin,
+        GeocodingResult dest,
+        double distanceKm)
+    {
+        var method = typeof(TravelService).GetMethod(
+            "ValidateTransportModeForRouteAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        if (method == null)
+            throw new InvalidOperationException("ValidateTransportModeForRouteAsync not found via reflection.");
+
+        try
+        {
+            var task = (Task)method.Invoke(svc, new object[]
+            {
+                mode,
+                origin,
+                dest,
+                distanceKm,
+                CancellationToken.None
+            })!;
+
+            await task.ConfigureAwait(false);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException != null)
+        {
+            // 解包内部异常以便 Assert.ThrowsAsync 能捕获到真实类型
+            throw ex.InnerException;
+        }
+    }
+
     [Fact]
     public async Task CreateTravelLogAsync_ShouldThrow_WhenModeIsTaxi()
     {
@@ -98,6 +133,57 @@ public class TravelServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             svc.PreviewRouteAsync(dto, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ValidateTransportMode_ShouldThrow_ForPlane_WhenDistanceTooShort()
+    {
+        await using var db = CreateInMemoryDb();
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        var origin = new GeocodingResult { Latitude = 1.0, Longitude = 103.0, FormattedAddress = "Singapore", Country = "Singapore" };
+        var dest = new GeocodingResult { Latitude = 1.0001, Longitude = 103.0001, FormattedAddress = "Singapore", Country = "Singapore" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeValidateTransportModeAsync(svc, TransportMode.Plane, origin, dest, distanceKm: 0.5));
+    }
+
+    [Fact]
+    public async Task ValidateTransportMode_ShouldThrow_ForPlane_WithinSingapore()
+    {
+        await using var db = CreateInMemoryDb();
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        var origin = new GeocodingResult { Latitude = 1.3, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+        var dest = new GeocodingResult { Latitude = 1.35, Longitude = 103.9, FormattedAddress = "Singapore", Country = "Singapore" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeValidateTransportModeAsync(svc, TransportMode.Plane, origin, dest, distanceKm: 50));
+    }
+
+    [Fact]
+    public async Task ValidateTransportMode_ShouldThrow_ForShip_WhenDistanceTooShort()
+    {
+        await using var db = CreateInMemoryDb();
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        var origin = new GeocodingResult { Latitude = 0.0, Longitude = 0.0, FormattedAddress = "Harbor A", Country = "CountryX" };
+        var dest = new GeocodingResult { Latitude = 0.01, Longitude = 0.01, FormattedAddress = "Harbor B", Country = "CountryX" };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            InvokeValidateTransportModeAsync(svc, TransportMode.Ship, origin, dest, distanceKm: 5));
     }
 }
 
