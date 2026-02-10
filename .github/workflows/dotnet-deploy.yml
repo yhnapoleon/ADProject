@@ -8,6 +8,10 @@ on:
       - '.NET/**' # 后端位于 .NET 目录；若目录不同请修改
       - '.github/workflows/dotnet-deploy.yml'
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
