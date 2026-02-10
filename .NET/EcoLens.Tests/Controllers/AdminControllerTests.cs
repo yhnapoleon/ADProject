@@ -329,4 +329,109 @@ public class AdminControllerTests
 		var ok = Assert.IsType<OkObjectResult>(result.Result);
 		Assert.NotNull(ok.Value);
 	}
+
+	[Fact]
+	public async Task BatchUpdateUsers_ShouldUpdateUserPointsAndStatus()
+	{
+		var db = CreateDbWithUsers(out var admin, out var user);
+		var controller = new AdminController(db);
+		SetAdminUser(controller, admin.Id);
+
+		var req = new AdminController.BatchUserUpdateRequest
+		{
+			Updates = new List<AdminController.BatchUserUpdateItem>
+			{
+				new()
+				{
+					Id = user.Id.ToString(),
+					Points = 100,
+					Status = "Active"
+				}
+			}
+		};
+
+		var result = await controller.BatchUpdateUsers(req, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var valueType = ok.Value!.GetType();
+		var updatedCountProp = valueType.GetProperty("updatedCount");
+		Assert.NotNull(updatedCountProp);
+		var updatedCount = (int)updatedCountProp!.GetValue(ok.Value)!;
+		Assert.Equal(1, updatedCount);
+
+		var updatedUser = await db.ApplicationUsers.FindAsync(user.Id);
+		Assert.NotNull(updatedUser);
+		Assert.Equal(100, updatedUser!.CurrentPoints);
+		Assert.True(updatedUser.IsActive);
+	}
+
+	[Fact]
+	public async Task BatchUpdateUsers_ShouldPreventSelfBan()
+	{
+		var db = CreateDbWithUsers(out var admin, out _);
+		var controller = new AdminController(db);
+		SetAdminUser(controller, admin.Id);
+
+		var req = new AdminController.BatchUserUpdateRequest
+		{
+			Updates = new List<AdminController.BatchUserUpdateItem>
+			{
+				new()
+				{
+					Id = admin.Id.ToString(),
+					Status = "Banned"
+				}
+			}
+		};
+
+		var result = await controller.BatchUpdateUsers(req, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var valueType = ok.Value!.GetType();
+		var updatedCount = (int)valueType.GetProperty("updatedCount")!.GetValue(ok.Value)!;
+		var errors = Assert.IsAssignableFrom<IEnumerable<string>>(valueType.GetProperty("errors")!.GetValue(ok.Value)!);
+
+		Assert.Equal(0, updatedCount);
+		Assert.Contains(errors, e => e.Contains("Cannot ban yourself", StringComparison.OrdinalIgnoreCase));
+
+		var refreshedAdmin = await db.ApplicationUsers.FindAsync(admin.Id);
+		Assert.NotNull(refreshedAdmin);
+		Assert.True(refreshedAdmin!.IsActive);
+	}
+
+	[Fact]
+	public async Task BatchUpdateUsers_ShouldPreventBanningLastActiveAdmin()
+	{
+		var db = CreateDbWithUsers(out var admin, out _);
+		var controller = new AdminController(db);
+
+		// 当前登录的管理员ID与目标管理员不同，以触发“最后一个管理员”保护逻辑而不是自我封禁逻辑
+		SetAdminUser(controller, admin.Id + 100);
+
+		var req = new AdminController.BatchUserUpdateRequest
+		{
+			Updates = new List<AdminController.BatchUserUpdateItem>
+			{
+				new()
+				{
+					Id = admin.Id.ToString(),
+					Status = "Banned"
+				}
+			}
+		};
+
+		var result = await controller.BatchUpdateUsers(req, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var valueType = ok.Value!.GetType();
+		var updatedCount = (int)valueType.GetProperty("updatedCount")!.GetValue(ok.Value)!;
+		var errors = Assert.IsAssignableFrom<IEnumerable<string>>(valueType.GetProperty("errors")!.GetValue(ok.Value)!);
+
+		Assert.Equal(0, updatedCount);
+		Assert.Contains(errors, e => e.Contains("Cannot ban the last active admin.", StringComparison.OrdinalIgnoreCase));
+
+		var refreshedAdmin = await db.ApplicationUsers.FindAsync(admin.Id);
+		Assert.NotNull(refreshedAdmin);
+		Assert.True(refreshedAdmin!.IsActive);
+	}
 }
