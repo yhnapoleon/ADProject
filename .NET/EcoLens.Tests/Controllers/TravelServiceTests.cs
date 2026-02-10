@@ -235,18 +235,17 @@ public class TravelServiceTests
             new DummyGeocodingCacheService(),
             _nullLogger);
 
-        // 仅统计用户1，日期范围最近7天
-        var start = today.AddDays(-7);
-        var stats = await svc.GetUserTravelStatisticsAsync(1, startDate: start, endDate: today, ct: CancellationToken.None);
+        // 仅统计用户1（不指定日期范围，包含该用户全部记录）
+        var stats = await svc.GetUserTravelStatisticsAsync(1, ct: CancellationToken.None);
 
-        Assert.Equal(2, stats.TotalRecords);               // 只包含最近7天的两条 Bus 记录
-        Assert.Equal(15, stats.TotalDistanceKilometers);   // 10 + 5
-        Assert.Equal(8, stats.TotalCarbonEmission);        // 5 + 3
+        Assert.Equal(3, stats.TotalRecords);               // 用户1共有 3 条记录
+        Assert.Equal(17, stats.TotalDistanceKilometers);   // 10 + 5 + 2
+        Assert.Equal(8.1m, stats.TotalCarbonEmission);     // 5 + 3 + 0.1
 
         Assert.NotNull(stats.ByTransportMode);
-        Assert.Single(stats.ByTransportMode);
-        var busStats = stats.ByTransportMode[0];
-        Assert.Equal(TransportMode.Bus, busStats.TransportMode);
+        Assert.Equal(2, stats.ByTransportMode.Count);      // Bus + Walking
+
+        var busStats = stats.ByTransportMode.Single(s => s.TransportMode == TransportMode.Bus);
         Assert.Equal(2, busStats.RecordCount);
         Assert.Equal(15, busStats.TotalDistanceKilometers);
         Assert.Equal(8, busStats.TotalCarbonEmission);
