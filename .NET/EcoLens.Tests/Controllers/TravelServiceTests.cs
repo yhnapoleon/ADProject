@@ -185,5 +185,70 @@ public class TravelServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             InvokeValidateTransportModeAsync(svc, TransportMode.Ship, origin, dest, distanceKm: 5));
     }
+
+    [Fact]
+    public async Task GetUserTravelStatisticsAsync_ShouldAggregateTotals_AndGroupByMode()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var today = DateTime.UtcNow.Date;
+        db.TravelLogs.AddRange(
+            new TravelLog
+            {
+                UserId = 1,
+                CreatedAt = today.AddDays(-1),
+                TransportMode = TransportMode.Bus,
+                DistanceKilometers = 10,
+                CarbonEmission = 5
+            },
+            new TravelLog
+            {
+                UserId = 1,
+                CreatedAt = today,
+                TransportMode = TransportMode.Bus,
+                DistanceKilometers = 5,
+                CarbonEmission = 3
+            },
+            new TravelLog
+            {
+                UserId = 1,
+                CreatedAt = today.AddDays(-10),
+                TransportMode = TransportMode.Walking,
+                DistanceKilometers = 2,
+                CarbonEmission = 0.1m
+            },
+            new TravelLog
+            {
+                UserId = 2,
+                CreatedAt = today,
+                TransportMode = TransportMode.Bus,
+                DistanceKilometers = 100,
+                CarbonEmission = 50
+            }
+        );
+        await db.SaveChangesAsync();
+
+        var svc = new TravelService(
+            db,
+            new DummyGoogleMapsService(),
+            new DummyGeocodingCacheService(),
+            _nullLogger);
+
+        // 仅统计用户1，日期范围最近7天
+        var start = today.AddDays(-7);
+        var stats = await svc.GetUserTravelStatisticsAsync(1, startDate: start, endDate: today, ct: CancellationToken.None);
+
+        Assert.Equal(2, stats.TotalRecords);               // 只包含最近7天的两条 Bus 记录
+        Assert.Equal(15, stats.TotalDistanceKilometers);   // 10 + 5
+        Assert.Equal(8, stats.TotalCarbonEmission);        // 5 + 3
+
+        Assert.NotNull(stats.ByTransportMode);
+        Assert.Single(stats.ByTransportMode);
+        var busStats = stats.ByTransportMode[0];
+        Assert.Equal(TransportMode.Bus, busStats.TransportMode);
+        Assert.Equal(2, busStats.RecordCount);
+        Assert.Equal(15, busStats.TotalDistanceKilometers);
+        Assert.Equal(8, busStats.TotalCarbonEmission);
+    }
 }
 
