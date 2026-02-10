@@ -1,0 +1,217 @@
+@startuml
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+hide empty methods
+
+package EcoLens.Domain {
+  abstract class BaseEntity {
+    Id: int
+    CreatedAt: DateTime
+    UpdatedAt: DateTime
+  }
+
+  class ApplicationUser {
+    Username: string
+    Nickname: string?
+    Email: string
+    PasswordHash: string
+    Role: UserRole
+    AvatarUrl: string?
+    TotalCarbonSaved: decimal(18,2)
+    TotalCarbonEmission: decimal(18,4)
+    CurrentPoints: int
+    Region: string
+    BirthDate: DateTime
+    LastNeutralDate: DateTime?
+    ContinuousNeutralDays: int
+    StepsUsedToday: int
+    LastStepUsageDate: DateTime?
+    IsActive: bool
+    TreesTotalCount: int
+    CurrentTreeProgress: int
+  }
+
+  class ActivityLog {
+    UserId: int
+    CarbonReferenceId: int
+    Quantity: decimal(18,4)
+    TotalEmission: decimal(18,4)
+    ImageUrl: string?
+    DetectedLabel: string?
+  }
+
+  class CarbonReference {
+    LabelName: string
+    Category: CarbonCategory
+    Co2Factor: decimal(18,4)
+    Unit: string
+    Region: string?
+    Source: string
+    ClimatiqActivityId: string?
+  }
+
+  class AiInsight {
+    UserId: int
+    Content: string
+    Type: InsightType
+    IsRead: bool
+  }
+
+  class StepRecord {
+    UserId: int
+    StepCount: int
+    RecordDate: DateTime
+    CarbonOffset: decimal(18,4)
+  }
+
+  class FoodRecord {
+    UserId: int
+    Name: string
+    Amount: double
+    EmissionFactor: decimal(18,4)
+    Emission: decimal(18,4)
+    Note: string?
+  }
+
+  class DietRecord {
+    UserId: int
+    Name: string
+    Amount: double
+    EmissionFactor: decimal(18,4)
+    Emission: decimal(18,4)
+  }
+
+  class DietTemplate {
+    UserId: Guid
+    TemplateName: string
+  }
+
+  class DietTemplateItem {
+    DietTemplateId: int
+    FoodId: int
+    Quantity: double
+    Unit: string
+  }
+
+  class TravelLog {
+    UserId: int
+    TransportMode: TransportMode
+    OriginAddress: string
+    OriginLatitude: decimal(10,7)
+    OriginLongitude: decimal(10,7)
+    DestinationAddress: string
+    DestinationLatitude: decimal(10,7)
+    DestinationLongitude: decimal(10,7)
+    DistanceMeters: int
+    DistanceKilometers: decimal(10,2)
+    DurationSeconds: int?
+    CarbonEmission: decimal(18,4)
+    RoutePolyline: string?
+    Notes: string?
+    PassengerCount: int?
+  }
+
+  class UtilityBill {
+    UserId: int
+    YearMonth: string
+    BillType: UtilityBillType
+    BillPeriodStart: DateTime
+    BillPeriodEnd: DateTime
+    ElectricityUsage: decimal(18,4)?
+    ElectricityCost: decimal(18,2)
+    WaterUsage: decimal(18,4)?
+    WaterCost: decimal(18,2)
+    GasUsage: decimal(18,4)?
+    GasCost: decimal(18,2)
+    ElectricityCarbonEmission: decimal(18,4)
+    WaterCarbonEmission: decimal(18,4)
+    GasCarbonEmission: decimal(18,4)
+    TotalCarbonEmission: decimal(18,4)
+    InputMethod: InputMethod
+    OcrConfidence: decimal(18,4)?
+    OcrRawText: string?
+    Notes: string?
+  }
+
+  class BarcodeReference {
+    Barcode: string
+    ProductName: string
+    CarbonReferenceId: int?
+    Category: string?
+    Brand: string?
+  }
+
+  enum UserRole {
+    User
+    Admin
+  }
+
+  enum CarbonCategory {
+    Food
+    Transport
+    Utility
+  }
+
+  enum InsightType {
+    WeeklyReport
+    DailyTip
+  }
+
+  enum TransportMode {
+    Walking
+    Bicycle
+    Motorcycle
+    Subway
+    Bus
+    Taxi
+    CarGasoline
+    CarElectric
+    Ship
+    Plane
+  }
+
+  enum UtilityBillType {
+    // see Models/Enums/UtilityBillType.cs
+  }
+
+  enum InputMethod {
+    // see Models/Enums/InputMethod.cs
+  }
+
+}
+
+' Inheritance
+ApplicationUser -up-|> BaseEntity
+ActivityLog -up-|> BaseEntity
+AiInsight -up-|> BaseEntity
+StepRecord -up-|> BaseEntity
+FoodRecord -up-|> BaseEntity
+DietRecord -up-|> BaseEntity
+DietTemplate -up-|> BaseEntity
+DietTemplateItem -up-|> BaseEntity
+TravelLog -up-|> BaseEntity
+UtilityBill -up-|> BaseEntity
+BarcodeReference -up-|> BaseEntity
+CarbonReference -up-|> BaseEntity
+
+' Associations (exclude isolated SystemSettings)
+ApplicationUser "1" o-- "*" ActivityLog : activityLogs
+ApplicationUser "1" o-- "*" AiInsight : aiInsights
+ApplicationUser "1" o-- "*" StepRecord : stepRecords
+ActivityLog "*" --> "1" CarbonReference
+ApplicationUser "1" o-- "*" FoodRecord
+ApplicationUser "1" o-- "*" DietRecord
+DietTemplate "1" o-- "*" DietTemplateItem : items
+TravelLog "*" --> "1" ApplicationUser : user
+UtilityBill "*" --> "1" ApplicationUser : user
+BarcodeReference "*" --> "0..1" CarbonReference
+
+' Enum usage links
+ApplicationUser --> UserRole
+AiInsight --> InsightType
+CarbonReference --> CarbonCategory
+TravelLog --> TransportMode
+UtilityBill --> UtilityBillType
+UtilityBill --> InputMethod
+
+@enduml

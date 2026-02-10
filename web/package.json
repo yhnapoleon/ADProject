@@ -11,7 +11,7 @@
   "dependencies": {
     "@zxing/library": "^0.20.0",
     "antd": "^6.2.1",
-    "axios": "^1.6.0",
+    "axios": "^1.13.5",
     "dayjs": "^1.11.19",
     "lottie-react": "^2.4.1",
     "react": "^18.2.0",

@@ -18,6 +18,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Lint (flake8) for VisionService
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install flake8
+          flake8 VisionService
+
       - name: Login to Azure Container Registry
         uses: azure/docker-login@v1
         with:
@@ -25,12 +31,27 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build and Push Docker image
+      - name: Build Docker image
         working-directory: VisionService
         run: |
           IMAGE_NAME=ecolensacr.azurecr.io/vision-service
           IMAGE_TAG=${{ github.sha }}
           docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Trivy Image Scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'ecolensacr.azurecr.io/vision-service:${{ github.sha }}'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Push Docker image
+        run: |
+          IMAGE_NAME=ecolensacr.azurecr.io/vision-service
+          IMAGE_TAG=${{ github.sha }}
           docker push $IMAGE_NAME:$IMAGE_TAG
 
       - name: Deploy to Azure Web App

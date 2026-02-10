@@ -388,43 +388,112 @@ public class AdminController : ControllerBase
 	}
 
 	/// <summary>
-	/// 基于 ActivityLogs 在给定时间范围内（[from, to)）按 Region 聚合统计。
-	/// - 若 to 传入的是当天日期，将自动按整天上限转为次日零点的开区间。
-	/// - 若 from/to 任一为空，则按存在的条件过滤。
+	/// 将用户自由填写的 Region 文本归一化为 GeoJSON 中使用的 REGION_C 代码。
+	/// - 返回的 Code 为 WR/NR/NER/ER/CR 之一（或空字符串表示无法识别）。
+	/// - Name 为规范化后的展示名称（如 "West Region"）。
+	/// </summary>
+	private static (string Code, string Name) NormalizeRegion(string? regionRaw)
+	{
+		if (string.IsNullOrWhiteSpace(regionRaw))
+			return (string.Empty, string.Empty);
+
+		var original = regionRaw.Trim();
+		var upper = original.ToUpperInvariant();
+		var compact = upper.Replace(" ", string.Empty).Replace("-", string.Empty);
+
+		// 已经是标准代码的情况
+		if (compact == "WR") return ("WR", "West Region");
+		if (compact == "NR") return ("NR", "North Region");
+		if (compact == "NER") return ("NER", "North-East Region");
+		if (compact == "ER") return ("ER", "East Region");
+		if (compact == "CR") return ("CR", "Central Region");
+
+		// 英文描述（允许大小写、空格、短横线差异）
+		if (compact.Contains("WEST"))
+			return ("WR", "West Region");
+		if (compact.Contains("NORTHEAST") || compact.Contains("NORTHEASTREGION") || compact.Contains("NORTHEASTERN"))
+			return ("NER", "North-East Region");
+		if (compact.Contains("NORTH"))
+			return ("NR", "North Region");
+		if (compact.Contains("EAST"))
+			return ("ER", "East Region");
+		if (compact.Contains("CENTRAL"))
+			return ("CR", "Central Region");
+		if (compact.Contains("SINGAPORE"))
+			// 用户只写 "Singapore" 时，默认归到 Central Region，避免整张图无数据。
+			return ("CR", "Central Region");
+
+		// 简单的中文关键字映射
+		if (original.Contains("西"))
+			return ("WR", "West Region");
+		if (original.Contains("东北"))
+			return ("NER", "North-East Region");
+		if (original.Contains("北"))
+			return ("NR", "North Region");
+		if (original.Contains("东"))
+			return ("ER", "East Region");
+		if (original.Contains("中"))
+			return ("CR", "Central Region");
+
+		// 无法识别：保留原始名称，但不返回代码（前端看不到这部分区域）。
+		return (string.Empty, original);
+	}
+
+	/// <summary>
+	/// 按用户累计的 TotalCarbonSaved（总碳减排量）在各 Region 间进行聚合统计。
+	/// 注意：当前实现不再按时间范围切分 from/to/days，而是始终使用用户表中的累计值，
+	/// 以保证与顶部 Carbon Reduced 卡片语义一致。
 	/// </summary>
 	private async Task<List<RegionStatItem>> ComputeRegionStatsByDateRange(DateTime? fromInclusiveUtc, DateTime? toExclusiveUtc, CancellationToken ct)
 	{
-		// 预先取出各 Region 的用户数（用于保持返回结构一致）
-		var regionUsers = await _db.ApplicationUsers
+		// 先按用户原始 Region 进行分组，汇总每个 Region 的总减排量与用户数
+		var groups = await _db.ApplicationUsers
 			.Where(u => u.Region != null && u.Region != string.Empty)
 			.GroupBy(u => u.Region!)
-			.Select(g => new { Region = g.Key, UserCount = g.Count() })
+			.Select(g => new
+			{
+				Region = g.Key,
+				TotalSaved = g.Sum(x => x.TotalCarbonSaved),
+				UserCount = g.Count()
+			})
 			.ToListAsync(ct);
 
-		// 在给定时间窗口内聚合 ActivityLogs，并关联用户以获取 Region
-		var logs = _db.ActivityLogs.AsQueryable();
-		if (fromInclusiveUtc.HasValue)
-			logs = logs.Where(l => l.CreatedAt >= fromInclusiveUtc.Value);
-		if (toExclusiveUtc.HasValue)
-			logs = logs.Where(l => l.CreatedAt < toExclusiveUtc.Value);
+		// 将不同写法的 Region 合并到统一的 REGION_C 代码上
+		var userCountByCode = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+		var savedByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+		var nameByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-		var aggregated = await (from l in logs
-								join u in _db.ApplicationUsers on l.UserId equals u.Id
-								where u.Region != null && u.Region != string.Empty
-								group l by u.Region! into g
-								select new { Region = g.Key, Emission = g.Sum(x => x.TotalEmission) })
-							.ToListAsync(ct);
-
-		var total = aggregated.Sum(x => x.Emission);
-		var emissionByRegion = aggregated.ToDictionary(x => x.Region, x => x.Emission);
-
-		var items = regionUsers.Select(g => new RegionStatItem
+		foreach (var g in groups)
 		{
-			RegionCode = g.Region,
-			RegionName = g.Region,
-			CarbonReduced = emissionByRegion.TryGetValue(g.Region, out var v) ? v : 0m,
-			UserCount = g.UserCount,
-			ReductionRate = total > 0 ? Math.Round((emissionByRegion.TryGetValue(g.Region, out var vv) ? vv : 0m) * 100m / total, 2) : 0m
+			var norm = NormalizeRegion(g.Region);
+			if (string.IsNullOrEmpty(norm.Code)) continue;
+
+			if (!userCountByCode.TryAdd(norm.Code, g.UserCount))
+				userCountByCode[norm.Code] += g.UserCount;
+
+			if (!savedByCode.TryAdd(norm.Code, g.TotalSaved))
+				savedByCode[norm.Code] += g.TotalSaved;
+
+			if (!string.IsNullOrWhiteSpace(norm.Name))
+				nameByCode[norm.Code] = norm.Name;
+		}
+
+		var totalSaved = savedByCode.Values.Sum();
+
+		var items = userCountByCode.Select(kvp =>
+		{
+			var code = kvp.Key;
+			savedByCode.TryGetValue(code, out var saved);
+			nameByCode.TryGetValue(code, out var name);
+
+			return new RegionStatItem
+			{
+				RegionCode = code,
+				RegionName = string.IsNullOrWhiteSpace(name) ? code : name,
+				CarbonReduced = saved,
+				UserCount = kvp.Value,
+				ReductionRate = totalSaved > 0 ? Math.Round(saved * 100m / totalSaved, 2) : 0m
+			};
 		}).ToList();
 
 		return items;
@@ -470,14 +539,42 @@ public class AdminController : ControllerBase
 				})
 				.ToListAsync(ct);
 
-			var totalSaved = groups.Sum(x => x.TotalSaved);
-			var items = groups.Select(g => new RegionStatItem
+			// 将不同写法的 Region 合并到统一的 REGION_C 代码上
+			var userCountByCode = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+			var savedByCode = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+			var nameByCode = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+			foreach (var g in groups)
 			{
-				RegionCode = g.Region,
-				RegionName = g.Region,
-				CarbonReduced = g.TotalSaved,
-				UserCount = g.UserCount,
-				ReductionRate = totalSaved > 0 ? Math.Round(g.TotalSaved * 100m / totalSaved, 2) : 0m
+				var norm = NormalizeRegion(g.Region);
+				if (string.IsNullOrEmpty(norm.Code)) continue;
+
+				if (!userCountByCode.TryAdd(norm.Code, g.UserCount))
+					userCountByCode[norm.Code] += g.UserCount;
+
+				if (!savedByCode.TryAdd(norm.Code, g.TotalSaved))
+					savedByCode[norm.Code] += g.TotalSaved;
+
+				if (!string.IsNullOrWhiteSpace(norm.Name))
+					nameByCode[norm.Code] = norm.Name;
+			}
+
+			var totalSaved = savedByCode.Values.Sum();
+
+			var items = userCountByCode.Select(kvp =>
+			{
+				var code = kvp.Key;
+				savedByCode.TryGetValue(code, out var saved);
+				nameByCode.TryGetValue(code, out var name);
+
+				return new RegionStatItem
+				{
+					RegionCode = code,
+					RegionName = string.IsNullOrWhiteSpace(name) ? code : name,
+					CarbonReduced = saved,
+					UserCount = kvp.Value,
+					ReductionRate = totalSaved > 0 ? Math.Round(saved * 100m / totalSaved, 2) : 0m
+				};
 			}).ToList();
 
 			return Ok(items);

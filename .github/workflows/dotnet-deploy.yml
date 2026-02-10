@@ -30,6 +30,42 @@ jobs:
         run: dotnet build ".NET/EcoLens.Api/EcoLens.Api.csproj" --configuration Release --no-restore
         # 若你有解决方案文件 .sln，请将上面路径替换为你的 .sln，相对仓库根路径
 
+      # 3.5 运行单元测试（生成错误文档与 TRX 报告）
+      - name: Test
+        run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports --collect "XPlat Code Coverage"
+
+      - name: Generate Coverage HTML Report
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:"test_reports/**/coverage.cobertura.xml" -targetdir:"coverage-report" -reporttypes:HtmlInline_AzurePipelines
+
+      - name: Verify Error Documentation Generated
+        run: |
+          if [ -f "Backend_Error_Codes.md" ]; then
+            echo "Backend_Error_Codes.md found at repo root."
+          else
+            FOUND_PATH="$(find . -type f -name Backend_Error_Codes.md | head -n 1)"
+            if [ -n "$FOUND_PATH" ]; then
+              echo "Found at $FOUND_PATH, copying to repo root..."
+              cp "$FOUND_PATH" "Backend_Error_Codes.md"
+            else
+              echo "Backend_Error_Codes.md not found after tests."
+              find . -name Backend_Error_Codes.md || true
+              exit 1
+            fi
+          fi
+
+      - name: Upload Backend Error Codes (Artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-error-codes
+          path: |
+            Backend_Error_Codes.md
+            test_reports/**
+            coverage-report/**
+          retention-days: 7
+
       # 4. 发布 (Publish)
       - name: Publish
         run: dotnet publish ".NET/EcoLens.Api/EcoLens.Api.csproj" -c Release -o ${{ github.workspace }}/publish

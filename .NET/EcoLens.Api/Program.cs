@@ -11,6 +11,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Microsoft.Extensions.Options;
 using Prometheus;
+using EcoLens.Api.Common.Errors;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -251,6 +253,17 @@ builder.Services.AddScoped<IDietTemplateService, DietTemplateService>();
 builder.Services.AddScoped<IPointService, PointService>();
 var app = builder.Build();
 
+// --- DevSecOps Remediation: Fix Security Headers ---
+app.Use(async (context, next) =>
+{
+	// Clickjacking
+	context.Response.Headers.Append("X-Frame-Options", "DENY");
+	// MIME-Sniffing
+	context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+	await next();
+});
+// ---------------------------------------------------
+
 // Middleware pipeline
 if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
@@ -260,6 +273,48 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 
 // HTTPS 重定向
 app.UseHttpsRedirection();
+
+// 全局异常处理中间件
+app.Use(async (context, next) =>
+{
+	try
+	{
+		await next();
+	}
+	catch (Exception ex)
+	{
+		var descriptor = ErrorRegistry.MapExceptionToDescriptor(ex);
+		context.Response.ContentType = "application/json; charset=utf-8";
+		context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+		var payload = new
+		{
+			errorCode = descriptor.ErrorCode,
+			message = descriptor.UserMessage,
+			technical = descriptor.TechnicalMessage
+		};
+
+		await context.Response.WriteAsync(JsonSerializer.Serialize(payload), Encoding.UTF8);
+	}
+});
+
+// 安全响应头中间件（为演示安全扫描，暂时禁用）
+/*
+app.Use(async (context, next) =>
+{
+	// 对所有响应设置安全相关的响应头
+	if (!context.Response.Headers.ContainsKey("X-Frame-Options"))
+	{
+		context.Response.Headers.Append("X-Frame-Options", "DENY");
+	}
+	// 使用 CSP 的 frame-ancestors 作为现代替代
+	if (!context.Response.Headers.ContainsKey("Content-Security-Policy"))
+	{
+		context.Response.Headers.Append("Content-Security-Policy", "frame-ancestors 'none'");
+	}
+	await next();
+});
+*/
 
 // 静态文件（用于访问 wwwroot/uploads）
 app.UseStaticFiles();

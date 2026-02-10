@@ -91,7 +91,6 @@ const App: React.FC = () => {
                       <Route path="emission-factors" element={<AdminEmissionFactors />} />
                       <Route path="community-analytics" element={<AdminCommunityAnalytics />} />
                       <Route path="user-emissions" element={<AdminUserEmissions />} />
-                      {/* <Route path="settings" element={<AdminSettings />} /> */}
                     </Routes>
                   </div>
                 </div>

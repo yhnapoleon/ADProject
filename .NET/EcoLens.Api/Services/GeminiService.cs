@@ -50,7 +50,7 @@ public class GeminiService : IAiService
 
 		var body = new
 		{
-			model = string.IsNullOrWhiteSpace(_settings.Model) ? "gemini-3-pro-preview" : _settings.Model,
+			model = string.IsNullOrWhiteSpace(_settings.Model) ? "gemini-3-flash-preview" : _settings.Model,
 			messages = new object[]
 			{
 				new { role = "user", content = userPrompt }

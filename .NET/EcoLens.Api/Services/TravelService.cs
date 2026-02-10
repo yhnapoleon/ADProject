@@ -1012,7 +1012,7 @@ public class TravelService : ITravelService
 
 		_logger.LogInformation(
 			"Transport mode validation passed: Mode={TransportMode}, Origin={OriginCountry}, Dest={DestCountry}, NavigationDistance={Distance}km",
-			transportMode, origin.Country, destination.Country, distanceKm);
+			transportMode, SanitizeForLog(origin.Country), SanitizeForLog(destination.Country), distanceKm);
 	}
 
 	/// <summary>Check if infrastructure (e.g. airport, port) exists near the given location.</summary>
@@ -1155,4 +1155,29 @@ public class TravelService : ITravelService
 	}
 
 	#endregion
+
+	/// <summary>
+	/// 统一的日志输入清洗：移除换行与控制字符，防止 Log Forging（日志注入）
+	/// </summary>
+	private static string SanitizeForLog(string? value)
+	{
+		if (string.IsNullOrEmpty(value))
+		{
+			return string.Empty;
+		}
+
+		// 将换行符可见化，避免打断日志行
+		var sanitized = value.Replace("\r", "\\r").Replace("\n", "\\n");
+
+		// 移除其它控制字符（保留空格与制表符）
+		var builder = new System.Text.StringBuilder(sanitized.Length);
+		foreach (var ch in sanitized)
+		{
+			if (!char.IsControl(ch) || ch == '\t' || ch == ' ')
+			{
+				builder.Append(ch);
+			}
+		}
+		return builder.ToString();
+	}
 }
