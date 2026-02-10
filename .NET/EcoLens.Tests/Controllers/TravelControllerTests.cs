@@ -14,72 +14,88 @@ using Xunit;
 
 namespace EcoLens.Tests;
 
-public class TravelControllerTests
-{
-    private class FakeTravelService : ITravelService
-    {
-        public int LastCreateUserId { get; private set; }
-        public CreateTravelLogDto? LastCreateDto { get; private set; }
-        public bool CreateCalled { get; private set; }
-        public bool PreviewCalled { get; private set; }
-        public bool GetLogsCalled { get; private set; }
+	public class TravelControllerTests
+	{
+		private class FakeTravelService : ITravelService
+		{
+			public int LastCreateUserId { get; private set; }
+			public CreateTravelLogDto? LastCreateDto { get; private set; }
+			public bool CreateCalled { get; private set; }
+			public bool PreviewCalled { get; private set; }
+			public bool GetLogsCalled { get; private set; }
 
-        public Task<TravelLogResponseDto> CreateTravelLogAsync(int userId, CreateTravelLogDto dto, CancellationToken ct = default)
-        {
-            CreateCalled = true;
-            LastCreateUserId = userId;
-            LastCreateDto = dto;
+			public int LastGetByIdUserId { get; private set; }
+			public int LastGetByIdId { get; private set; }
+			public TravelLogResponseDto? GetByIdResult { get; set; }
 
-            return Task.FromResult(new TravelLogResponseDto
-            {
-                Id = 1,
-                CreatedAt = DateTime.UtcNow,
-                TransportMode = dto.TransportMode,
-                TransportModeName = "Bus",
-                OriginAddress = dto.OriginAddress,
-                DestinationAddress = dto.DestinationAddress,
-                DistanceMeters = 1000,
-                DistanceKilometers = 1,
-                CarbonEmission = 10
-            });
-        }
+			public int LastDeleteUserId { get; private set; }
+			public int LastDeleteId { get; private set; }
+			public bool DeleteResult { get; set; }
 
-        public Task<RoutePreviewDto> PreviewRouteAsync(CreateTravelLogDto dto, CancellationToken ct = default)
-        {
-            PreviewCalled = true;
-            return Task.FromResult(new RoutePreviewDto
-            {
-                OriginAddress = dto.OriginAddress,
-                DestinationAddress = dto.DestinationAddress,
-                TransportMode = dto.TransportMode,
-                TransportModeName = "Bus",
-                DistanceMeters = 1000,
-                DistanceKilometers = 1,
-                EstimatedCarbonEmission = 10
-            });
-        }
+			public Task<TravelLogResponseDto> CreateTravelLogAsync(int userId, CreateTravelLogDto dto, CancellationToken ct = default)
+			{
+				CreateCalled = true;
+				LastCreateUserId = userId;
+				LastCreateDto = dto;
 
-        public Task<PagedResultDto<TravelLogResponseDto>> GetUserTravelLogsAsync(int userId, GetTravelLogsQueryDto? query = null, CancellationToken ct = default)
-        {
-            GetLogsCalled = true;
-            return Task.FromResult(new PagedResultDto<TravelLogResponseDto>
-            {
-                Items = new List<TravelLogResponseDto>(),
-                TotalCount = 0,
-                Page = query?.Page ?? 1,
-                PageSize = query?.PageSize ?? 20
-            });
-        }
+				return Task.FromResult(new TravelLogResponseDto
+				{
+					Id = 1,
+					CreatedAt = DateTime.UtcNow,
+					TransportMode = dto.TransportMode,
+					TransportModeName = "Bus",
+					OriginAddress = dto.OriginAddress,
+					DestinationAddress = dto.DestinationAddress,
+					DistanceMeters = 1000,
+					DistanceKilometers = 1,
+					CarbonEmission = 10
+				});
+			}
 
-        public Task<TravelLogResponseDto?> GetTravelLogByIdAsync(int id, int userId, CancellationToken ct = default)
-            => Task.FromResult<TravelLogResponseDto?>(null);
+			public Task<RoutePreviewDto> PreviewRouteAsync(CreateTravelLogDto dto, CancellationToken ct = default)
+			{
+				PreviewCalled = true;
+				return Task.FromResult(new RoutePreviewDto
+				{
+					OriginAddress = dto.OriginAddress,
+					DestinationAddress = dto.DestinationAddress,
+					TransportMode = dto.TransportMode,
+					TransportModeName = "Bus",
+					DistanceMeters = 1000,
+					DistanceKilometers = 1,
+					EstimatedCarbonEmission = 10
+				});
+			}
 
-        public Task<bool> DeleteTravelLogAsync(int id, int userId, CancellationToken ct = default)
-            => Task.FromResult(false);
+			public Task<PagedResultDto<TravelLogResponseDto>> GetUserTravelLogsAsync(int userId, GetTravelLogsQueryDto? query = null, CancellationToken ct = default)
+			{
+				GetLogsCalled = true;
+				return Task.FromResult(new PagedResultDto<TravelLogResponseDto>
+				{
+					Items = new List<TravelLogResponseDto>(),
+					TotalCount = 0,
+					Page = query?.Page ?? 1,
+					PageSize = query?.PageSize ?? 20
+				});
+			}
 
-        public Task<TravelStatisticsDto> GetUserTravelStatisticsAsync(int userId, DateTime? startDate = null, DateTime? endDate = null, CancellationToken ct = default)
-            => Task.FromResult(new TravelStatisticsDto());
-    }
+			public Task<TravelLogResponseDto?> GetTravelLogByIdAsync(int id, int userId, CancellationToken ct = default)
+			{
+				LastGetByIdId = id;
+				LastGetByIdUserId = userId;
+				return Task.FromResult<TravelLogResponseDto?>(GetByIdResult);
+			}
+
+			public Task<bool> DeleteTravelLogAsync(int id, int userId, CancellationToken ct = default)
+			{
+				LastDeleteId = id;
+				LastDeleteUserId = userId;
+				return Task.FromResult(DeleteResult);
+			}
+
+			public Task<TravelStatisticsDto> GetUserTravelStatisticsAsync(int userId, DateTime? startDate = null, DateTime? endDate = null, CancellationToken ct = default)
+				=> Task.FromResult(new TravelStatisticsDto());
+		}
 
     private class FakePointService : IPointService
     {
@@ -232,5 +248,54 @@ public class TravelControllerTests
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
         Assert.Contains("Unable to get user information", unauthorized.Value!.ToString());
     }
+
+	[Fact]
+	public async Task Delete_ShouldReturnUnauthorized_WhenUserIdMissing()
+	{
+		var travelService = new FakeTravelService();
+		var pointService = new FakePointService();
+		var controller = CreateControllerWithUser(travelService, pointService, userId: null);
+
+		var result = await controller.Delete(10, CancellationToken.None);
+
+		var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
+		Assert.Contains("Unable to get user information", unauthorized.Value!.ToString());
+	}
+
+	[Fact]
+	public async Task Delete_ShouldReturnNotFound_WhenServiceReturnsFalse()
+	{
+		var travelService = new FakeTravelService
+		{
+			DeleteResult = false
+		};
+		var pointService = new FakePointService();
+		var controller = CreateControllerWithUser(travelService, pointService, userId: 5);
+
+		var result = await controller.Delete(99, CancellationToken.None);
+
+		var notFound = Assert.IsType<NotFoundObjectResult>(result);
+		Assert.Contains("Travel log not found or access denied", notFound.Value!.ToString());
+		Assert.Equal(99, travelService.LastDeleteId);
+		Assert.Equal(5, travelService.LastDeleteUserId);
+	}
+
+	[Fact]
+	public async Task Delete_ShouldReturnOk_WhenDeleted()
+	{
+		var travelService = new FakeTravelService
+		{
+			DeleteResult = true
+		};
+		var pointService = new FakePointService();
+		var controller = CreateControllerWithUser(travelService, pointService, userId: 7);
+
+		var result = await controller.Delete(123, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result);
+		Assert.Contains("Deleted successfully", ok.Value!.ToString());
+		Assert.Equal(123, travelService.LastDeleteId);
+		Assert.Equal(7, travelService.LastDeleteUserId);
+	}
 }
 
