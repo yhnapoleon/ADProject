@@ -150,17 +150,6 @@ jobs:
             --noupdate
             --suppression dependency-check-suppressions.xml
 
-      - name: Upload Backend Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-comprehensive-reports
-          path: |
-            reports/dependency-check-report.html
-            test_reports/**
-            Backend_Error_Codes.md
-          retention-days: 7
-
       - name: Initialize CodeQL (C#)
         uses: github/codeql-action/init@v3
         with:
@@ -191,6 +180,17 @@ jobs:
               exit 1
             fi
           fi
+
+      - name: Upload Backend Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-comprehensive-reports
+          path: |
+            reports/dependency-check-report.html
+            test_reports/**
+            Backend_Error_Codes.md
+          retention-days: 7
 
       - name: Publish
         run: dotnet publish "./.NET/EcoLens.Api/EcoLens.Api.csproj" -c Release -o "./.NET/EcoLens.Api/publish" --nologo
