@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using EcoLens.Api.Data;
 using EcoLens.Api.DTOs.Travel;
+using EcoLens.Api.Models;
 using EcoLens.Api.Models.Enums;
 using EcoLens.Api.Services;
 using EcoLens.Api.Services.Caching;
