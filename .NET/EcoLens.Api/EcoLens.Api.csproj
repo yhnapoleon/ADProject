@@ -18,7 +18,7 @@
     </PackageReference>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
     <PackageReference Include="PdfPig" Version="0.1.8" />
-    <PackageReference Include="SkiaSharp" Version="2.88.6" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
     <PackageReference Include="prometheus-net.AspNetCore" Version="8.*" />
     <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.*" />
   </ItemGroup>
