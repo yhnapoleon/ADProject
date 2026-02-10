@@ -34,6 +34,11 @@ jobs:
       - name: Test
         run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports --collect "XPlat Code Coverage"
 
+      - name: Generate Coverage HTML Report
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:"test_reports/**/coverage.cobertura.xml" -targetdir:"coverage-report" -reporttypes:HtmlInline_AzurePipelines
+
       - name: Verify Error Documentation Generated
         run: |
           if [ -f "Backend_Error_Codes.md" ]; then
@@ -58,6 +63,7 @@ jobs:
           path: |
             Backend_Error_Codes.md
             test_reports/**
+            coverage-report/**
           retention-days: 7
 
       # 4. 发布 (Publish)
