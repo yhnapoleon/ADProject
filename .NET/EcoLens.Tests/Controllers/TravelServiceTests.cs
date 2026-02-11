@@ -598,5 +598,177 @@ public class TravelServiceTests
         Assert.Empty(result.Items);
         Assert.Equal(0, result.TotalCount);
     }
+
+	// ---------- 分支覆盖率：ValidateSingaporeLevel / ValidateGlobalCityLevel / ValidateGeneralLevel ----------
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenSingapore_SubwayDistanceExceedsMRTRange()
+	{
+		var sgA = new GeocodingResult { Latitude = 1.3, Longitude = 103.8, FormattedAddress = "Singapore A", Country = "Singapore" };
+		var sgB = new GeocodingResult { Latitude = 1.84, Longitude = 103.8, FormattedAddress = "Singapore B", Country = "Singapore" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync("SG-A", It.IsAny<CancellationToken>())).ReturnsAsync(sgA);
+		mockMaps.Setup(x => x.GeocodeAsync("SG-B", It.IsAny<CancellationToken>())).ReturnsAsync(sgB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "SG-A", DestinationAddress = "SG-B", TransportMode = TransportMode.Subway };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("MRT range", ex.Message);
+	}
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenSingapore_BusDistanceExceedsRange()
+	{
+		var sgA = new GeocodingResult { Latitude = 1.3, Longitude = 103.8, FormattedAddress = "Singapore A", Country = "Singapore" };
+		var sgB = new GeocodingResult { Latitude = 1.84, Longitude = 103.8, FormattedAddress = "Singapore B", Country = "Singapore" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync("A", It.IsAny<CancellationToken>())).ReturnsAsync(sgA);
+		mockMaps.Setup(x => x.GeocodeAsync("B", It.IsAny<CancellationToken>())).ReturnsAsync(sgB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "A", DestinationAddress = "B", TransportMode = TransportMode.Bus };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("bus range", ex.Message);
+	}
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenSingapore_WalkingDistanceTooLong()
+	{
+		var sgA = new GeocodingResult { Latitude = 1.3, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+		var sgB = new GeocodingResult { Latitude = 1.53, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync((string addr, CancellationToken _) => addr == "Walk-A" ? sgA : sgB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "Walk-A", DestinationAddress = "Walk-B", TransportMode = TransportMode.Walking };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("walking", ex.Message);
+	}
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenSingapore_BicycleDistanceTooLong()
+	{
+		var sgA = new GeocodingResult { Latitude = 1.3, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+		var sgB = new GeocodingResult { Latitude = 1.62, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync((string addr, CancellationToken _) => addr == "Bike-A" ? sgA : sgB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "Bike-A", DestinationAddress = "Bike-B", TransportMode = TransportMode.Bicycle };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("bicycle", ex.Message);
+	}
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenSingapore_CarDistanceExceedsRange()
+	{
+		var sgA = new GeocodingResult { Latitude = 1.3, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+		var sgB = new GeocodingResult { Latitude = 1.84, Longitude = 103.8, FormattedAddress = "Singapore", Country = "Singapore" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync((string addr, CancellationToken _) => addr == "CarA" ? sgA : sgB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "CarA", DestinationAddress = "CarB", TransportMode = TransportMode.CarGasoline };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("reasonable range", ex.Message);
+	}
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenGlobalCityLevel_ShipDistanceTooShort()
+	{
+		var londonA = new GeocodingResult { Latitude = 51.5, Longitude = 0, City = "London", Country = "United Kingdom", FormattedAddress = "London, UK" };
+		var londonB = new GeocodingResult { Latitude = 51.52, Longitude = 0.1, City = "London", Country = "United Kingdom", FormattedAddress = "London, UK" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync("LondonA", It.IsAny<CancellationToken>())).ReturnsAsync(londonA);
+		mockMaps.Setup(x => x.GeocodeAsync("LondonB", It.IsAny<CancellationToken>())).ReturnsAsync(londonB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "LondonA", DestinationAddress = "LondonB", TransportMode = TransportMode.Ship };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("major cities", ex.Message);
+		Assert.Contains("ship", ex.Message);
+	}
+
+	[Fact]
+	public async Task CreateTravelLogAsync_ShouldThrow_WhenGeneralLevel_WalkingDistanceTooLong()
+	{
+		var townA = new GeocodingResult { Latitude = 0, Longitude = 0, City = "SmallTownA", Country = "CountryX", FormattedAddress = "SmallTownA, CountryX" };
+		var townB = new GeocodingResult { Latitude = 1.35, Longitude = 0, City = "SmallTownB", Country = "CountryX", FormattedAddress = "SmallTownB, CountryX" };
+		var mockMaps = new Mock<IGoogleMapsService>();
+		mockMaps.Setup(x => x.GeocodeAsync("TownA", It.IsAny<CancellationToken>())).ReturnsAsync(townA);
+		mockMaps.Setup(x => x.GeocodeAsync("TownB", It.IsAny<CancellationToken>())).ReturnsAsync(townB);
+		var mockCache = new Mock<IGeocodingCacheService>();
+		mockCache.Setup(x => x.GetCachedGeocodeAsync(It.IsAny<string>())).ReturnsAsync((GeocodingResult?)null);
+
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, mockMaps.Object, mockCache.Object, _nullLogger);
+		var dto = new CreateTravelLogDto { OriginAddress = "TownA", DestinationAddress = "TownB", TransportMode = TransportMode.Walking };
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.CreateTravelLogAsync(1, dto, CancellationToken.None));
+		Assert.Contains("walking", ex.Message);
+	}
+
+	[Fact]
+	public async Task ValidateTransportMode_ShouldThrow_ForBus_WhenDistanceTooLong()
+	{
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, new DummyGoogleMapsService(), new DummyGeocodingCacheService(), _nullLogger);
+		var origin = new GeocodingResult { Latitude = 1, Longitude = 103, FormattedAddress = "A", Country = "Singapore" };
+		var dest = new GeocodingResult { Latitude = 5, Longitude = 103, FormattedAddress = "B", Country = "Singapore" };
+
+		await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			InvokeValidateTransportModeAsync(svc, TransportMode.Bus, origin, dest, distanceKm: 600));
+	}
+
+	[Fact]
+	public async Task ValidateTransportMode_ShouldThrow_ForWalking_WhenDistanceTooLong()
+	{
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, new DummyGoogleMapsService(), new DummyGeocodingCacheService(), _nullLogger);
+		var origin = new GeocodingResult { Latitude = 0, Longitude = 0, FormattedAddress = "Start", Country = "X" };
+		var dest = new GeocodingResult { Latitude = 1, Longitude = 0, FormattedAddress = "End", Country = "X" };
+
+		await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			InvokeValidateTransportModeAsync(svc, TransportMode.Walking, origin, dest, distanceKm: 150));
+	}
+
+	[Fact]
+	public async Task ValidateTransportMode_ShouldThrow_ForSubway_WhenDistanceTooLong()
+	{
+		await using var db = CreateInMemoryDb();
+		var svc = new TravelService(db, new DummyGoogleMapsService(), new DummyGeocodingCacheService(), _nullLogger);
+		var origin = new GeocodingResult { Latitude = 51.5, Longitude = 0, City = "London", Country = "UK", FormattedAddress = "London" };
+		var dest = new GeocodingResult { Latitude = 53.5, Longitude = 0, City = "Manchester", Country = "UK", FormattedAddress = "Manchester" };
+
+		await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			InvokeValidateTransportModeAsync(svc, TransportMode.Subway, origin, dest, distanceKm: 250));
+	}
 }
 

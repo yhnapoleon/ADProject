@@ -13,6 +13,7 @@ using EcoLens.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 
 namespace EcoLens.Tests;
@@ -126,7 +127,7 @@ public class UtilityBillControllerTests
             => Task.FromResult(new UtilityBillStatisticsDto());
     }
 
-    private static UtilityBillController CreateController(int? userId, FakeUtilityBillService service)
+    private static UtilityBillController CreateController(int? userId, IUtilityBillService service)
     {
         var logger = new LoggerFactory().CreateLogger<UtilityBillController>();
         var controller = new UtilityBillController(service, logger);
@@ -260,6 +261,107 @@ public class UtilityBillControllerTests
         Assert.Equal(UtilityBillType.Electricity, body.BillType);
         Assert.Equal(77, service.LastUserId);
         Assert.Equal(dto.ElectricityUsage, service.LastManualDto!.ElectricityUsage);
+    }
+
+    [Fact]
+    public async Task CreateManually_ShouldReturnBadRequest_WhenServiceThrowsArgumentException()
+    {
+        var mock = new Mock<IUtilityBillService>();
+        mock.Setup(x => x.CreateBillManuallyAsync(It.IsAny<int>(), It.IsAny<CreateUtilityBillManuallyDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ArgumentException("Invalid date range"));
+        var controller = CreateController(1, mock.Object);
+        var dto = new CreateUtilityBillManuallyDto
+        {
+            BillType = UtilityBillType.Electricity,
+            BillPeriodStart = new DateTime(2024, 1, 1),
+            BillPeriodEnd = new DateTime(2024, 1, 31)
+        };
+
+        var result = await controller.CreateManually(dto, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("Invalid date range", badRequest.Value!.ToString());
+    }
+
+    [Fact]
+    public async Task CreateManually_ShouldReturnBadRequest_WhenServiceThrowsInvalidOperationException()
+    {
+        var mock = new Mock<IUtilityBillService>();
+        mock.Setup(x => x.CreateBillManuallyAsync(It.IsAny<int>(), It.IsAny<CreateUtilityBillManuallyDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Business rule violation"));
+        var controller = CreateController(1, mock.Object);
+        var dto = new CreateUtilityBillManuallyDto
+        {
+            BillType = UtilityBillType.Electricity,
+            BillPeriodStart = new DateTime(2024, 1, 1),
+            BillPeriodEnd = new DateTime(2024, 1, 31)
+        };
+
+        var result = await controller.CreateManually(dto, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("Business rule violation", badRequest.Value!.ToString());
+    }
+
+    [Fact]
+    public async Task CreateManually_ShouldReturnBadRequest_WhenServiceThrowsDuplicateKeyException()
+    {
+        var mock = new Mock<IUtilityBillService>();
+        mock.Setup(x => x.CreateBillManuallyAsync(It.IsAny<int>(), It.IsAny<CreateUtilityBillManuallyDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Cannot insert duplicate key"));
+        var controller = CreateController(1, mock.Object);
+        var dto = new CreateUtilityBillManuallyDto
+        {
+            BillType = UtilityBillType.Electricity,
+            BillPeriodStart = new DateTime(2024, 1, 1),
+            BillPeriodEnd = new DateTime(2024, 1, 31)
+        };
+
+        var result = await controller.CreateManually(dto, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("duplicate", badRequest.Value!.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateManually_ShouldReturnBadRequest_WhenServiceThrowsFactorNotFound()
+    {
+        var mock = new Mock<IUtilityBillService>();
+        mock.Setup(x => x.CreateBillManuallyAsync(It.IsAny<int>(), It.IsAny<CreateUtilityBillManuallyDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Emission factor not found"));
+        var controller = CreateController(1, mock.Object);
+        var dto = new CreateUtilityBillManuallyDto
+        {
+            BillType = UtilityBillType.Electricity,
+            BillPeriodStart = new DateTime(2024, 1, 1),
+            BillPeriodEnd = new DateTime(2024, 1, 31)
+        };
+
+        var result = await controller.CreateManually(dto, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("factor", badRequest.Value!.ToString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateManually_ShouldReturn500_WhenServiceThrowsGenericException()
+    {
+        var mock = new Mock<IUtilityBillService>();
+        mock.Setup(x => x.CreateBillManuallyAsync(It.IsAny<int>(), It.IsAny<CreateUtilityBillManuallyDto>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidTimeZoneException("Unexpected server error"));
+        var controller = CreateController(1, mock.Object);
+        var dto = new CreateUtilityBillManuallyDto
+        {
+            BillType = UtilityBillType.Electricity,
+            BillPeriodStart = new DateTime(2024, 1, 1),
+            BillPeriodEnd = new DateTime(2024, 1, 31)
+        };
+
+        var result = await controller.CreateManually(dto, CancellationToken.None);
+
+        var statusCode = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCode.StatusCode);
+        Assert.NotNull(statusCode.Value);
     }
 
     [Fact]
