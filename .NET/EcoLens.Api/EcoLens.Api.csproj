@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <!-- Exclude .gitkeep from static web assets to avoid duplicate key in DiscoverPrecompressedAssets (SDK 9) -->
+  <!-- Exclude from static web assets to avoid duplicate key in DiscoverPrecompressedAssets (SDK 9) -->
   <ItemGroup>
     <Content Remove="wwwroot\.gitkeep" />
+    <Content Remove="wwwroot\uploads\**\*" />
   </ItemGroup>
 
   <PropertyGroup>
