@@ -75,7 +75,7 @@ const AdminCommunityAnalytics: React.FC = () => {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => (percent >= 0.01 ? `${name}: ${(percent * 100).toFixed(1)}%` : null)}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"

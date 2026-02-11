@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { message } from 'antd';
 import request from '../utils/request';
 import './AdminEmissionFactors.css';
 
@@ -219,7 +220,7 @@ const AdminEmissionFactors: React.FC = () => {
         await fetchFactors();
         setIsEditMode(false);
         setEditingFactors({});
-        alert(`Successfully updated ${successCount} emission factor(s).`);
+        message.success(`Successfully updated ${successCount} emission factor(s).`);
       }
     } catch (e: any) {
       console.error('Failed to save emission factors:', e);
@@ -250,6 +251,7 @@ const AdminEmissionFactors: React.FC = () => {
       allFactorsRef.current = null;
       setFactors(factors.filter((f) => f.id !== factor.id));
       setTotalFactors((prev) => Math.max(0, prev - 1));
+      message.success(`"${factor.itemName}" has been deleted.`);
     } catch (e: any) {
       console.error('Failed to delete emission factor:', e);
       setError(
