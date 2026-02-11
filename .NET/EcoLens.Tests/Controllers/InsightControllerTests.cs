@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using EcoLens.Api.Controllers;
 using EcoLens.Api.Data;
+using EcoLens.Api.Models.Enums;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -58,5 +59,19 @@ public class InsightControllerTests
 		Assert.Equal(0, dto.Id);
 		Assert.False(dto.IsRead);
 		Assert.Contains("plant-based", dto.Content, StringComparison.OrdinalIgnoreCase);
+	}
+
+	[Fact]
+	public async Task WeeklyReport_ReturnsOkWithTypeWeeklyReport_WhenUserSet()
+	{
+		await using var db = CreateDb();
+		var controller = new InsightController(db);
+		SetUser(controller, 1);
+
+		var result = await controller.WeeklyReport(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<EcoLens.Api.DTOs.Insights.AiInsightDto>(ok.Value);
+		Assert.Equal(InsightType.WeeklyReport, dto.Type);
 	}
 }

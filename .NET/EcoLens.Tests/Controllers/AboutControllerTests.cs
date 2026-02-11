@@ -74,4 +74,21 @@ public class AboutControllerTests
 			Assert.True(m.Month.Length == 7 && m.Month[4] == '-'); // yyyy-MM
 		}
 	}
+
+	[Fact]
+	public async Task Get_ReturnsOkWithZeroEmissions_WhenUserHasNoActivity()
+	{
+		await using var db = await CreateDbAsync(withUser: true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var controller = new AboutController(db);
+		SetUser(controller, user.Id);
+
+		var result = await controller.Get(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var list = Assert.IsAssignableFrom<IEnumerable<AboutController.MonthlyEmissionDto>>(ok.Value).ToList();
+		Assert.Equal(12, list.Count);
+		Assert.All(list, m => Assert.Equal(0, m.EmissionsTotal));
+		Assert.All(list, m => Assert.Equal(0, m.AverageAllUsers));
+	}
 }

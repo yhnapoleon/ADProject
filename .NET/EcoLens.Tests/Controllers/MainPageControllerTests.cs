@@ -70,4 +70,22 @@ public class MainPageControllerTests
 		Assert.Equal(dto.Food + dto.Transport + dto.Utility, dto.Total);
 		Assert.True(dto.Total >= 0);
 	}
+
+	[Fact]
+	public async Task Get_ReturnsOkWithZeroTotal_WhenUserHasNoActivity()
+	{
+		await using var db = CreateDb(withUser: true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var controller = new MainPageController(db);
+		SetUser(controller, user.Id);
+
+		var result = await controller.Get(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<MainPageController.MainPageStatsDto>(ok.Value);
+		Assert.Equal(0, dto.Total);
+		Assert.Equal(0, dto.Food);
+		Assert.Equal(0, dto.Transport);
+		Assert.Equal(0, dto.Utility);
+	}
 }
