@@ -133,8 +133,8 @@ public class UtilityBillParserTests
 	public async Task ParseBillDataAsync_ShouldIdentifyBillType_ElectricityOnly()
 	{
 		var parser = CreateParser();
-		// Avoid 'l' (water) and gas keywords; use electricity + kwh only
-		var ocrText = "Electricity 100 kWh.";
+		// 避免水费关键词：单字母 'l' 会命中（如 Electricity 中含 l）；用 Power + kWh 仅触发电费
+		var ocrText = "Power 100 kWh.";
 		var result = await parser.ParseBillDataAsync(ocrText);
 		Assert.NotNull(result);
 		Assert.Equal(UtilityBillType.Electricity, result!.BillType);
