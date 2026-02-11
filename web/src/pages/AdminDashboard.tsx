@@ -370,7 +370,7 @@ const AdminDashboard: React.FC = () => {
             {loading ? 'Loading...' : stats.totalUsers.toLocaleString()}
           </div>
           <div className="stat-change positive">
-            {stats.userGrowth > 0 ? `+${stats.userGrowth}% this week` : 'Database Updated'}
+            {stats.userGrowth > 0 ? `+${stats.userGrowth}% this week` : ''}
           </div>
         </div>
         <div
@@ -385,7 +385,7 @@ const AdminDashboard: React.FC = () => {
             {loading ? 'Loading...' : `${stats.totalCarbonReduced.toLocaleString()} kg`}
           </div>
           <div className="stat-change positive">
-            {stats.carbonGrowth > 0 ? `+${stats.carbonGrowth}% this week` : 'Database Updated'}
+            {stats.carbonGrowth > 0 ? `+${stats.carbonGrowth}% this week` : ''}
           </div>
         </div>
         <div
@@ -399,7 +399,7 @@ const AdminDashboard: React.FC = () => {
           <div className="stat-value">
             {loading ? 'Loading...' : stats.activeFactors.toLocaleString()}
           </div>
-          <div className="stat-change positive">Database Updated</div>
+          <div className="stat-change positive"></div>
         </div>
       </div>
 
@@ -646,7 +646,7 @@ const AdminDashboard: React.FC = () => {
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/emission-factors')}
       >
-        <h3>Emission Factor Database (Recent Updates)</h3>
+        <h3>Emission Factor Database</h3>
         {loading ? (
           <div style={{ padding: '20px', textAlign: 'center' }}>Loading emission factors...</div>
         ) : (
@@ -658,7 +658,6 @@ const AdminDashboard: React.FC = () => {
                 <th>Item Name</th>
                 <th>Emission Factor ({emissionFactors[0]?.unit || 'kg CO2/unit'})</th>
                 <th>Last Updated</th>
-                <th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -670,16 +669,11 @@ const AdminDashboard: React.FC = () => {
                     <td>{item.itemName}</td>
                     <td>{item.factor}</td>
                     <td>{item.lastUpdated}</td>
-                    <td>
-                      <span className={`status-badge ${item.status?.toLowerCase().replace(/\s+/g, '-') || 'active'}`}>
-                        {item.status || 'Active'}
-                      </span>
-                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '20px' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '20px' }}>
                     No emission factors found
                   </td>
                 </tr>
