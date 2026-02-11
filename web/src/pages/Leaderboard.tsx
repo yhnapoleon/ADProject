@@ -28,7 +28,8 @@ const Leaderboard = () => {
       let url: string;
       if (currentPeriod === 'today') url = '/api/Leaderboard/today';
       else if (currentPeriod === 'month') url = '/api/Leaderboard/month';
-      else url = '/api/Leaderboard';
+      // Explicitly request all-time data instead of relying on backend default ("month")
+      else url = '/api/Leaderboard?period=all';
       const res: any = await request.get(url);
       const list = Array.isArray(res) ? res : res.items || [];
       setData(list);
