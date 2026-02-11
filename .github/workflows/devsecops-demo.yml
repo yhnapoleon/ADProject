@@ -324,9 +324,30 @@ jobs:
 
       - name: Serve frontend and run ZAP (Frontend DAST)
         run: |
-          npx --yes serve -s web/dist -l 3000 &
-          sleep 5
+          # Start frontend server in background
+          npx --yes serve -s web/dist -l 3000 > serve.log 2>&1 &
+          SERVE_PID=$!
+          
+          # Wait for server to be ready with retries
+          echo "Waiting for frontend server to start..."
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+              echo "Frontend server is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Frontend server failed to start after 30 attempts"
+              cat serve.log
+              kill $SERVE_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 2
+          done
+          
+          # Pull ZAP image
           docker pull ghcr.io/zaproxy/zaproxy:stable -q
+          
+          # Run ZAP scan
           docker run --rm \
             -v "${{ github.workspace }}":/zap/wrk/:rw \
             --network=host \
@@ -336,8 +357,44 @@ jobs:
               -J report_frontend_json.json \
               -w report_frontend_md.md \
               -r report_frontend_html.html \
-              -m 5 -d 1
+              -m 10 -d 1 || true
+          
+          # Stop the frontend server
+          kill $SERVE_PID 2>/dev/null || true
+          
+          # Verify reports were generated
+          if [ ! -f report_frontend_html.html ] || [ ! -s report_frontend_html.html ]; then
+            echo "Warning: report_frontend_html.html is missing or empty"
+            ls -la report_frontend_* || true
+          fi
+          if [ ! -f report_frontend_json.json ] || [ ! -s report_frontend_json.json ]; then
+            echo "Warning: report_frontend_json.json is missing or empty"
+          fi
+          if [ ! -f report_frontend_md.md ] || [ ! -s report_frontend_md.md ]; then
+            echo "Warning: report_frontend_md.md is missing or empty"
+          fi
         continue-on-error: true
+
+      - name: Verify and list report files before upload
+        if: always()
+        run: |
+          echo "Checking report files..."
+          ls -lh report_frontend_* 2>/dev/null || echo "No report files found"
+          echo ""
+          echo "File sizes:"
+          for file in report_frontend_html.html report_frontend_md.md report_frontend_json.json; do
+            if [ -f "$file" ]; then
+              size=$(wc -c < "$file" || echo "0")
+              echo "  $file: $size bytes"
+              if [ "$size" -lt 100 ]; then
+                echo "    Warning: File is very small, showing first 500 chars:"
+                head -c 500 "$file" || true
+                echo ""
+              fi
+            else
+              echo "  $file: NOT FOUND"
+            fi
+          done
 
       - name: Upload frontend DAST reports
         if: always()
@@ -349,4 +406,5 @@ jobs:
             report_frontend_md.md
             report_frontend_json.json
           retention-days: 7
+          if-no-files-found: warn
 
