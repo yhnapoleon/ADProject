@@ -319,8 +319,24 @@ jobs:
 
       - name: Prepare ZAP writable files (frontend)
         run: |
-          touch zap_frontend.yaml report_frontend_json.json report_frontend_md.md report_frontend_html.html
-          chmod a+w zap_frontend.yaml report_frontend_json.json report_frontend_md.md report_frontend_html.html
+          # Create reports directory with full permissions for all users
+          mkdir -p frontend_dast_reports
+          chmod 777 frontend_dast_reports
+          
+          # Create report files with full write permissions (ZAP will overwrite them)
+          touch frontend_dast_reports/report_frontend_json.json \
+                frontend_dast_reports/report_frontend_md.md \
+                frontend_dast_reports/report_frontend_html.html
+          chmod 666 frontend_dast_reports/report_frontend_json.json \
+                    frontend_dast_reports/report_frontend_md.md \
+                    frontend_dast_reports/report_frontend_html.html
+          
+          # Create zap.yaml in workspace root (ZAP expects it at /zap/wrk/zap.yaml)
+          touch zap_frontend.yaml
+          chmod 666 zap_frontend.yaml
+          
+          echo "Files prepared with permissions:"
+          ls -la frontend_dast_reports/ zap_frontend.yaml
 
       - name: Serve frontend and run ZAP (Frontend DAST)
         run: |
@@ -347,31 +363,52 @@ jobs:
           # Pull ZAP image
           docker pull ghcr.io/zaproxy/zaproxy:stable -q
           
-          # Run ZAP scan
+          # Run ZAP scan with proper file paths
+          # Ensure ZAP can write to workspace by running container commands to fix permissions
           docker run --rm \
             -v "${{ github.workspace }}":/zap/wrk/:rw \
             --network=host \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py \
-              -t http://127.0.0.1:3000 \
-              -J report_frontend_json.json \
-              -w report_frontend_md.md \
-              -r report_frontend_html.html \
-              -m 10 -d 1 || true
+            sh -c "
+              # Fix permissions for workspace and report files
+              chmod 777 /zap/wrk /zap/wrk/frontend_dast_reports 2>/dev/null || true
+              chmod 666 /zap/wrk/zap_frontend.yaml /zap/wrk/frontend_dast_reports/*.json /zap/wrk/frontend_dast_reports/*.md /zap/wrk/frontend_dast_reports/*.html 2>/dev/null || true
+              
+              # Create symlink or copy zap.yaml if needed (ZAP may look for zap.yaml in root)
+              if [ ! -f /zap/wrk/zap.yaml ]; then
+                touch /zap/wrk/zap.yaml
+                chmod 666 /zap/wrk/zap.yaml
+              fi
+              
+              # Run ZAP baseline scan
+              zap-baseline.py \
+                -t http://127.0.0.1:3000 \
+                -J /zap/wrk/frontend_dast_reports/report_frontend_json.json \
+                -w /zap/wrk/frontend_dast_reports/report_frontend_md.md \
+                -r /zap/wrk/frontend_dast_reports/report_frontend_html.html \
+                -m 10 -d 1
+            " || true
           
           # Stop the frontend server
           kill $SERVE_PID 2>/dev/null || true
           
           # Verify reports were generated
-          if [ ! -f report_frontend_html.html ] || [ ! -s report_frontend_html.html ]; then
+          echo "Checking report files..."
+          if [ ! -f frontend_dast_reports/report_frontend_html.html ] || [ ! -s frontend_dast_reports/report_frontend_html.html ]; then
             echo "Warning: report_frontend_html.html is missing or empty"
-            ls -la report_frontend_* || true
+            ls -la frontend_dast_reports/ || true
+          else
+            echo "✓ report_frontend_html.html generated successfully ($(wc -c < frontend_dast_reports/report_frontend_html.html) bytes)"
           fi
-          if [ ! -f report_frontend_json.json ] || [ ! -s report_frontend_json.json ]; then
+          if [ ! -f frontend_dast_reports/report_frontend_json.json ] || [ ! -s frontend_dast_reports/report_frontend_json.json ]; then
             echo "Warning: report_frontend_json.json is missing or empty"
+          else
+            echo "✓ report_frontend_json.json generated successfully ($(wc -c < frontend_dast_reports/report_frontend_json.json) bytes)"
           fi
-          if [ ! -f report_frontend_md.md ] || [ ! -s report_frontend_md.md ]; then
+          if [ ! -f frontend_dast_reports/report_frontend_md.md ] || [ ! -s frontend_dast_reports/report_frontend_md.md ]; then
             echo "Warning: report_frontend_md.md is missing or empty"
+          else
+            echo "✓ report_frontend_md.md generated successfully ($(wc -c < frontend_dast_reports/report_frontend_md.md) bytes)"
           fi
         continue-on-error: true
 
@@ -379,10 +416,10 @@ jobs:
         if: always()
         run: |
           echo "Checking report files..."
-          ls -lh report_frontend_* 2>/dev/null || echo "No report files found"
+          ls -lh frontend_dast_reports/ 2>/dev/null || echo "No report directory found"
           echo ""
           echo "File sizes:"
-          for file in report_frontend_html.html report_frontend_md.md report_frontend_json.json; do
+          for file in frontend_dast_reports/report_frontend_html.html frontend_dast_reports/report_frontend_md.md frontend_dast_reports/report_frontend_json.json; do
             if [ -f "$file" ]; then
               size=$(wc -c < "$file" || echo "0")
               echo "  $file: $size bytes"
@@ -402,9 +439,9 @@ jobs:
         with:
           name: frontend-dast-reports
           path: |
-            report_frontend_html.html
-            report_frontend_md.md
-            report_frontend_json.json
+            frontend_dast_reports/report_frontend_html.html
+            frontend_dast_reports/report_frontend_md.md
+            frontend_dast_reports/report_frontend_json.json
           retention-days: 7
           if-no-files-found: warn
 
