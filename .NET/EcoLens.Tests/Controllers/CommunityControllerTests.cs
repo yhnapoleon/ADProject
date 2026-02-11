@@ -78,6 +78,35 @@ public class CommunityControllerTests
 	}
 
 	[Fact]
+	public async Task GetPosts_ReturnsOkWithEmptyList_WhenNoPosts()
+	{
+		await using var db = await CreateDbAsync(withUser: true, withPost: false);
+		var controller = new CommunityController(db);
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { Request = { Scheme = "https", Host = new HostString("localhost") } } };
+
+		var result = await controller.GetPosts(null, 1, 10, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var list = Assert.IsAssignableFrom<IEnumerable<CommunityController.PostListItemDto>>(ok.Value);
+		Assert.Empty(list);
+	}
+
+	[Fact]
+	public async Task GetPosts_ReturnsOk_WhenTypeUserFilter()
+	{
+		await using var db = await CreateDbAsync(withUser: true, withPost: true);
+		var controller = new CommunityController(db);
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { Request = { Scheme = "https", Host = new HostString("localhost") } } };
+
+		var result = await controller.GetPosts("User", 1, 10, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var list = Assert.IsAssignableFrom<IEnumerable<CommunityController.PostListItemDto>>(ok.Value);
+		Assert.Single(list);
+		Assert.Equal(PostType.User, list.First().Type);
+	}
+
+	[Fact]
 	public async Task GetPostDetail_ReturnsNotFound_WhenPostMissing()
 	{
 		await using var db = await CreateDbAsync(true);

@@ -94,4 +94,21 @@ public class DietTemplateControllerTests
 		Assert.Single(items);
 		Assert.Equal("T1", items[0].TemplateName);
 	}
+
+	[Fact]
+	public async Task GetList_ReturnsOkWithEmptyList_WhenUserHasNoTemplates()
+	{
+		var userId = Guid.NewGuid();
+		var mockService = new Mock<IDietTemplateService>();
+		mockService.Setup(x => x.GetUserTemplatesAsync(userId, It.IsAny<CancellationToken>())).ReturnsAsync(new List<DietTemplateDto>());
+		var controller = new DietTemplateController(mockService.Object);
+		SetUser(controller, userId);
+
+		var result = await controller.GetList(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result);
+		var items = Assert.IsAssignableFrom<List<DietTemplateDto>>(ok.Value);
+		Assert.NotNull(items);
+		Assert.Empty(items);
+	}
 }

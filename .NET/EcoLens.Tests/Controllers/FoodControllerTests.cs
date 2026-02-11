@@ -241,4 +241,97 @@ public class FoodControllerTests
 		Assert.Equal("Beef", dto.FoodName);
 		Assert.Equal(95, dto.Confidence);
 	}
+
+	[Fact]
+	public async Task IngestByName_ReturnsNotFound_WhenFactorNotFound()
+	{
+		var json = JsonSerializer.Serialize(Array.Empty<object>());
+		var client = new HttpClient(new MockCarbonLookupHandler(json)) { BaseAddress = new Uri("https://localhost") };
+		var mockFactory = new Mock<IHttpClientFactory>();
+		mockFactory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(client);
+		await using var db = await CreateDbAsync(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var mockVision = new Mock<IVisionService>();
+		var mockPoint = new Mock<IPointService>();
+		var controller = new FoodController(db, mockVision.Object, mockPoint.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<FoodController>.Instance, mockFactory.Object);
+		SetUser(controller, user.Id);
+		controller.ControllerContext.HttpContext ??= new DefaultHttpContext();
+		controller.ControllerContext.HttpContext.Request.Scheme = "https";
+		controller.ControllerContext.HttpContext.Request.Host = new HostString("localhost");
+
+		var result = await controller.IngestByName(new FoodIngestByNameRequest { Name = "UnknownFood", Quantity = 1, Unit = "kg" }, CancellationToken.None);
+
+		Assert.IsType<NotFoundObjectResult>(result.Result);
+	}
+
+	[Fact]
+	public async Task IngestFromImage_ReturnsUnauthorized_WhenUserNotSet()
+	{
+		await using var db = await CreateDbAsync(true);
+		var mockVision = new Mock<IVisionService>();
+		mockVision.Setup(x => x.PredictAsync(It.IsAny<IFormFile>(), It.IsAny<CancellationToken>())).ReturnsAsync(new EcoLens.Api.DTOs.VisionPredictionResponseDto { Label = "Beef", Confidence = 90, SourceModel = "test" });
+		var mockPoint = new Mock<IPointService>();
+		var controller = new FoodController(db, mockVision.Object, mockPoint.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<FoodController>.Instance, CreateMockHttpClientFactory());
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(), Request = { Scheme = "https", Host = new HostString("localhost") } } };
+		using var stream = new MemoryStream(Encoding.UTF8.GetBytes("fake"));
+		var file = new FormFile(stream, 0, stream.Length, "file", "x.jpg") { Headers = new HeaderDictionary() };
+
+		var result = await controller.IngestFromImage(new FoodIngestFromImageRequest { File = file, Quantity = 0.2, Unit = "kg" }, CancellationToken.None);
+
+		Assert.IsType<UnauthorizedResult>(result.Result);
+	}
+
+	[Fact]
+	public async Task IngestFromImage_ReturnsBadRequest_WhenNoFile()
+	{
+		await using var db = await CreateDbAsync(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var mockVision = new Mock<IVisionService>();
+		var mockPoint = new Mock<IPointService>();
+		var controller = new FoodController(db, mockVision.Object, mockPoint.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<FoodController>.Instance, CreateMockHttpClientFactory());
+		SetUser(controller, user.Id);
+		controller.ControllerContext.HttpContext ??= new DefaultHttpContext();
+		controller.ControllerContext.HttpContext.Request.Scheme = "https";
+		controller.ControllerContext.HttpContext.Request.Host = new HostString("localhost");
+
+		var result = await controller.IngestFromImage(new FoodIngestFromImageRequest { File = null!, Quantity = 0.2, Unit = "kg" }, CancellationToken.None);
+
+		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+		Assert.Equal("No image uploaded.", badRequest.Value);
+	}
+
+	[Fact]
+	public async Task CalculateFromImage_ReturnsBadRequest_WhenNoFile()
+	{
+		await using var db = await CreateDbAsync();
+		var mockVision = new Mock<IVisionService>();
+		var mockPoint = new Mock<IPointService>();
+		var controller = new FoodController(db, mockVision.Object, mockPoint.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<FoodController>.Instance, CreateMockHttpClientFactory());
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { Request = { Scheme = "https", Host = new HostString("localhost") } } };
+
+		var result = await controller.CalculateFromImage(new FoodCalculateFromImageRequest { File = null!, Quantity = 0.1, Unit = "kg" }, CancellationToken.None);
+
+		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+		Assert.Equal("No image uploaded.", badRequest.Value);
+	}
+
+	[Fact]
+	public async Task CalculateFromImage_ReturnsOk_WhenValid()
+	{
+		await using var db = await CreateDbAsync();
+		var mockVision = new Mock<IVisionService>();
+		mockVision.Setup(x => x.PredictAsync(It.IsAny<IFormFile>(), It.IsAny<CancellationToken>())).ReturnsAsync(new EcoLens.Api.DTOs.VisionPredictionResponseDto { Label = "Beef", Confidence = 90, SourceModel = "test" });
+		var mockPoint = new Mock<IPointService>();
+		var controller = new FoodController(db, mockVision.Object, mockPoint.Object, Microsoft.Extensions.Logging.Abstractions.NullLogger<FoodController>.Instance, CreateMockHttpClientFactory());
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { Request = { Scheme = "https", Host = new HostString("localhost") } } };
+		using var stream = new MemoryStream(Encoding.UTF8.GetBytes("fake"));
+		var file = new FormFile(stream, 0, stream.Length, "file", "x.jpg") { Headers = new HeaderDictionary() };
+
+		var result = await controller.CalculateFromImage(new FoodCalculateFromImageRequest { File = file, Quantity = 0.1, Unit = "kg" }, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<FoodCalculationResultDto>(ok.Value);
+		Assert.Equal("Beef", dto.FoodName);
+		Assert.Equal(2.7m, dto.TotalEmission);
+	}
 }
