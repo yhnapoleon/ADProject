@@ -41,11 +41,7 @@ public class BarcodeControllerTests
 
     private static BarcodeController CreateController(ApplicationDbContext db)
     {
-        var lookupService = new BarcodeLookupService(
-            db,
-            new DummyOpenFoodFactsService(),
-            new DummyClimatiqService());
-        return new BarcodeController(db, lookupService);
+        return new BarcodeController(db, new DummyOpenFoodFactsService(), new DummyClimatiqService());
     }
 
     [Fact]
@@ -247,8 +243,7 @@ public class BarcodeControllerTests
         });
         await db.SaveChangesAsync();
 
-        var lookupService = new BarcodeLookupService(db, new OpenFoodFactsWithCo2Service(), new DummyClimatiqService());
-        var controller = new BarcodeController(db, lookupService);
+        var controller = new BarcodeController(db, new OpenFoodFactsWithCo2Service(), new DummyClimatiqService());
 
         var result = await controller.GetByBarcode("BEEF123", refresh: true, useDefault: null, CancellationToken.None);
 
@@ -290,8 +285,7 @@ public class BarcodeControllerTests
         });
         await db.SaveChangesAsync();
 
-        var lookupService = new BarcodeLookupService(db, new OpenFoodFactsNoCo2Service(), new ClimatiqWithValueService());
-        var controller = new BarcodeController(db, lookupService);
+        var controller = new BarcodeController(db, new OpenFoodFactsNoCo2Service(), new ClimatiqWithValueService());
 
         var result = await controller.GetByBarcode("BEEFCLIM", refresh: true, useDefault: null, CancellationToken.None);
 
