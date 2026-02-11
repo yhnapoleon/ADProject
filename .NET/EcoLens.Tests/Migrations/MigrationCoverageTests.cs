@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using EcoLens.Api.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 using Xunit;
@@ -48,7 +49,10 @@ public class MigrationCoverageTests
 		{
 			var container = new MsSqlBuilder().Build();
 			await container.StartAsync();
-			return (container.GetConnectionString(), container);
+			// Use a dedicated database name; container default is 'master' and EnsureDeletedAsync cannot run on master.
+			var dbName = "EcoLensMigrationCoverage_" + Guid.NewGuid().ToString("N")[..8];
+			var builder = new SqlConnectionStringBuilder(container.GetConnectionString()) { InitialCatalog = dbName };
+			return (builder.ConnectionString, container);
 		}
 		catch (Exception)
 		{
@@ -81,9 +85,11 @@ public class MigrationCoverageTests
 				Assert.NotEmpty(applied);
 			}
 
-			await using (var context = new ApplicationDbContext(options))
+			// Only drop DB when using LocalDB; with container, disposing the container removes everything (cannot run EnsureDeleted on master).
+			if (container == null)
 			{
-				await context.Database.EnsureDeletedAsync();
+				await using (var context = new ApplicationDbContext(options))
+					await context.Database.EnsureDeletedAsync();
 			}
 		}
 		finally
@@ -113,7 +119,8 @@ public class MigrationCoverageTests
 			Assert.Contains(migrations, m => m.Contains("InitialCreate"));
 			Assert.Contains(migrations, m => m.Contains("AddPointAwardLogsEf"));
 
-			await context.Database.EnsureDeletedAsync();
+			if (container == null)
+				await context.Database.EnsureDeletedAsync();
 		}
 		finally
 		{
