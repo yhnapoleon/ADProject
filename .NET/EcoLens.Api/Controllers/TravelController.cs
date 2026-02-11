@@ -231,7 +231,7 @@ public class TravelController : ControllerBase
 	/// **示例请求：**
 	/// ```
 	/// GET /api/travel/my-travels
-	/// GET /api/travel/my-travels?startDate=2024-01-01&endDate=2024-01-31&transportMode=3&page=1&pageSize=20
+	/// GET /api/travel/my-travels?startDate=2024-01-01&amp;endDate=2024-01-31&amp;transportMode=3&amp;page=1&amp;pageSize=20
 	/// ```
 	/// </remarks>
 	/// <param name="query">查询参数</param>
@@ -383,7 +383,7 @@ public class TravelController : ControllerBase
 	/// **示例请求：**
 	/// ```
 	/// GET /api/travel/statistics
-	/// GET /api/travel/statistics?startDate=2024-01-01&endDate=2024-01-31
+	/// GET /api/travel/statistics?startDate=2024-01-01&amp;endDate=2024-01-31
 	/// ```
 	/// </remarks>
 	/// <param name="startDate">开始日期（可选）</param>
