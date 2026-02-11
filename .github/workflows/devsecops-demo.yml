@@ -319,24 +319,12 @@ jobs:
 
       - name: Prepare ZAP writable files (frontend)
         run: |
-          # Create reports directory with full permissions for all users
-          mkdir -p frontend_dast_reports
-          chmod 777 frontend_dast_reports
+          # Create report files in workspace root (same pattern as backend DAST)
+          touch report_frontend_json.json report_frontend_md.md report_frontend_html.html zap_frontend.yaml
+          chmod a+w report_frontend_json.json report_frontend_md.md report_frontend_html.html zap_frontend.yaml
           
-          # Create report files with full write permissions (ZAP will overwrite them)
-          touch frontend_dast_reports/report_frontend_json.json \
-                frontend_dast_reports/report_frontend_md.md \
-                frontend_dast_reports/report_frontend_html.html
-          chmod 666 frontend_dast_reports/report_frontend_json.json \
-                    frontend_dast_reports/report_frontend_md.md \
-                    frontend_dast_reports/report_frontend_html.html
-          
-          # Create zap.yaml in workspace root (ZAP expects it at /zap/wrk/zap.yaml)
-          touch zap_frontend.yaml
-          chmod 666 zap_frontend.yaml
-          
-          echo "Files prepared with permissions:"
-          ls -la frontend_dast_reports/ zap_frontend.yaml
+          echo "Files prepared:"
+          ls -la report_frontend_* zap_frontend.yaml
 
       - name: Serve frontend and run ZAP (Frontend DAST)
         run: |
@@ -363,73 +351,71 @@ jobs:
           # Pull ZAP image
           docker pull ghcr.io/zaproxy/zaproxy:stable -q
           
-          # Run ZAP scan with proper file paths
-          # Ensure ZAP can write to workspace by running container commands to fix permissions
+          # Verify frontend server is accessible before running ZAP
+          echo "Verifying frontend server accessibility..."
+          if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+            echo "✓ Frontend server is accessible"
+          else
+            echo "✗ Frontend server is NOT accessible"
+            cat serve.log || true
+          fi
+          
+          # Run ZAP scan (same pattern as backend DAST)
+          echo "Starting ZAP baseline scan..."
           docker run --rm \
             -v "${{ github.workspace }}":/zap/wrk/:rw \
             --network=host \
             ghcr.io/zaproxy/zaproxy:stable \
-            sh -c "
-              # Fix permissions for workspace and report files
-              chmod 777 /zap/wrk /zap/wrk/frontend_dast_reports 2>/dev/null || true
-              chmod 666 /zap/wrk/zap_frontend.yaml /zap/wrk/frontend_dast_reports/*.json /zap/wrk/frontend_dast_reports/*.md /zap/wrk/frontend_dast_reports/*.html 2>/dev/null || true
-              
-              # Create symlink or copy zap.yaml if needed (ZAP may look for zap.yaml in root)
-              if [ ! -f /zap/wrk/zap.yaml ]; then
-                touch /zap/wrk/zap.yaml
-                chmod 666 /zap/wrk/zap.yaml
-              fi
-              
-              # Run ZAP baseline scan
-              zap-baseline.py \
-                -t http://127.0.0.1:3000 \
-                -J /zap/wrk/frontend_dast_reports/report_frontend_json.json \
-                -w /zap/wrk/frontend_dast_reports/report_frontend_md.md \
-                -r /zap/wrk/frontend_dast_reports/report_frontend_html.html \
-                -m 10 -d 1
-            " || true
+            zap-baseline.py \
+              -t http://127.0.0.1:3000 \
+              -J report_frontend_json.json \
+              -w report_frontend_md.md \
+              -r report_frontend_html.html \
+              -m 10 -d 1
+          
+          echo "ZAP scan completed"
           
           # Stop the frontend server
           kill $SERVE_PID 2>/dev/null || true
           
-          # Verify reports were generated
-          echo "Checking report files..."
-          if [ ! -f frontend_dast_reports/report_frontend_html.html ] || [ ! -s frontend_dast_reports/report_frontend_html.html ]; then
-            echo "Warning: report_frontend_html.html is missing or empty"
-            ls -la frontend_dast_reports/ || true
-          else
-            echo "✓ report_frontend_html.html generated successfully ($(wc -c < frontend_dast_reports/report_frontend_html.html) bytes)"
-          fi
-          if [ ! -f frontend_dast_reports/report_frontend_json.json ] || [ ! -s frontend_dast_reports/report_frontend_json.json ]; then
-            echo "Warning: report_frontend_json.json is missing or empty"
-          else
-            echo "✓ report_frontend_json.json generated successfully ($(wc -c < frontend_dast_reports/report_frontend_json.json) bytes)"
-          fi
-          if [ ! -f frontend_dast_reports/report_frontend_md.md ] || [ ! -s frontend_dast_reports/report_frontend_md.md ]; then
-            echo "Warning: report_frontend_md.md is missing or empty"
-          else
-            echo "✓ report_frontend_md.md generated successfully ($(wc -c < frontend_dast_reports/report_frontend_md.md) bytes)"
-          fi
+          # Verify reports were generated and have content
+          echo "Checking report files after ZAP scan..."
+          for report_file in report_frontend_html.html report_frontend_json.json report_frontend_md.md; do
+            if [ -f "$report_file" ]; then
+              size=$(wc -c < "$report_file" 2>/dev/null || echo "0")
+              echo "File: $report_file - $size bytes"
+              if [ "$size" -lt 100 ]; then
+                echo "  ⚠️  WARNING: File is very small or empty!"
+                echo "  First 200 characters:"
+                head -c 200 "$report_file" 2>/dev/null || echo "  (Could not read file)"
+                echo ""
+              else
+                echo "  ✓ File has content"
+              fi
+            else
+              echo "  ❌ File not found: $report_file"
+            fi
+          done
         continue-on-error: true
 
       - name: Verify and list report files before upload
         if: always()
         run: |
-          echo "Checking report files..."
-          ls -lh frontend_dast_reports/ 2>/dev/null || echo "No report directory found"
+          echo "Checking report files before upload..."
+          ls -lh report_frontend_* 2>/dev/null || echo "No report files found"
           echo ""
           echo "File sizes:"
-          for file in frontend_dast_reports/report_frontend_html.html frontend_dast_reports/report_frontend_md.md frontend_dast_reports/report_frontend_json.json; do
+          for file in report_frontend_html.html report_frontend_md.md report_frontend_json.json; do
             if [ -f "$file" ]; then
               size=$(wc -c < "$file" || echo "0")
               echo "  $file: $size bytes"
               if [ "$size" -lt 100 ]; then
-                echo "    Warning: File is very small, showing first 500 chars:"
+                echo "    ⚠️  Warning: File is very small, showing first 500 chars:"
                 head -c 500 "$file" || true
                 echo ""
               fi
             else
-              echo "  $file: NOT FOUND"
+              echo "  ❌ $file: NOT FOUND"
             fi
           done
 
@@ -439,9 +425,9 @@ jobs:
         with:
           name: frontend-dast-reports
           path: |
-            frontend_dast_reports/report_frontend_html.html
-            frontend_dast_reports/report_frontend_md.md
-            frontend_dast_reports/report_frontend_json.json
+            report_frontend_html.html
+            report_frontend_md.md
+            report_frontend_json.json
           retention-days: 7
           if-no-files-found: warn
 
