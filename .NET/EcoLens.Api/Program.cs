@@ -221,6 +221,7 @@ builder.Services.AddScoped<EcoLens.Api.Services.Caching.IGeocodingCacheService, 
 // External API services
 builder.Services.AddHttpClient<IClimatiqService, ClimatiqService>();
 builder.Services.AddHttpClient<IOpenFoodFactsService, OpenFoodFactsService>();
+builder.Services.AddScoped<IBarcodeLookupService, BarcodeLookupService>();
 builder.Services.AddHttpClient<IAiService, GeminiService>((sp, client) =>
 {
 	var options = sp.GetRequiredService<IOptions<AiSettings>>().Value;
