@@ -44,4 +44,18 @@ public class CarbonEmissionDataTests
 	{
 		Assert.Equal(1.0, CarbonEmissionData.GetFactor("NonExistentLabel123"));
 	}
+
+	[Fact]
+	public void GetFactor_ReturnsExactMatch_WhenSnakeCaseKey()
+	{
+		// Food-101 风格键，直接匹配
+		Assert.Equal(0.90, CarbonEmissionData.GetFactor("fried_rice"));
+		Assert.Equal(0.80, CarbonEmissionData.GetFactor("dumplings"));
+	}
+
+	[Fact]
+	public void GetFactor_ReturnsCaseInsensitive_WhenSnakeCaseKey()
+	{
+		Assert.Equal(0.90, CarbonEmissionData.GetFactor("FRIED_RICE"));
+	}
 }

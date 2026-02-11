@@ -91,5 +91,99 @@ public class UtilityBillCalculationServiceTests
 
 		Assert.Contains("Electricity carbon emission factor not found", ex.Message);
 	}
+
+	[Fact]
+	public async Task CalculateCarbonEmissionAsync_ShouldThrow_WhenWaterFactorMissing()
+	{
+		await using var db = CreateDb();
+		db.CarbonReferences.AddRange(
+			new CarbonReference { LabelName = "Electricity", Category = CarbonCategory.Utility, Co2Factor = 0.5m, Unit = "kWh" },
+			new CarbonReference { LabelName = "Gas", Category = CarbonCategory.Utility, Co2Factor = 1.0m, Unit = "m3" }
+		);
+		await db.SaveChangesAsync();
+		var service = CreateService(db);
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			service.CalculateCarbonEmissionAsync(100m, 10m, 5m, CancellationToken.None));
+
+		Assert.Contains("Water carbon emission factor not found", ex.Message);
+	}
+
+	[Fact]
+	public async Task CalculateCarbonEmissionAsync_ShouldThrow_WhenGasFactorMissing()
+	{
+		await using var db = CreateDb();
+		db.CarbonReferences.AddRange(
+			new CarbonReference { LabelName = "Electricity", Category = CarbonCategory.Utility, Co2Factor = 0.5m, Unit = "kWh" },
+			new CarbonReference { LabelName = "Water", Category = CarbonCategory.Utility, Co2Factor = 0.2m, Unit = "m3" }
+		);
+		await db.SaveChangesAsync();
+		var service = CreateService(db);
+
+		var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			service.CalculateCarbonEmissionAsync(100m, 10m, 5m, CancellationToken.None));
+
+		Assert.Contains("Gas carbon emission factor not found", ex.Message);
+	}
+
+	[Fact]
+	public async Task CalculateCarbonEmissionAsync_ShouldReturnZeroForUtility_WhenUsageIsZero()
+	{
+		await using var db = CreateDb();
+		db.CarbonReferences.AddRange(
+			new CarbonReference { LabelName = "Electricity", Category = CarbonCategory.Utility, Co2Factor = 0.5m, Unit = "kWh" },
+			new CarbonReference { LabelName = "Water", Category = CarbonCategory.Utility, Co2Factor = 0.2m, Unit = "m3" },
+			new CarbonReference { LabelName = "Gas", Category = CarbonCategory.Utility, Co2Factor = 1.0m, Unit = "m3" }
+		);
+		await db.SaveChangesAsync();
+		var service = CreateService(db);
+
+		var result = await service.CalculateCarbonEmissionAsync(0m, 0m, 0m, CancellationToken.None);
+
+		Assert.Equal(0m, result.ElectricityCarbon);
+		Assert.Equal(0m, result.WaterCarbon);
+		Assert.Equal(0m, result.GasCarbon);
+		Assert.Equal(0m, result.TotalCarbon);
+	}
+
+	[Fact]
+	public async Task CalculateCarbonEmissionAsync_ShouldOnlyCountPositiveUsage()
+	{
+		await using var db = CreateDb();
+		db.CarbonReferences.AddRange(
+			new CarbonReference { LabelName = "Electricity", Category = CarbonCategory.Utility, Co2Factor = 0.5m, Unit = "kWh" },
+			new CarbonReference { LabelName = "Water", Category = CarbonCategory.Utility, Co2Factor = 0.2m, Unit = "m3" },
+			new CarbonReference { LabelName = "Gas", Category = CarbonCategory.Utility, Co2Factor = 1.0m, Unit = "m3" }
+		);
+		await db.SaveChangesAsync();
+		var service = CreateService(db);
+
+		// 仅电有用量，水/气为 null
+		var result = await service.CalculateCarbonEmissionAsync(10m, null, null, CancellationToken.None);
+
+		Assert.Equal(5m, result.ElectricityCarbon);
+		Assert.Equal(0m, result.WaterCarbon);
+		Assert.Equal(0m, result.GasCarbon);
+		Assert.Equal(5m, result.TotalCarbon);
+	}
+
+	[Fact]
+	public async Task CalculateCarbonEmissionAsync_ShouldCompute_WhenTotalExceedsLargeThreshold()
+	{
+		await using var db = CreateDb();
+		db.CarbonReferences.AddRange(
+			new CarbonReference { LabelName = "Electricity", Category = CarbonCategory.Utility, Co2Factor = 0.5m, Unit = "kWh" },
+			new CarbonReference { LabelName = "Water", Category = CarbonCategory.Utility, Co2Factor = 0.2m, Unit = "m3" },
+			new CarbonReference { LabelName = "Gas", Category = CarbonCategory.Utility, Co2Factor = 1.0m, Unit = "m3" }
+		);
+		await db.SaveChangesAsync();
+		var service = CreateService(db);
+
+		// 用电量极大，使 totalCarbon > 1000000，触发“异常大”分支（仅覆盖分支，不断言日志）
+		var result = await service.CalculateCarbonEmissionAsync(3_000_000m, 0m, 0m, CancellationToken.None);
+
+		Assert.Equal(1_500_000m, result.ElectricityCarbon);
+		Assert.True(result.TotalCarbon > 1000000m);
+	}
 }
 

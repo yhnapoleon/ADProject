@@ -324,5 +324,29 @@ public class UtilityBillParserTests
 		// 单日可能只填 end 或 start
 		Assert.True(result.BillPeriodStart != null || result.BillPeriodEnd != null);
 	}
+
+	[Fact]
+	public async Task ParseBillDataAsync_ShouldParseBoundaryDates_Day1AndDay31()
+	{
+		var parser = CreateParser();
+		var ocrText = "Billing Period: 01 Jan 2025 - 31 Jan 2025. Electricity 88 kWh.";
+		var result = await parser.ParseBillDataAsync(ocrText, UtilityBillType.Electricity);
+		Assert.NotNull(result);
+		Assert.Equal(88m, result!.ElectricityUsage);
+		Assert.Equal(new DateTime(2025, 1, 1), result.BillPeriodStart);
+		Assert.Equal(new DateTime(2025, 1, 31), result.BillPeriodEnd);
+	}
+
+	[Fact]
+	public async Task ParseBillDataAsync_ShouldParseBoundaryMonths_JanuaryDecember()
+	{
+		var parser = CreateParser();
+		var ocrText = "Billing Period: 01 Dec 2024 - 31 Dec 2024. Electricity 75 kWh.";
+		var result = await parser.ParseBillDataAsync(ocrText, UtilityBillType.Electricity);
+		Assert.NotNull(result);
+		Assert.Equal(75m, result!.ElectricityUsage);
+		Assert.Equal(new DateTime(2024, 12, 1), result.BillPeriodStart);
+		Assert.Equal(new DateTime(2024, 12, 31), result.BillPeriodEnd);
+	}
 }
 
