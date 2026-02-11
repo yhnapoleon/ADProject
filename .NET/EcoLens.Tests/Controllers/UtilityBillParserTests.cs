@@ -248,5 +248,20 @@ public class UtilityBillParserTests
 		Assert.Equal(new DateTime(2024, 12, 1), result!.BillPeriodStart);
 		Assert.Equal(new DateTime(2025, 1, 5), result.BillPeriodEnd);
 	}
+
+	[Fact]
+	public async Task ParseBillDataAsync_ShouldNotSetPeriod_WhenBothDatesInvalid()
+	{
+		var parser = CreateParser();
+		// 开始、结束均为非法日（day=32），TryParseDate 校验 1-31 会失败，周期不落库
+		var ocrText = """
+			Bill From 32/01/2025 to 32/01/2025
+			Power 50 kWh
+			""";
+		var result = await parser.ParseBillDataAsync(ocrText, UtilityBillType.Electricity);
+		Assert.NotNull(result);
+		Assert.Null(result!.BillPeriodStart);
+		Assert.Null(result.BillPeriodEnd);
+	}
 }
 

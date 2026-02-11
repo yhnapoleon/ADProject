@@ -244,6 +244,68 @@ public class AdminControllerTests
 	}
 
 	[Fact]
+	public async Task RegionStats_ShouldNormalizeRegionVariants_ToRegionCodes()
+	{
+		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+			.UseInMemoryDatabase(Guid.NewGuid().ToString())
+			.Options;
+		await using var db = new ApplicationDbContext(options);
+		var admin = new ApplicationUser
+		{
+			Username = "admin",
+			Email = "admin@test.com",
+			PasswordHash = "x",
+			Role = UserRole.Admin,
+			Region = "West Region",
+			BirthDate = DateTime.UtcNow.AddYears(-30),
+			IsActive = true,
+			TotalCarbonSaved = 0
+		};
+		db.ApplicationUsers.Add(admin);
+		db.ApplicationUsers.Add(new ApplicationUser
+		{
+			Username = "u1",
+			Email = "u1@t.com",
+			PasswordHash = "x",
+			Role = UserRole.User,
+			Region = "North Region",
+			BirthDate = DateTime.UtcNow.AddYears(-20),
+			TotalCarbonSaved = 5m
+		});
+		db.ApplicationUsers.Add(new ApplicationUser
+		{
+			Username = "u2",
+			Email = "u2@t.com",
+			PasswordHash = "x",
+			Role = UserRole.User,
+			Region = "Central",
+			BirthDate = DateTime.UtcNow.AddYears(-20),
+			TotalCarbonSaved = 10m
+		});
+		db.ApplicationUsers.Add(new ApplicationUser
+		{
+			Username = "u3",
+			Email = "u3@t.com",
+			PasswordHash = "x",
+			Role = UserRole.User,
+			Region = "西",
+			BirthDate = DateTime.UtcNow.AddYears(-20),
+			TotalCarbonSaved = 15m
+		});
+		await db.SaveChangesAsync();
+
+		var controller = new AdminController(db);
+		SetAdminUser(controller, admin.Id);
+		var result = await controller.RegionStats(null, null, null, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var items = Assert.IsAssignableFrom<IEnumerable<AdminController.RegionStatItem>>(ok.Value).ToList();
+		Assert.Contains(items, i => i.RegionCode == "NR");
+		Assert.Contains(items, i => i.RegionCode == "CR");
+		Assert.Contains(items, i => i.RegionCode == "WR");
+	}
+
+	[Fact]
 	public async Task WeeklyImpact_ShouldReturnFiveWeeksOfData()
 	{
 		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
