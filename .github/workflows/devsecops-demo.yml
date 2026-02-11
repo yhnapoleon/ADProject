@@ -320,11 +320,12 @@ jobs:
       - name: Prepare ZAP writable files (frontend)
         run: |
           # Create report files in workspace root (same pattern as backend DAST)
-          touch report_frontend_json.json report_frontend_md.md report_frontend_html.html zap_frontend.yaml
-          chmod a+w report_frontend_json.json report_frontend_md.md report_frontend_html.html zap_frontend.yaml
+          # Note: ZAP requires zap.yaml (not zap_frontend.yaml) for its internal config
+          touch report_frontend_json.json report_frontend_md.md report_frontend_html.html zap.yaml
+          chmod a+w report_frontend_json.json report_frontend_md.md report_frontend_html.html zap.yaml
           
           echo "Files prepared:"
-          ls -la report_frontend_* zap_frontend.yaml
+          ls -la report_frontend_* zap.yaml
 
       - name: Serve frontend and run ZAP (Frontend DAST)
         run: |
