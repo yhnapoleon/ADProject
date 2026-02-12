@@ -63,7 +63,7 @@ public class AiChatController : ControllerBase
 		if (hit != null)
 		{
 			// 不回显命中的敏感词，避免“提示绕过”。
-			return BadRequest("对不起，我无法协助处理包含不当内容的请求。请调整问题后再试。");
+			return BadRequest("Sorry, I can’t help with requests that contain inappropriate content. Please rephrase and try again.");
 		}
 
 		var reply = await GenerateSqlRagReplyAsync(message, ct);
@@ -108,7 +108,7 @@ public class AiChatController : ControllerBase
 		var hit = _sensitiveWordService.ContainsSensitiveWord(prompt);
 		if (hit != null)
 		{
-			return BadRequest("对不起，我无法协助处理包含不当内容的请求。请调整问题后再试。");
+			return BadRequest("Sorry, I can’t help with requests that contain inappropriate content. Please rephrase and try again.");
 		}
 
 		var reply = await GenerateSqlRagReplyAsync(prompt, ct);
@@ -155,13 +155,14 @@ public class AiChatController : ControllerBase
 	// -------------------- 阶段二：Pass 1 关键词提取 --------------------
 	private async Task<List<string>> ExtractIntentKeywordsAsync(string userMessage, CancellationToken ct)
 	{
-		// System Prompt：要求仅返回 JSON 字符串数组（英文 Label）
+		// System Prompt: extract entities and convert them to English DB labels. Return ONLY a JSON string array.
 		var systemPrompt = """
-你是一个信息抽取器。你的任务：
-1) 从用户问题中提取“可用于数据库检索的实体/概念”，并转换为英文数据库标签（Label）。
-2) 仅输出 JSON 字符串数组，例如：["Beef","Car"]。
-3) 禁止输出任何解释、Markdown、代码块、额外字段；不要输出对象，只能是数组。
-4) 如果无法提取，输出空数组：[]。
+You are an information extraction component.
+Your task:
+1) Extract entities/concepts from the user's question that are useful for database retrieval, and convert them into English database labels (Label).
+2) Output ONLY a JSON string array, e.g. ["Beef","Car"].
+3) Do NOT output any explanations, Markdown, code fences, or extra fields. Do NOT output an object. Only an array.
+4) If nothing can be extracted, output an empty array: [].
 """;
 
 		// User Prompt：原始问题
@@ -269,10 +270,10 @@ public class AiChatController : ControllerBase
 	{
 		var sb = new StringBuilder();
 
-		sb.AppendLine("【数据库检索关键词】");
+		sb.AppendLine("[Extracted Retrieval Keywords]");
 		if (extractedKeywords == null || extractedKeywords.Count == 0)
 		{
-			sb.AppendLine("- （无）");
+			sb.AppendLine("- (none)");
 		}
 		else
 		{
@@ -280,10 +281,10 @@ public class AiChatController : ControllerBase
 		}
 
 		sb.AppendLine();
-		sb.AppendLine("【碳排放事实（来自 CarbonReferences）】");
+		sb.AppendLine("[Carbon Facts (from CarbonReferences)]");
 		if (refs == null || refs.Count == 0)
 		{
-			sb.AppendLine("- 未找到具体数据库记录。");
+			sb.AppendLine("- No specific database records were found.");
 		}
 		else
 		{
@@ -295,10 +296,10 @@ public class AiChatController : ControllerBase
 		}
 
 		sb.AppendLine();
-		sb.AppendLine("【用户当前状态】");
+		sb.AppendLine("[User Status]");
 		if (user == null)
 		{
-			sb.AppendLine("- 用户未登录或未能识别身份，无法读取积分/累计排放。");
+			sb.AppendLine("- User is not authenticated or identity is unavailable; points and totals could not be loaded.");
 		}
 		else
 		{
@@ -316,12 +317,13 @@ public class AiChatController : ControllerBase
 	{
 		// 角色设定：环保科学顾问
 		return """
-你是一名环保科学顾问（Environmental Science Advisor）。
-你的目标：基于提供的【Context】与用户问题，给出可执行、可量化的低碳建议。
-要求：
-- 输出为纯文本，禁止 Markdown（不要出现 #、**、``` 等）。
-- 如果 Context 明确写明“未找到具体数据库记录”，请明确告诉用户你将基于通用环保知识回答，并避免捏造数据库数值。
-- 回答要避免夸大其词，尽量给出具体建议（例如替代方案、频次、范围）。
+You are an Environmental Science Advisor.
+Your goal: based on the provided Context and the user's question, provide actionable, realistic, and (when possible) quantifiable low-carbon guidance.
+Rules:
+- Always respond in English, even if the user writes in another language.
+- Output must be plain text only. No Markdown (do not use #, **, ```).
+- If the Context states that no specific database records were found, explicitly say you will answer using general environmental knowledge and do NOT fabricate database numbers.
+- Avoid exaggeration. Prefer specific recommendations (alternatives, frequency, scope).
 """;
 	}
 
@@ -330,20 +332,20 @@ public class AiChatController : ControllerBase
 		// 思维链（CoT）：要求先 Thought 再 Answer（后端会清洗并只返回 Answer 给前端）
 		var notFoundHint = hasFacts
 			? string.Empty
-			: "提示：未找到具体数据库记录，请基于通用环保知识回答。";
+			: "Note: No specific database records were found. Please answer using general environmental knowledge.";
 
 		return $"""
-【Context】
+Context:
 {context}
 
 {notFoundHint}
 
-【User Question】
+User Question:
 {userMessage}
 
-【Output Format】
-Thought: （先简要推理你的依据与步骤）
-Answer: （给用户的最终建议，清晰、可执行、尽量量化）
+Output Format:
+Thought: (brief reasoning steps)
+Answer: (final recommendations to the user; clear, actionable, and as quantifiable as possible)
 """;
 	}
 
