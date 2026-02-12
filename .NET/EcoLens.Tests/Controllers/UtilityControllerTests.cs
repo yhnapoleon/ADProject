@@ -37,6 +37,9 @@ public class UtilityControllerTests
 
 		public Task<string> GetAnswerAsync(string userPrompt) => Task.FromResult("");
 
+		public Task<string> GetAnswerAsync(string userPrompt, string? systemPrompt, CancellationToken ct = default)
+			=> Task.FromResult("");
+
 		public Task<string> AnalyzeImageAsync(string prompt, IFormFile image)
 		{
 			LastPrompt = prompt;

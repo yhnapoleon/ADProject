@@ -50,29 +50,33 @@ public class AiChatControllerTests
 	{
 		var mockAi = new Mock<IAiService>();
 		await using var db = CreateDb();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 
 		var result = await controller.Chat(new AiChatController.ChatRequestDto { Message = "   " }, CancellationToken.None);
 
 		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
 		Assert.Equal("Message is required.", badRequest.Value);
 		mockAi.Verify(x => x.GetAnswerAsync(It.IsAny<string>()), Times.Never);
+		mockAi.Verify(x => x.GetAnswerAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
 	}
 
 	[Fact]
 	public async Task Chat_ReturnsOkWithReply_WhenMessageValid()
 	{
 		var mockAi = new Mock<IAiService>();
-		mockAi.Setup(x => x.GetAnswerAsync(It.IsAny<string>())).ReturnsAsync("Here is some advice.");
+		// 双阶段：Pass1 返回关键词数组；Pass2 返回最终答案
+		mockAi.SetupSequence(x => x.GetAnswerAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync("[]")
+			.ReturnsAsync("Here is some advice.");
 		await using var db = CreateDb();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 
 		var result = await controller.Chat(new AiChatController.ChatRequestDto { Message = "How to reduce carbon?" }, CancellationToken.None);
 
 		var ok = Assert.IsType<OkObjectResult>(result.Result);
 		var dto = Assert.IsType<AiChatController.ChatResponseDto>(ok.Value);
 		Assert.Equal("Here is some advice.", dto.Reply);
-		mockAi.Verify(x => x.GetAnswerAsync("How to reduce carbon?"), Times.Once);
+		mockAi.Verify(x => x.GetAnswerAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
 	}
 
 	[Fact]
@@ -80,7 +84,7 @@ public class AiChatControllerTests
 	{
 		var mockAi = new Mock<IAiService>();
 		await using var db = CreateDb();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 
 		var result = await controller.AssistantChat(new AiChatController.MessagesChatRequestDto { Messages = new List<AiChatController.ChatMessageItem>() }, CancellationToken.None);
 
@@ -93,7 +97,7 @@ public class AiChatControllerTests
 	{
 		var mockAi = new Mock<IAiService>();
 		await using var db = CreateDb();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 		// Last user message and fallback last message are both empty/whitespace -> "No content to answer."
 		var result = await controller.AssistantChat(new AiChatController.MessagesChatRequestDto
 		{
@@ -112,9 +116,11 @@ public class AiChatControllerTests
 	public async Task AssistantChat_ReturnsOkWithMessage_WhenValid()
 	{
 		var mockAi = new Mock<IAiService>();
-		mockAi.Setup(x => x.GetAnswerAsync(It.IsAny<string>())).ReturnsAsync("Assistant reply.");
+		mockAi.SetupSequence(x => x.GetAnswerAsync(It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+			.ReturnsAsync("[]")
+			.ReturnsAsync("Assistant reply.");
 		await using var db = CreateDb();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 
 		var result = await controller.AssistantChat(new AiChatController.MessagesChatRequestDto
 		{
@@ -137,7 +143,7 @@ public class AiChatControllerTests
 	{
 		var mockAi = new Mock<IAiService>();
 		await using var db = CreateDb();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() } };
 
 		var result = await controller.Analysis(null, CancellationToken.None);
@@ -153,7 +159,7 @@ public class AiChatControllerTests
 		mockAi.Setup(x => x.GetAnswerAsync(It.IsAny<string>())).ReturnsAsync("Your emission summary and suggestions.");
 		await using var db = CreateDb(withUser: true);
 		var user = await db.ApplicationUsers.FirstAsync();
-		var controller = new AiChatController(mockAi.Object, db);
+		var controller = new AiChatController(mockAi.Object, db, new SensitiveWordService());
 		SetUser(controller, user.Id);
 
 		var result = await controller.Analysis(new AiChatController.AnalysisRequestDto { TimeRange = "month" }, CancellationToken.None);
