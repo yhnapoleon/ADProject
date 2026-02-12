@@ -25,11 +25,12 @@ const Leaderboard = () => {
   const fetchLeaderboard = async (currentPeriod: LeaderboardPeriod) => {
     setLoading(true);
     try {
-      let url: string;
+      let url: string = '/api/Leaderboard?period=all';
       if (currentPeriod === 'today') url = '/api/Leaderboard/today';
       else if (currentPeriod === 'month') url = '/api/Leaderboard/month';
-      else url = '/api/Leaderboard';
-      const res: any = await request.get(url);
+      else if (currentPeriod === 'all') url = '/api/Leaderboard?period=all';
+      const separator = url.includes('?') ? '&' : '?';
+const res: any = await request.get(`${url}${separator}_t=${Date.now()}`);
       const list = Array.isArray(res) ? res : res.items || [];
       setData(list);
     } catch (error: any) {
@@ -45,17 +46,7 @@ const Leaderboard = () => {
     fetchLeaderboard(period);
   }, [period]);
 
-  // Refresh when page regains focus (e.g., returning from Records after deletion)
-  useEffect(() => {
-    const onFocus = () => fetchLeaderboard(period);
-    window.addEventListener('focus', onFocus);
-    const onVisibilityChange = () => document.visibilityState === 'visible' && onFocus();
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [period]);
+  
 
   const dataSource = useMemo(() => {
     return data.map((row, idx) => ({ ...row, rank: idx + 1 }));

@@ -59,36 +59,9 @@ const Profile = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [isEditing, setIsEditing] = useState(false);
-  const [user, setUser] = useState<User>(() => {
-    // Fast initial paint: hydrate basic user info from localStorage if available
-    try {
-      const raw = localStorage.getItem('user');
-      if (!raw) return defaultUser;
-      const cached = JSON.parse(raw) as Partial<{
-        id: string;
-        username: string;
-        name: string;
-        email: string;
-        nickname: string;
-        avatar: string;
-        avatarUrl: string;
-      }>;
-      return {
-        ...defaultUser,
-        id: cached.id ?? defaultUser.id,
-        name: cached.username ?? cached.name ?? defaultUser.name,
-        email: cached.email ?? defaultUser.email,
-        nickname: cached.nickname ?? defaultUser.nickname,
-        avatar: cached.avatar ?? cached.avatarUrl ?? defaultUser.avatar,
-      };
-    } catch {
-      return defaultUser;
-    }
-  });
-  const [loading, setLoading] = useState(() => {
-    // If we have any cached identity, avoid blocking the whole page on API latency
-    return !(user?.id || user?.email || user?.name);
-  });
+  const [user, setUser] = useState<User>(defaultUser);
+  
+  const [loading, setLoading] = useState(true);
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [totalCarbonSaved, setTotalCarbonSaved] = useState(0);
   const [rank, setRank] = useState(0);
@@ -150,24 +123,14 @@ const Profile = () => {
             pointsTotal: me.pointsTotal ?? 0,
           });
           setAvatarUrl(avatar);
-          // keep local cache fresh for faster next visit
-          localStorage.setItem(
-            'user',
-            JSON.stringify({
-              id: me.id,
-              username: me.name,
-              name: me.name,
-              nickname: me.nickname,
-              email: me.email,
-              avatar: avatar,
-            })
-          );
         });
         // reset retry budget after a successful response
         meTimeoutRetries = 0;
         return me;
       } catch (e: any) {
         if (e.response?.status === 401) {
+          navigate('/login', { replace: true });
+          localStorage.clear();
           navigate('/login', { replace: true });
           return null;
         }
