@@ -59,7 +59,6 @@ data class BarcodeResponse(
 )
 
 // 批量删除请求体
-// 新的批量删除请求单条目 DTO
 data class TypedDeleteEntry(
     val type: Int, // 1=Food, 2=Travel, 3=Utility
     val id: Int

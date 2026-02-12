@@ -109,7 +109,6 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
                 val latLng = place.latLng
                 if (isOrigin) {
                     originAddress = address
-                    // 🌟 修改：如果是全球模式，缩放稍微远一点
                     val zoomLevel = if (currentModeId == 9 || currentModeId == 5) 10f else 14f
                     latLng?.let { mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, zoomLevel)) }
                 } else {
@@ -123,7 +122,7 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
         })
     }
 
-    // 🌟 核心功能：动态更新搜索范围和地图视野
+    // 动态更新搜索范围和地图视野
     private fun updateAutocompleteConstraints(isGlobal: Boolean) {
         val countries = if (isGlobal) emptyList() else listOf("SG")
         originFragment.setCountries(countries)
@@ -164,7 +163,7 @@ class AddTravelActivity : AppCompatActivity(), OnMapReadyCallback {
             TransportMode(6, "Car (Gasoline)", R.raw.transport_sedan, 0.2),
             TransportMode(7, "Car (Electric)", R.raw.transport_sedan2, 0.05),
             TransportMode(4, "Bus", R.raw.transport_bus, 0.05),
-            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.02),
+            TransportMode(2, "Motorcycle", R.raw.transport_cycling, 0.12),
             TransportMode(3, "Subway", R.raw.transport_train, 0.03),
             TransportMode(5, "Ship", R.raw.transport_ship, 0.03),
             TransportMode(9, "Airplane", R.raw.transport_airplane, 0.25)

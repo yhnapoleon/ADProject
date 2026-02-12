@@ -40,7 +40,7 @@ class EmissionRecordsActivity : AppCompatActivity() {
 
     private var selectedType = "All Types"
 
-    // 🌟 核心：分拆日期范围为开始和结束
+    // 分拆日期范围为开始和结束
     private var startDate: Long? = null
     private var endDate: Long? = null
     private val sdfFilter = SimpleDateFormat("MMM dd", Locale.US)
@@ -156,7 +156,7 @@ class EmissionRecordsActivity : AppCompatActivity() {
 
         btnType.setOnClickListener { showTypePopupMenu(it) }
 
-        // 🌟 设置开始日期
+        // 设置开始日期
         btnStart.setOnClickListener {
             showDatePicker("Select Start Date", startDate) { date ->
                 startDate = date
@@ -165,7 +165,7 @@ class EmissionRecordsActivity : AppCompatActivity() {
             }
         }
 
-        // 🌟 设置结束日期
+        // 设置结束日期
         btnEnd.setOnClickListener {
             showDatePicker("Select End Date", endDate) { date ->
                 endDate = date
@@ -174,7 +174,7 @@ class EmissionRecordsActivity : AppCompatActivity() {
             }
         }
 
-        // 🌟 可选：长按重置日期
+        // 长按重置日期
         btnStart.setOnLongClickListener {
             startDate = null
             btnStart.text = "Start"
@@ -201,12 +201,12 @@ class EmissionRecordsActivity : AppCompatActivity() {
     private fun applyFilters() {
         var filtered = allRecords.toList()
 
-        // 1. 类型过滤
+        // 类型过滤
         if (selectedType != "All Types") {
             filtered = filtered.filter { it.type == selectedType }
         }
 
-        // 2. 🌟 核心：日期范围过滤
+        // 日期范围过滤
         val isoParser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
             timeZone = TimeZone.getTimeZone("UTC")
         }

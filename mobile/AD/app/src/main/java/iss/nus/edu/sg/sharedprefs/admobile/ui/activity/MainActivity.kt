@@ -39,7 +39,7 @@ class MainActivity : AppCompatActivity() {
 
         setupClickListeners()
 
-        // 🌟 加载所有数据
+        // 加载所有数据
         loadDashboardData()
         loadRankingData()
         fetchStepDataFromBackend() // 从后端获取步数并更新 UI
@@ -50,7 +50,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 核心修改：格式化步数显示
      * 小于 10,000 步显示具体数字（带千分位，如 9,277）
      * 大于等于 10,000 步显示为 "w"（如 1.2w）
      */
@@ -64,7 +63,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 核心修改：从 /api/getTree 获取今日总步数并更新主页 UI
+     * 从 /api/getTree 获取今日总步数并更新主页 UI
      */
     private fun fetchStepDataFromBackend() {
         lifecycleScope.launch {
@@ -165,17 +164,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateRankingUI(list: List<LeaderboardItem>) {
+        // 格式化显示 排放量 | 积分
+        fun formatRankValue(item: LeaderboardItem): String {
+            return String.format("%.1f kg | %d pts", item.emissionsTotal, item.pointsToday)
+        }
+
+        // 第 1 名
         list.getOrNull(0)?.let { item ->
             findViewById<TextView>(R.id.tv_rank1_name).text = item.nickname ?: item.username
-            findViewById<TextView>(R.id.tv_rank1_value).text = String.format("%.1f kg", item.emissionsTotal)
+            findViewById<TextView>(R.id.tv_rank1_value).text = formatRankValue(item)
         }
+
+        // 第 2 名
         list.getOrNull(1)?.let { item ->
             findViewById<TextView>(R.id.tv_rank2_name).text = item.nickname ?: item.username
-            findViewById<TextView>(R.id.tv_rank2_value).text = String.format("%.1f kg", item.emissionsTotal)
+            findViewById<TextView>(R.id.tv_rank2_value).text = formatRankValue(item)
         }
+
+        // 第 3 名
         list.getOrNull(2)?.let { item ->
             findViewById<TextView>(R.id.tv_rank3_name).text = item.nickname ?: item.username
-            findViewById<TextView>(R.id.tv_rank3_value).text = String.format("%.1f kg", item.emissionsTotal)
+            findViewById<TextView>(R.id.tv_rank3_value).text = formatRankValue(item)
         }
     }
 
@@ -185,7 +194,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.tv_travel_value).text = String.format("%.2f kg", data.transport)
         findViewById<TextView>(R.id.tv_utility_value).text = String.format("%.2f kg", data.utility)
 
-        val target = 5.0
+        val target = 200.0
         val progressPercent = ((data.total / target) * 100).toInt()
         findViewById<ProgressBar>(R.id.carbon_progress).progress = progressPercent.coerceAtMost(100)
     }

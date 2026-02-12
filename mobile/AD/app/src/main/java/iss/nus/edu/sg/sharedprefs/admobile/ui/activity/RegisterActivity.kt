@@ -38,7 +38,7 @@ class RegisterActivity : AppCompatActivity() {
         val textLogin = findViewById<TextView>(R.id.textLogin)
         val tvPasswordStrength = findViewById<TextView>(R.id.tvPasswordStrength)
 
-        // 🌟 1. 限制密码最大长度为 20 位
+        //  1. 限制密码最大长度为 20 位
         val filterArray = arrayOf<InputFilter>(InputFilter.LengthFilter(20))
         editPassword.filters = filterArray
         editConfirmPassword.filters = filterArray
@@ -61,7 +61,7 @@ class RegisterActivity : AppCompatActivity() {
             }, calendar.get(Calendar.YEAR) - 20, calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
         }
 
-        // 🌟 2. 实时监听密码强度
+        // 2. 实时监听密码强度
         editPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -80,7 +80,7 @@ class RegisterActivity : AppCompatActivity() {
             }
         })
 
-        // 🌟 3. 实时监听确认密码：不一致立即提示
+        // 3. 实时监听确认密码：不一致立即提示
         editConfirmPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -151,7 +151,7 @@ class RegisterActivity : AppCompatActivity() {
         textLogin.setOnClickListener { finish() }
     }
 
-    // 🌟 抽取出的密码匹配检查函数
+    // 抽取出的密码匹配检查函数
     private fun checkPasswordMatch(p1: EditText, p2: EditText) {
         if (p1.text.toString() != p2.text.toString()) {
             p2.error = "Passwords do not match"

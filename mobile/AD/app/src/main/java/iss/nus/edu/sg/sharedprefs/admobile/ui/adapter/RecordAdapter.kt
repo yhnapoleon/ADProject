@@ -26,7 +26,6 @@ class RecordAdapter(private var records: MutableList<EmissionRecord>) : Recycler
     var onDeleteClickListener: ((Int) -> Unit)? = null
     var onItemClickListener: ((EmissionRecord) -> Unit)? = null
 
-    // 🌟 核心修复：通过注解更改属性自动生成的 Setter 名称，避免与下面的函数冲突
     @get:JvmName("getEditModeState")
     @set:JvmName("setEditModeState")
     var isEditMode = false
@@ -46,7 +45,7 @@ class RecordAdapter(private var records: MutableList<EmissionRecord>) : Recycler
     }
 
     /**
-     * 🌟 状态切换方法：现在它与属性 Setter 不再冲突
+     * 状态切换方法：现在它与属性 Setter 不再冲突
      */
     fun setEditMode(enabled: Boolean) {
         this.isEditMode = enabled
@@ -57,7 +56,7 @@ class RecordAdapter(private var records: MutableList<EmissionRecord>) : Recycler
     }
 
     /**
-     * 🌟 切换单项选中状态
+     * 切换单项选中状态
      */
     fun toggleSelection(record: EmissionRecord) {
         if (selectedItems.contains(record)) {
@@ -72,7 +71,7 @@ class RecordAdapter(private var records: MutableList<EmissionRecord>) : Recycler
     }
 
     /**
-     * 🌟 获取选中的项用于 API 请求
+     * 获取选中的项用于 API 请求
      */
     fun getSelectedItems(): List<EmissionRecord> = selectedItems.toList()
 

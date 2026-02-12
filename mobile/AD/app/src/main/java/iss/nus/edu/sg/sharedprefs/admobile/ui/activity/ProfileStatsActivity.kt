@@ -18,6 +18,7 @@ import iss.nus.edu.sg.sharedprefs.admobile.R
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.UserStatsResponse
 import iss.nus.edu.sg.sharedprefs.admobile.data.network.NetworkClient
 import kotlinx.coroutines.launch
+import java.util.ArrayList
 
 class ProfileStatsActivity : AppCompatActivity() {
 
@@ -34,11 +35,9 @@ class ProfileStatsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_statistics)
 
-        // 设置状态栏
         window.statusBarColor = Color.WHITE
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
-        // 1. 初始化视图绑定
         tvTotalValue = findViewById(R.id.tv_total_emissions_value)
         tvComparisonValue = findViewById(R.id.tv_comparison_value)
         tvComparisonDesc = findViewById(R.id.tv_comparison_desc)
@@ -50,10 +49,7 @@ class ProfileStatsActivity : AppCompatActivity() {
             onBackPressedDispatcher.onBackPressed()
         }
 
-        // 2. 配置图表基础样式
         initChartStyles()
-
-        // 3. 后端拉取数据
         fetchStatsFromServer()
     }
 
@@ -86,8 +82,6 @@ class ProfileStatsActivity : AppCompatActivity() {
 
                 if (response.isSuccessful && response.body() != null) {
                     statsData = response.body()!!
-
-                    // 数据同步后更新 UI
                     updateTopCards()
                     setupLineChart()
                     setupTimeRangeSpinner()
@@ -100,40 +94,35 @@ class ProfileStatsActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 🌟 修改后的顶部卡片逻辑：匹配图片样式
-     */
     private fun updateTopCards() {
         if (statsData.isEmpty()) return
 
-        // 1. 总排放量：计算加入以来的所有月份总和
+        // 1. 显示总排放量
         val totalSum = statsData.sumOf { it.emissionsTotal }
         tvTotalValue.text = "${String.format("%.0f", totalSum)} kg"
 
-        // 2. 对比：基于最近一个月的数据与全站平均值进行比较
-        val latest = statsData.last()
-        val avg = latest.averageAllUsers
+        // 2. 计算所有月份的平均对比
+        val userAvg = statsData.map { it.emissionsTotal }.average()
+        val baseAvg = statsData.map { it.averageAllUsers }.average()
 
-        if (avg > 0) {
-            val diffPercent = ((latest.emissionsTotal - avg) / avg) * 100
+        if (baseAvg > 0) {
+            val diffPercent = ((userAvg - baseAvg) / baseAvg) * 100
 
             if (diffPercent > 0) {
-                // 高于平均值 (红色警示)
-                tvComparisonValue.text = "↑ ${String.format("%.0f", diffPercent)}%"
+                tvComparisonValue.text = "↑ ${String.format("%.1f", diffPercent)}%"
                 tvComparisonValue.setTextColor(Color.parseColor("#FF5252"))
-                tvComparisonDesc.text = "higher than average"
+                tvComparisonDesc.text = "higher than global avg"
                 tvComparisonDesc.setTextColor(Color.parseColor("#FF5252"))
             } else {
-                // 低于平均值 (绿色优秀 - 匹配图片)
                 val absPercent = Math.abs(diffPercent)
-                tvComparisonValue.text = "↓ ${String.format("%.0f", absPercent)}%"
+                tvComparisonValue.text = "↓ ${String.format("%.1f", absPercent)}%"
                 tvComparisonValue.setTextColor(Color.parseColor("#4CAF50"))
-                tvComparisonDesc.text = "lower than average"
+                tvComparisonDesc.text = "lower than global avg"
                 tvComparisonDesc.setTextColor(Color.parseColor("#4CAF50"))
             }
         } else {
             tvComparisonValue.text = "--"
-            tvComparisonDesc.text = "no average data"
+            tvComparisonDesc.text = "no baseline data"
         }
     }
 

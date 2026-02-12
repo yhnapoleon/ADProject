@@ -39,7 +39,7 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // 🌟 1. 进入加载状态
+            // 进入加载状态
             setLoading(true, btnLogin, progressBar)
 
             lifecycleScope.launch {
@@ -60,7 +60,7 @@ class LoginActivity : AppCompatActivity() {
                     startActivity(intent)
                     finish()
                 }.onFailure { exception ->
-                    // 🌟 2. 登录失败：显示易懂的错误提示
+                    // 登录失败
                     setLoading(false, btnLogin, progressBar)
 
                     val friendlyMessage = getFriendlyMessage(exception)
@@ -80,7 +80,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 将异常转换为用户友好的文案
+     * 将异常转换为用户友好的文案
      */
     private fun getFriendlyMessage(throwable: Throwable): String {
         return when (throwable) {

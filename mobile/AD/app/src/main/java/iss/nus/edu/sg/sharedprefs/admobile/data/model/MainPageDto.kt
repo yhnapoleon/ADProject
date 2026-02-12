@@ -19,7 +19,7 @@ data class UserStatsResponse(
 // 请求体
 data class StepSyncRequest(
     val stepCount: Int,
-    val date: String // 后端要求的格式: "2026-02-04T05:58:42.407Z"
+    val date: String
 )
 
 // 响应体

@@ -41,17 +41,18 @@ class AddFoodActivity : AppCompatActivity() {
     private lateinit var analyzeProgress: ProgressBar
     private lateinit var btnCalculate: Button
     private lateinit var btnSave: Button
+    private var photoUri: Uri? = null
     private val TAG = "ECO_DEBUG"
 
-    // 🌟 修改：Launcher 不再直接调用识别，而是走统一处理入口
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { handleSelectedImage(it) }
     }
 
-    private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap: Bitmap? ->
-        bitmap?.let {
-            val uri = saveBitmapToTempFile(it)
-            handleSelectedImage(uri)
+    private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) {
+            photoUri?.let { handleSelectedImage(it) }
+        } else {
+            Log.e(TAG, "Camera capture failed or was cancelled")
         }
     }
 
@@ -87,7 +88,7 @@ class AddFoodActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 核心处理入口：区分条形码和普通图片
+     *核心处理：区分条形码和普通图片
      */
     private fun handleSelectedImage(uri: Uri) {
         Log.d(TAG, "handleSelectedImage: Start processing URI: $uri")
@@ -150,7 +151,7 @@ class AddFoodActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 调用后端条形码接口
+     * 调用后端条形码接口
      */
     private fun queryBarcodeData(barcode: String, originalUri: Uri) {
         lifecycleScope.launch {
@@ -352,15 +353,48 @@ class AddFoodActivity : AppCompatActivity() {
     }
 
     private fun checkCameraPermissionAndLaunch() {
-        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            takePictureLauncher.launch(null)
-        } else {
-            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        when {
+            // 已有权限，直接启动
+            checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
+                launchCamera()
+            }
+            // 无权限，发起申请
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
         }
     }
 
-    private val requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) takePictureLauncher.launch(null)
+    private fun launchCamera() {
+        try {
+            // 1. 创建临时文件
+            val file = File(cacheDir, "camera_capture_${System.currentTimeMillis()}.jpg")
+
+            // 2. 获取安全 Uri
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                "${this.packageName}.fileprovider",
+                file
+            )
+
+            // 3. 赋值给全局变量并启动
+            photoUri = uri
+            takePictureLauncher.launch(uri)
+        } catch (e: Exception) {
+            Log.e(TAG, "launchCamera Error: ${e.message}")
+            Toast.makeText(this, "Failed to initialize camera", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            // 权限通过，直接调用启动函数
+            launchCamera()
+        } else {
+            Toast.makeText(this, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showImage(uri: Uri) {

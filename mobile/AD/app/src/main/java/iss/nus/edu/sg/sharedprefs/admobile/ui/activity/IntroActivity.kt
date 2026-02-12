@@ -19,7 +19,7 @@ class IntroActivity : AppCompatActivity() {
 
     private lateinit var viewPager: ViewPager2
     private lateinit var btnNext: Button
-    private lateinit var tvSkip: TextView // 🌟 新增
+    private lateinit var tvSkip: TextView
 
     private val introItems = listOf(
         IntroItem("Track Your Carbon Footprint", "Understand the environmental impact of your daily activities.", R.drawable.intro1),
@@ -33,11 +33,11 @@ class IntroActivity : AppCompatActivity() {
 
         viewPager = findViewById(R.id.viewPager)
         btnNext = findViewById(R.id.btnNext)
-        tvSkip = findViewById(R.id.tvSkip) // 🌟 初始化
+        tvSkip = findViewById(R.id.tvSkip)
 
         viewPager.adapter = IntroAdapter(introItems)
 
-        // 🌟 Skip 按钮点击事件：直接跳转到登录页
+        // Skip 按钮点击事件：直接跳转到登录页
         tvSkip.setOnClickListener {
             navigateToLogin()
         }
@@ -47,10 +47,10 @@ class IntroActivity : AppCompatActivity() {
                 super.onPageSelected(position)
                 if (position == introItems.size - 1) {
                     btnNext.text = "Finish"
-                    tvSkip.visibility = View.GONE // 🌟 最后一页隐藏 Skip 按钮
+                    tvSkip.visibility = View.GONE // 最后一页隐藏 Skip 按钮
                 } else {
                     btnNext.text = "Next"
-                    tvSkip.visibility = View.VISIBLE // 🌟 非最后一页显示 Skip 按钮
+                    tvSkip.visibility = View.VISIBLE // 非最后一页显示 Skip 按钮
                 }
             }
         })

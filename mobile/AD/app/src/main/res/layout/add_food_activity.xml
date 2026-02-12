@@ -148,7 +148,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:background="@drawable/bottom_nav_background"
-                        android:hint="27.00"
+                        android:hint="--"
                         android:padding="12dp" />
                 </LinearLayout>
                 <LinearLayout
