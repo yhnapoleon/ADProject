@@ -133,7 +133,7 @@ class TreePlantingActivity : AppCompatActivity() {
                     val response = NetworkClient.apiService.postTreeData(token, request)
 
                     if (response.isSuccessful) {
-                        // 🌟 执行统一的动画逻辑
+                        // 执行统一的动画逻辑
                         performGrowthAnimation(growthGain, totalPotential)
                         // 动画开始后同步后端数据，但在动画结束前 UI 不会因为 fetchTreeData 而突变
                         fetchTreeData()
@@ -157,7 +157,7 @@ class TreePlantingActivity : AppCompatActivity() {
         val leftover = potential % 100
 
         if (treesAdded > 0) {
-            // 🌟 只要有树成熟，将进度条拉满并播放一次庆祝
+            // 只要有树成熟，将进度条拉满并播放一次庆祝
             currentTreeGrowth = 100
             refreshUI()
             startCelebration(leftover, treesAdded)

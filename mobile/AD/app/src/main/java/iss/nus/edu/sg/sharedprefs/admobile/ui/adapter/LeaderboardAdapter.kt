@@ -11,14 +11,18 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import iss.nus.edu.sg.sharedprefs.admobile.R
 import iss.nus.edu.sg.sharedprefs.admobile.data.model.LeaderboardItem
+import iss.nus.edu.sg.sharedprefs.admobile.data.model.RankingType // 🌟 引入共享枚举
 
 class LeaderboardAdapter(private var items: List<LeaderboardItem>) :
     RecyclerView.Adapter<LeaderboardAdapter.ViewHolder>() {
 
-    private val BASE_URL = "https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net"
+    private var currentType: RankingType = RankingType.DAILY
 
-    fun updateData(newItems: List<LeaderboardItem>) {
+    private val BASE_URL = "http://10.0.2.2:5133/"
+
+    fun updateData(newItems: List<LeaderboardItem>, type: RankingType) {
         this.items = newItems
+        this.currentType = type
         notifyDataSetChanged()
     }
 
@@ -30,23 +34,32 @@ class LeaderboardAdapter(private var items: List<LeaderboardItem>) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
-        holder.tvRank.text = item.rank.toString()
+        holder.tvRank.text = (position + 4).toString()
         holder.tvName.text = item.nickname ?: item.username
-        holder.tvValue.text = String.format("%.2f kg", item.emissionsTotal)
 
-        // 🌟 处理 URL 拼接：此时 item.avatarUrl 已包含 ?v=xxx
+        // 根据共享枚举展示积分
+        val displayPoints = when (currentType) {
+            RankingType.DAILY -> item.pointsToday
+            RankingType.MONTHLY -> item.pointsMonth
+            RankingType.TOTAL -> item.pointsTotal
+        }
+
+        holder.tvValue.text = String.format("%.1f kg | %d pts", item.emissionsTotal, displayPoints)
+
         val avatarPath = item.avatarUrl ?: ""
         val fullAvatarUrl = if (avatarPath.isNotEmpty()) {
-            if (avatarPath.startsWith("http")) avatarPath
-            else "$BASE_URL${avatarPath.replace("\\", "/")}"
+            if (avatarPath.startsWith("http")) {
+                avatarPath.replace("localhost", "10.0.2.2")
+            } else {
+                "$BASE_URL${avatarPath.replace("\\", "/").removePrefix("/")}"
+            }
         } else null
 
-        // 🌟 性能优化：启用缓存以实现流畅滑动
         Glide.with(holder.itemView.context)
             .load(fullAvatarUrl)
             .apply(RequestOptions.circleCropTransform())
-            .skipMemoryCache(false) // 🌟 允许内存缓存：滑动回看时瞬间加载
-            .diskCacheStrategy(DiskCacheStrategy.ALL) // 🌟 允许磁盘缓存：下次打开 App 免下载
+            .skipMemoryCache(false)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
             .placeholder(R.drawable.ic_avatar_placeholder)
             .error(R.drawable.ic_avatar_placeholder)
             .into(holder.ivAvatar)

@@ -1,14 +1,14 @@
 package iss.nus.edu.sg.sharedprefs.admobile.data.model
 
-// 1. 发送给后端的请求对象 (对应 Swagger Request Body)
+// 1. 发送给后端的请求对象
 data class AddTravelRequest(
-    val originAddress: String,      // 起点地址文字
-    val destinationAddress: String, // 终点地址文字
-    val transportMode: Int,         // 交通工具 ID (0, 1, 2...)
-    val notes: String?              // 备注
+    val originAddress: String,
+    val destinationAddress: String,
+    val transportMode: Int,
+    val notes: String?
 )
 
-// 2. 后端返回的结果对象 (对应 Swagger 200 Response)
+// 2. 后端返回的结果对象
 data class TravelResponse(
     val id: Int,
     val transportModeName: String,

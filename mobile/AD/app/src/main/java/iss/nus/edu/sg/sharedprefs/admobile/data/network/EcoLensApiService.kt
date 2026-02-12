@@ -94,7 +94,7 @@ interface EcoLensApiService {
 
     // 获取总排行榜 (假设路径为原有的 api/Leaderboard)
     @GET("api/Leaderboard")
-    suspend fun getAllTimeLeaderboard(@Query("limit") limit: Int): Response<List<LeaderboardItem>>
+    suspend fun getAllTimeLeaderboard(@Query("period") period: String = "total",@Query("limit") limit: Int): Response<List<LeaderboardItem>>
 
     // ApiService.kt
     @POST("api/ai/chat")

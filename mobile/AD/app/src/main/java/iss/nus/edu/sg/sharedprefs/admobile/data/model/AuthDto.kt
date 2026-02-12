@@ -8,8 +8,8 @@ data class RegisterRequestDto(
     val email: String,
     val password: String,
     val birthDate: String,
-    @SerializedName("Region") // 🌟 告诉 Retrofit：发请求时 JSON 字段叫 "Region"
-    val region: String        // 🌟 告诉 Kotlin：代码里这个变量叫 region
+    @SerializedName("Region")
+    val region: String
 )
 
 // 2. 登录请求
@@ -18,7 +18,7 @@ data class LoginRequestDto(
     val password: String
 )
 
-// 3. 用户详细信息 (从 Swagger 响应提取)
+// 3. 用户详细信息
 data class UserSummaryDto(
     val id: String,
     val username: String,

@@ -48,7 +48,7 @@ class AddUtilityActivity : AppCompatActivity() {
     private lateinit var llPlaceholder: LinearLayout
     private lateinit var etNotes: EditText
 
-    // 🌟 相册选择回调 -> 触发上传识别
+    // 相册选择回调 -> 触发上传识别
     private val pickImageLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             ivBillPreview.setImageURI(it)
@@ -57,7 +57,7 @@ class AddUtilityActivity : AppCompatActivity() {
         }
     }
 
-    // 🌟 拍照回调 (注意：缩略图转文件比较麻烦，建议优先用相册或实现完整的拍照存文件逻辑)
+    // 拍照回调 (注意：缩略图转文件比较麻烦，建议优先用相册或实现完整的拍照存文件逻辑)
     private val takePictureLauncher = registerForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap: Bitmap? ->
         bitmap?.let {
             ivBillPreview.setImageBitmap(it)
@@ -123,7 +123,7 @@ class AddUtilityActivity : AppCompatActivity() {
     }
 
     /**
-     * 🌟 调用后端 /api/UtilityBill/upload 接口识别图片
+     * /api/UtilityBill/upload 接口识别图片
      */
     private fun uploadAndRecognizeBill(uri: Uri) {
         lifecycleScope.launch {
@@ -155,9 +155,6 @@ class AddUtilityActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 🌟 调用后端 /api/UtilityBill/manual 接口保存到数据库
-     */
     private fun saveBillToDatabase() {
         // 🌟 从输入框获取文本
         val noteContent = etNotes.text.toString()

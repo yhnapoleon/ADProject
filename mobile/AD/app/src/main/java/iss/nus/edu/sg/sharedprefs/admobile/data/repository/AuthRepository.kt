@@ -24,14 +24,12 @@ class AuthRepository(context: Context) {
         }
     }
 
-    // AuthRepository.kt 中的建议写法
     suspend fun register(request: RegisterRequestDto): Result<Unit> {
         return try {
             val response = apiService.register(request) // 假设返回的是 Response<Unit>
             if (response.isSuccessful) {
                 Result.success(Unit)
             } else {
-                // 🌟 关键：提取后端返回的原始 JSON 错误信息
                 val errorJson = response.errorBody()?.string() ?: "Unknown server error"
                 Log.e("API_DEBUG", "Server Response Error Body: $errorJson")
 
@@ -48,15 +46,12 @@ class AuthRepository(context: Context) {
             putString("token", data.token)
             putString("userId", data.user.id)
             putString("username", data.user.username)
-            // 存下这些，ProfileActivity 就能直接显示了
             apply()
         }
     }
 
-    // AuthRepository.kt 增加以下方法
     suspend fun getMainPageData(token: String): Result<MainPageResponseDto> {
         return try {
-            // 注意：这里需要传入 Bearer 前缀
             val response = apiService.getMainPageData("Bearer $token")
             if (response.isSuccessful) {
                 Result.success(response.body()!!)

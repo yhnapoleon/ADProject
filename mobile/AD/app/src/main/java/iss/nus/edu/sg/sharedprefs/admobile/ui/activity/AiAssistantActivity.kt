@@ -38,7 +38,7 @@ class AiAssistantActivity : AppCompatActivity() {
         chatRecycler.layoutManager = LinearLayoutManager(this)
         chatRecycler.adapter = adapter
 
-        // 🌟 初始化快捷 Tips 点击事件
+        // 初始化快捷 Tips 点击事件
         setupQuickTips()
 
         addMessage("Hello! I'm your AI Carbon Guide. How can I help you reduce your footprint today?", true)
@@ -54,7 +54,6 @@ class AiAssistantActivity : AppCompatActivity() {
         NavigationUtils.setupBottomNavigation(this, R.id.nav_chat)
     }
 
-    // 🌟 核心修改：利用 ID 直接绑定点击逻辑
     private fun setupQuickTips() {
         findViewById<TextView>(R.id.tip_food).setOnClickListener {
             sendMessageToAi("Give me some low-carbon food tips.")
