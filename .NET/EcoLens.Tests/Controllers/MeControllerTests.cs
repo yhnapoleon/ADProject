@@ -1,3 +1,4 @@
+using System.Text;
 using System.Security.Claims;
 using EcoLens.Api.Controllers;
 using EcoLens.Api.Data;
@@ -207,5 +208,81 @@ public class MeControllerTests
 
 		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
 		Assert.Equal("No file uploaded.", badRequest.Value);
+	}
+
+	[Fact]
+	public async Task Update_UpdatesBirthDate_WhenValid()
+	{
+		await using var db = CreateDb(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var controller = new MeController(db, CreateMockEnv());
+		SetUser(controller, user.Id);
+		controller.ControllerContext.HttpContext ??= new DefaultHttpContext();
+		controller.ControllerContext.HttpContext.Request.Scheme = "https";
+		controller.ControllerContext.HttpContext.Request.Host = new HostString("localhost");
+		var newDate = "2000-06-15";
+
+		var result = await controller.Update(new MeController.UpdateMeRequest { BirthDate = newDate }, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<MeController.MeDto>(ok.Value);
+		Assert.Equal(newDate, dto.BirthDate);
+		var updated = await db.ApplicationUsers.FindAsync(user.Id);
+		Assert.Equal(2000, updated!.BirthDate.Year);
+		Assert.Equal(6, updated.BirthDate.Month);
+	}
+
+	[Fact]
+	public async Task Update_UpdatesLocation_WhenValid()
+	{
+		await using var db = CreateDb(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var controller = new MeController(db, CreateMockEnv());
+		SetUser(controller, user.Id);
+		controller.ControllerContext.HttpContext ??= new DefaultHttpContext();
+		controller.ControllerContext.HttpContext.Request.Scheme = "https";
+		controller.ControllerContext.HttpContext.Request.Host = new HostString("localhost");
+
+		var result = await controller.Update(new MeController.UpdateMeRequest { Location = "North" }, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<MeController.MeDto>(ok.Value);
+		Assert.Equal("North", dto.Location);
+		var updated = await db.ApplicationUsers.FindAsync(user.Id);
+		Assert.Equal("North", updated!.Region);
+	}
+
+	[Fact]
+	public async Task UpdateAvatar_ReturnsBadRequest_WhenFileTooLarge()
+	{
+		await using var db = CreateDb(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var controller = new MeController(db, CreateMockEnv());
+		SetUser(controller, user.Id);
+		var oversized = new byte[3 * 1024 * 1024];
+		using var stream = new MemoryStream(oversized);
+		var file = new FormFile(stream, 0, oversized.Length, "file", "x.jpg") { Headers = new HeaderDictionary() };
+
+		var result = await controller.UpdateAvatar(file, CancellationToken.None);
+
+		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+		Assert.Equal("Avatar file is too large.", badRequest.Value);
+	}
+
+	[Fact]
+	public async Task UpdateAvatar_ReturnsBadRequest_WhenInvalidFileType()
+	{
+		await using var db = CreateDb(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var controller = new MeController(db, CreateMockEnv());
+		SetUser(controller, user.Id);
+		using var stream = new MemoryStream(Encoding.UTF8.GetBytes("not an image"));
+		var file = new FormFile(stream, 0, stream.Length, "file", "x.txt") { Headers = new HeaderDictionary() };
+
+		var result = await controller.UpdateAvatar(file, CancellationToken.None);
+
+		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+		Assert.NotNull(badRequest.Value);
+		Assert.Contains("Invalid file type", badRequest.Value?.ToString());
 	}
 }

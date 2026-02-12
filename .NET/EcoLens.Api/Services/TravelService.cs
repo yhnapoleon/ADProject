@@ -468,7 +468,6 @@ public class TravelService : ITravelService
 		};
 	}
 
-	/// <summary>
 	/// <summary>Get display name for transport mode.</summary>
 	private string GetTransportModeName(TransportMode mode)
 	{
@@ -689,7 +688,6 @@ public class TravelService : ITravelService
 		}
 	}
 
-	/// <summary>
 	/// <summary>Global major-city level validation.</summary>
 	private void ValidateGlobalCityLevel(TransportMode transportMode, GeocodingResult origin, GeocodingResult destination, double distanceKm)
 	{

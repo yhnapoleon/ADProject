@@ -277,7 +277,7 @@ public class UtilityBillController : ControllerBase
 	/// **示例请求：**
 	/// ```
 	/// GET /api/utility-bills/my-bills
-	/// GET /api/utility-bills/my-bills?startDate=2024-01-01&endDate=2024-01-31&billType=0&page=1&pageSize=20
+	/// GET /api/utility-bills/my-bills?startDate=2024-01-01&amp;endDate=2024-01-31&amp;billType=0&amp;page=1&amp;pageSize=20
 	/// ```
 	/// </remarks>
 	/// <param name="query">查询参数</param>
@@ -458,7 +458,7 @@ public class UtilityBillController : ControllerBase
 	/// **示例请求：**
 	/// ```
 	/// GET /api/utility-bills/statistics
-	/// GET /api/utility-bills/statistics?startDate=2024-01-01&endDate=2024-01-31
+	/// GET /api/utility-bills/statistics?startDate=2024-01-01&amp;endDate=2024-01-31
 	/// ```
 	/// </remarks>
 	/// <param name="startDate">开始日期（可选）</param>

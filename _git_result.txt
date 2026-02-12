@@ -1,0 +1,176 @@
+﻿=== git status before ===
+M  .NET/EcoLens.Api/Controllers/AuthController.cs
+A  EcoLens-debug.apk
+M  web/.env.local
+M  web/src/pages/Leaderboard.tsx
+M  web/src/pages/Login.tsx
+M  web/src/pages/Profile.tsx
+M  web/src/utils/request.ts
+?? _git_result.txt
+?? _git_web_push.ps1
+=== status after add ===
+M  .NET/EcoLens.Api/Controllers/AuthController.cs
+ M web/.env.local
+M  web/src/pages/Leaderboard.tsx
+M  web/src/pages/Login.tsx
+M  web/src/pages/Profile.tsx
+M  web/src/utils/request.ts
+?? EcoLens-debug.apk
+?? _git_result.txt
+?? _git_web_push.ps1
+=== commit done ===
+552a35c web: login/profile/request fixes, profile load optimization, API timing and timeout handling
+git : remote: 
+所在位置 D:\ADProject-main\ADProject-main\_git_web_push.ps1:28 字符: 1
++ git push origin xuwenzhe 2>&1 | Out-File $log -Append -Encoding
+ utf8
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (remote: :String) [] 
+   , RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+remote: GitHub found 3 vulnerabilities on yhnapoleon/ADProject's 
+default branch (2 high, 1 moderate). To find out more, visit:    
+    
+remote:      https://github.com/yhnapoleon/ADProject/security/dep
+endabot        
+remote: 
+To https://github.com/yhnapoleon/ADProject.git
+   0bbdffd..552a35c  xuwenzhe -> xuwenzhe
+M	web/.env.local
+Your branch is behind 'origin/main' by 9 commits, and can be fast-forwarded.
+  (use "git pull" to update your local branch)
+git : Switched to branch 'main'
+所在位置 D:\ADProject-main\ADProject-main\_git_web_push.ps1:32 字符: 1
++ git checkout main 2>&1 | Out-File $log -Append -Encoding utf8
++ ~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Switched to branch  
+   'main':String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+git : From https://github.com/yhnapoleon/ADProject
+所在位置 D:\ADProject-main\ADProject-main\_git_web_push.ps1:33 字符: 1
++ git pull origin main 2>&1 | Out-File $log -Append -Encoding utf
+8
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (From https://gi...o 
+   leon/ADProject:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ * branch            main       -> FETCH_HEAD
+Updating c87f146..d9737e7
+Fast-forward
+ .NET/EcoLens.Api/Controllers/MeController.cs       |   1 -
+ .NET/EcoLens.Api/Controllers/TreesController.cs    | 149 ++++---
+ .../Controllers/UserProfileController.cs           |   1 -
+ .NET/EcoLens.Api/Data/ApplicationDbContext.cs      |  26 +-
+ mobile/AD/app/build.gradle.kts                     |   7 +-
+ mobile/AD/app/src/main/AndroidManifest.xml         |   2 +-
+ .../edu/sg/sharedprefs/admobile/AddFoodActivity.kt | 355 ----------------
+ .../sg/sharedprefs/admobile/data/model/AuthDto.kt  |  33 ++
+ .../sg/sharedprefs/admobile/data/model/ChatDto.kt  |   7 +
+ .../sg/sharedprefs/admobile/data/model/FoodDto.kt  |  74 ++++
+ .../admobile/data/model/LeaderboardDto.kt          |  10 +
+ .../sharedprefs/admobile/data/model/MainPageDto.kt |  30 ++
+ .../admobile/data/model/MainPageResponseDto.kt     |   8 -
+ .../sharedprefs/admobile/data/model/TravelDto.kt   |  16 +
+ .../sharedprefs/admobile/data/model/UtilityDto.kt  |  43 ++
+ .../admobile/data/network/EcoLensApiService.kt     | 163 ++++++++
+ .../admobile/data/network/NetworkClient.kt         |  11 +
+ .../admobile/ui/activity/AddFoodActivity.kt        | 332 +++++++++++++--
+ .../admobile/ui/activity/AddTravelActivity.kt      |  47 ++-
+ .../admobile/ui/activity/AddUtilityActivity.kt     | 258 +++++++-----
+ .../admobile/ui/activity/AiAssistantActivity.kt    |  64 +--
+ .../ui/activity/EmissionRecordsActivity.kt         | 418 +++++++++++++++++--
+ .../admobile/ui/activity/IntroActivity.kt          |  19 +-
+ .../admobile/ui/activity/LeaderboardActivity.kt    | 169 +++++---
+ .../admobile/ui/activity/LoginActivity.kt          |  66 ++-
+ .../admobile/ui/activity/MainActivity.kt           | 158 +++++--
+ .../admobile/ui/activity/ProfileActivity.kt        | 458 +++++++++++++--------
+ .../admobile/ui/activity/ProfileStatsActivity.kt   | 279 ++++++++-----
+ .../admobile/ui/adapter/LeaderboardAdapter.kt      |  63 +++
+ .../admobile/ui/adapter/RecordAdapter.kt           | 103 ++++-
+ .../edu/sg/sharedprefs/admobile/utils/ApiHelper.kt |  88 ----
+ .../admobile/utils/StepCounterManager.kt           |  53 +++
+ .../src/main/res/drawable/ic_arrow_drop_down.xml   |   5 +
+ .../AD/app/src/main/res/drawable/ic_calculate.xml  |   5 +
+ .../main/res/drawable/shape_badge_transport.xml    |   5 +
+ .../src/main/res/drawable/shape_badge_utility.xml  |   5 +
+ .../src/main/res/layout/activity_ai_assistant.xml  |   3 +
+ .../src/main/res/layout/activity_leaderboard.xml   |  20 +-
+ .../AD/app/src/main/res/layout/activity_main.xml   |  20 +-
+ .../app/src/main/res/layout/activity_profile.xml   |   9 +-
+ .../app/src/main/res/layout/activity_records.xml   |   9 +-
+ .../src/main/res/layout/activity_statistics.xml    |   4 +-
+ .../app/src/main/res/layout/add_food_activity.xml  |  78 ++--
+ .../src/main/res/layout/add_utility_activity.xml   |  65 ++-
+ .../src/main/res/layout/dialog_change_password.xml |  42 ++
+ .../res/layout/dialog_change_password_step2.xml    |  29 ++
+ .../src/main/res/layout/dialog_record_detail.xml   |  27 ++
+ .../AD/app/src/main/res/layout/intro_activity.xml  |  29 +-
+ .../AD/app/src/main/res/layout/item_detail_row.xml |  19 +
+ .../src/main/res/layout/item_emission_record.xml   |  18 +-
+ .../app/src/main/res/layout/item_podium_user.xml   |  12 +-
+ .../app/src/main/res/layout/item_ranking_row.xml   |  10 +-
+ .../AD/app/src/main/res/layout/login_activity.xml  |  23 +-
+ mobile/AD/app/src/main/res/menu/menu_records.xml   |   8 +
+ mobile/AD/app/src/main/res/xml/file_paths.xml      |   2 +-
+ web/src/pages/Dashboard.tsx                        |  36 +-
+ web/src/pages/Profile.tsx                          |  17 +-
+ web/src/pages/TreePlanting.tsx                     |  97 +++--
+ web/src/utils/request.ts                           |   3 +-
+ 59 files changed, 2833 insertions(+), 1278 deletions(-)
+ delete mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/AddFoodActivity.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/data/model/ChatDto.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/data/model/FoodDto.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/data/model/LeaderboardDto.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/data/model/MainPageDto.kt
+ delete mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/data/model/MainPageResponseDto.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/data/model/UtilityDto.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/ui/adapter/LeaderboardAdapter.kt
+ delete mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/utils/ApiHelper.kt
+ create mode 100644 mobile/AD/app/src/main/java/iss/nus/edu/sg/sharedprefs/admobile/utils/StepCounterManager.kt
+ create mode 100644 mobile/AD/app/src/main/res/drawable/ic_arrow_drop_down.xml
+ create mode 100644 mobile/AD/app/src/main/res/drawable/ic_calculate.xml
+ create mode 100644 mobile/AD/app/src/main/res/drawable/shape_badge_transport.xml
+ create mode 100644 mobile/AD/app/src/main/res/drawable/shape_badge_utility.xml
+ create mode 100644 mobile/AD/app/src/main/res/layout/dialog_change_password.xml
+ create mode 100644 mobile/AD/app/src/main/res/layout/dialog_change_password_step2.xml
+ create mode 100644 mobile/AD/app/src/main/res/layout/dialog_record_detail.xml
+ create mode 100644 mobile/AD/app/src/main/res/layout/item_detail_row.xml
+ create mode 100644 mobile/AD/app/src/main/res/menu/menu_records.xml
+Updating d9737e7..552a35c
+Fast-forward (no commit created; -m option ignored)
+ .NET/EcoLens.Api/Controllers/AuthController.cs |   8 +-
+ web/src/pages/Leaderboard.tsx                  |   3 +-
+ web/src/pages/Login.tsx                        |  14 +-
+ web/src/pages/Profile.tsx                      | 186 +++++++++++++++++++------
+ web/src/utils/request.ts                       |  47 ++++++-
+ 5 files changed, 208 insertions(+), 50 deletions(-)
+git : remote: 
+所在位置 D:\ADProject-main\ADProject-main\_git_web_push.ps1:35 字符: 1
++ git push origin main 2>&1 | Out-File $log -Append -Encoding utf
+8
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (remote: :String) [] 
+   , RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+remote: GitHub found 3 vulnerabilities on yhnapoleon/ADProject's 
+default branch (2 high, 1 moderate). To find out more, visit:    
+    
+remote:      https://github.com/yhnapoleon/ADProject/security/dep
+endabot        
+remote: 
+To https://github.com/yhnapoleon/ADProject.git
+   d9737e7..552a35c  main -> main
+=== final status ===
+## main...origin/main
+ M web/.env.local
+?? EcoLens-debug.apk
+?? _git_result.txt
+?? _git_web_push.ps1
+* main       552a35c web: login/profile/request fixes, profile load optimization, API timing and timeout handling
+  master     a21e8b1 feat: Integrate Climatiq and Barcode management, update docs
+  xuwenzhe   552a35c web: login/profile/request fixes, profile load optimization, API timing and timeout handling
+  zhoufushun 83e93de chore: remove EcoLens.Api bin/obj generated files

@@ -846,7 +846,7 @@ public class AdminController : ControllerBase
 	#region Analytics
 
 	/// <summary>
-	/// 类目占比（按 ActivityLog 的 CarbonReference.Category 汇总，并包含 TravelLogs 的碳排放）。
+	/// 类目占比（按 ActivityLog 的 CarbonReference.Category 汇总，并包含 TravelLogs、UtilityBills、FoodRecords 的碳排放）。
 	/// </summary>
 	[HttpGet("analytics/category-share")]
 	public async Task<ActionResult<IEnumerable<object>>> CategoryShare(CancellationToken ct)
@@ -870,13 +870,24 @@ public class AdminController : ControllerBase
 		var utilityBillsEmission = await _db.UtilityBills
 			.SumAsync(b => (decimal?)b.TotalCarbonEmission, ct) ?? 0m;
 
-		// 4. 计算各类别的总碳排放
+		// 4. 从 FoodRecords 汇总所有食物记录碳排放（计入 Food 类别；表可能不存在则忽略）
+		decimal foodRecordsEmission = 0m;
+		try
+		{
+			foodRecordsEmission = await _db.FoodRecords.SumAsync(r => r.Emission, ct);
+		}
+		catch (Exception)
+		{
+			// FoodRecords 表可能不存在（未执行迁移），忽略
+		}
+
+		// 5. 计算各类别的总碳排放
 		decimal GetTotal(CarbonCategory cat) => grouped.FirstOrDefault(x => x.Category == cat)?.Total ?? 0m;
-		var food = GetTotal(CarbonCategory.Food);
+		var food = GetTotal(CarbonCategory.Food) + foodRecordsEmission; // Food = ActivityLogs 中的 Food + FoodRecords
 		var transport = GetTotal(CarbonCategory.Transport) + travelEmission; // Transport = ActivityLogs 中的 Transport + TravelLogs
 		var utility = GetTotal(CarbonCategory.Utility) + utilityBillsEmission; // Utility = ActivityLogs 中的 Utility + UtilityBills
 
-		// 5. 计算总碳排放和百分比
+		// 6. 计算总碳排放和百分比
 		var total = food + transport + utility;
 		decimal AsPercent(decimal part) => total > 0 ? Math.Round(part * 100m / total, 2) : 0m;
 

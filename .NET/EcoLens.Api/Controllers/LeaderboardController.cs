@@ -139,11 +139,27 @@ public class LeaderboardController : ControllerBase
 		}
 		catch { /* FoodRecords table may not exist */ }
 
-		var emissionByUser = users.ToDictionary(u => u.Id, _ => 0m);
-		foreach (var e in activityEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
-		foreach (var e in travelEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
-		foreach (var e in utilityEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
-		foreach (var kv in foodDict) emissionByUser[kv.Key] = emissionByUser.GetValueOrDefault(kv.Key) + kv.Value;
+		// When period is "all", use TotalCarbonEmission from user table (which already contains all historical data)
+		// and add FoodRecords (since TotalCarbonEmission doesn't include FoodRecords)
+		var emissionByUser = new Dictionary<int, decimal>();
+		if (!from.HasValue && !toDate.HasValue)
+		{
+			// Period is "all" - use TotalCarbonEmission from user table + FoodRecords
+			foreach (var u in users)
+			{
+				var foodEmission = foodDict.GetValueOrDefault(u.Id);
+				emissionByUser[u.Id] = u.TotalCarbonEmission + foodEmission;
+			}
+		}
+		else
+		{
+			// Period is "today", "week", or "month" - calculate from logs
+			emissionByUser = users.ToDictionary(u => u.Id, _ => 0m);
+			foreach (var e in activityEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
+			foreach (var e in travelEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
+			foreach (var e in utilityEmissions) emissionByUser[e.UserId] = emissionByUser.GetValueOrDefault(e.UserId) + e.Emission;
+			foreach (var kv in foodDict) emissionByUser[kv.Key] = emissionByUser.GetValueOrDefault(kv.Key) + kv.Value;
+		}
 
 		// Sort: today by today's points, week by week's points, month by month's points, all by total points (all descending)
 		var list = users

@@ -77,11 +77,13 @@ service.interceptors.response.use(
     if ((error as any).code === 'ECONNABORTED' && /timeout/i.test(error.message)) {
       console.warn(`[API] timeout after ${cfg.timeout ?? 'unknown'}ms: ${method} ${url}`);
     }
-    // 处理401未授权错误，清除token
+    // 处理401未授权错误，清除token和登录状态
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('adminToken');
       localStorage.removeItem('adminAuthenticated');
+      localStorage.removeItem('user');
+      localStorage.removeItem('isLoggedIn');
       // 注意：不再在这里自动跳转，让调用方决定如何处理
       // 这样可以避免在上传图片等操作时意外跳转
     }

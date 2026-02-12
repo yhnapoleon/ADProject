@@ -13,6 +13,20 @@ namespace EcoLens.Tests.Controllers;
 
 public class TreesControllerTests
 {
+	/// <summary>与 TreesController 的「今天」一致（新加坡时区或 UTC），保证 CI/本地都能查到今日步数。</summary>
+	private static DateTime GetTodayForSteps()
+	{
+		try
+		{
+			var tz = TimeZoneInfo.FindSystemTimeZoneById("Singapore Standard Time");
+			return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+		}
+		catch
+		{
+			return DateTime.UtcNow.Date;
+		}
+	}
+
 	private static ApplicationDbContext CreateDb(bool withUser = false, int? todaySteps = null)
 	{
 		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -38,7 +52,7 @@ public class TreesControllerTests
 			db.SaveChanges();
 			if (todaySteps.HasValue && todaySteps.Value > 0)
 			{
-				var today = DateTime.UtcNow.Date;
+				var today = GetTodayForSteps();
 				db.StepRecords.Add(new StepRecord
 				{
 					UserId = user.Id,
@@ -240,5 +254,71 @@ public class TreesControllerTests
 		Assert.NotNull(ok.Value);
 		var todaySteps = ok.Value.GetType().GetProperty("todaySteps")?.GetValue(ok.Value);
 		Assert.Equal(2000, todaySteps);
+	}
+
+	[Fact]
+	public async Task Grow_ReturnsUnauthorized_WhenUserNotSet()
+	{
+		await using var db = CreateDb(withUser: true, todaySteps: 500);
+		var pointService = new Mock<IPointService>();
+		var controller = new TreesController(db, pointService.Object);
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() } };
+
+		var result = await controller.Grow(CancellationToken.None);
+
+		Assert.IsType<UnauthorizedResult>(result.Result);
+	}
+
+	[Fact]
+	public async Task Grow_ReturnsNotFound_WhenUserNotInDb()
+	{
+		await using var db = CreateDb(false);
+		var pointService = new Mock<IPointService>();
+		var controller = new TreesController(db, pointService.Object);
+		SetUser(controller, 999);
+
+		var result = await controller.Grow(CancellationToken.None);
+
+		Assert.IsType<NotFoundResult>(result.Result);
+	}
+
+	[Fact]
+	public async Task Grow_ReturnsBadRequest_WhenNoStepsAvailable()
+	{
+		await using var db = CreateDb(withUser: true, todaySteps: 0);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var pointService = new Mock<IPointService>();
+		var controller = new TreesController(db, pointService.Object);
+		SetUser(controller, user.Id);
+
+		var result = await controller.Grow(CancellationToken.None);
+
+		var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+		Assert.NotNull(badRequest.Value);
+		var msg = badRequest.Value!.GetType().GetProperty("message")?.GetValue(badRequest.Value)?.ToString();
+		Assert.Contains("No steps available", msg!, StringComparison.OrdinalIgnoreCase);
+	}
+
+	[Fact]
+	public async Task Grow_ReturnsOkWithProgress_WhenStepsAvailable()
+	{
+		await using var db = CreateDb(withUser: true, todaySteps: 300);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var pointService = new Mock<IPointService>();
+		var controller = new TreesController(db, pointService.Object);
+		SetUser(controller, user.Id);
+
+		var result = await controller.Grow(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		Assert.NotNull(ok.Value);
+		var treesTotal = ok.Value!.GetType().GetProperty("TreesTotalCount")?.GetValue(ok.Value);
+		var currentProgress = ok.Value.GetType().GetProperty("CurrentTreeProgress")?.GetValue(ok.Value);
+		var availableSteps = ok.Value.GetType().GetProperty("AvailableSteps")?.GetValue(ok.Value);
+		Assert.NotNull(treesTotal);
+		Assert.NotNull(currentProgress);
+		Assert.Equal(0, availableSteps); // 全部消耗后可用为 0
+		var updated = await db.ApplicationUsers.FirstAsync(u => u.Id == user.Id);
+		Assert.Equal(300, updated.StepsUsedToday);
 	}
 }

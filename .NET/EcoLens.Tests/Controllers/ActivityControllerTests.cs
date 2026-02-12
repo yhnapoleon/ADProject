@@ -258,4 +258,95 @@ public class ActivityControllerTests
 		var list = Assert.IsAssignableFrom<IEnumerable<RegionHeatmapDto>>(ok.Value);
 		Assert.NotNull(list);
 	}
+
+	[Fact]
+	public async Task DailyNetValue_ReturnsUnauthorized_WhenUserNotSet()
+	{
+		await using var db = await CreateDbAsync(true);
+		var mockClimatiq = new Mock<IClimatiqService>();
+		var mockPoint = new Mock<IPointService>();
+		mockPoint.Setup(x => x.CalculateDailyNetValueAsync(It.IsAny<int>(), It.IsAny<DateTime>())).ReturnsAsync(0m);
+		var controller = new ActivityController(db, mockClimatiq.Object, mockPoint.Object);
+		controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal() } };
+
+		var result = await controller.DailyNetValue(CancellationToken.None);
+
+		Assert.IsType<UnauthorizedResult>(result.Result);
+	}
+
+	[Fact]
+	public async Task DailyNetValue_ReturnsOkWithBreakdown_WhenUserSet()
+	{
+		await using var db = await CreateDbAsync(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var mockClimatiq = new Mock<IClimatiqService>();
+		var mockPoint = new Mock<IPointService>();
+		mockPoint.Setup(x => x.CalculateDailyNetValueAsync(user.Id, It.IsAny<DateTime>())).ReturnsAsync(1.5m);
+		var controller = new ActivityController(db, mockClimatiq.Object, mockPoint.Object);
+		SetUser(controller, user.Id);
+
+		var result = await controller.DailyNetValue(CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<DailyNetValueResponseDto>(ok.Value);
+		Assert.Equal(1.5m, dto.Value);
+		Assert.NotNull(dto.Breakdown);
+		Assert.Equal(15.0m, dto.Breakdown.Benchmark);
+	}
+
+	[Fact]
+	public async Task Stats_ReturnsNotFound_WhenUserMissing()
+	{
+		await using var db = await CreateDbAsync(false);
+		var mockClimatiq = new Mock<IClimatiqService>();
+		var mockPoint = new Mock<IPointService>();
+		var controller = new ActivityController(db, mockClimatiq.Object, mockPoint.Object);
+		SetUser(controller, 99999);
+
+		var result = await controller.Stats(CancellationToken.None);
+
+		Assert.IsType<NotFoundResult>(result.Result);
+	}
+
+	[Fact]
+	public async Task Upload_ReturnsOk_WhenUtilityCategoryAndRegionMatch()
+	{
+		await using var db = await CreateDbAsync(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var carbonRef = await db.CarbonReferences.FirstOrDefaultAsync(c => c.Category == CarbonCategory.Utility);
+		if (carbonRef == null)
+		{
+			carbonRef = new EcoLens.Api.Models.CarbonReference { LabelName = "Electricity", Category = CarbonCategory.Utility, Co2Factor = 0.5m, Unit = "kWh", Region = "SG" };
+			db.CarbonReferences.Add(carbonRef);
+			await db.SaveChangesAsync();
+		}
+		var mockClimatiq = new Mock<IClimatiqService>();
+		var mockPoint = new Mock<IPointService>();
+		mockPoint.Setup(x => x.RecalculateTotalCarbonSavedAsync(It.IsAny<int>())).Returns(Task.CompletedTask);
+		var controller = new ActivityController(db, mockClimatiq.Object, mockPoint.Object, NullLogger<ActivityController>.Instance);
+		SetUser(controller, user.Id);
+
+		var result = await controller.Upload(new CreateActivityLogDto { Label = carbonRef.LabelName, Category = CarbonCategory.Utility, Quantity = 10, Unit = carbonRef.Unit }, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var dto = Assert.IsType<ActivityLogResponseDto>(ok.Value);
+		Assert.Equal(carbonRef.LabelName, dto.Label);
+	}
+
+	[Fact]
+	public async Task ChartData_DefaultsTo7Days_WhenDaysZeroOrNegative()
+	{
+		await using var db = await CreateDbAsync(true);
+		var user = await db.ApplicationUsers.FirstAsync();
+		var mockClimatiq = new Mock<IClimatiqService>();
+		var mockPoint = new Mock<IPointService>();
+		var controller = new ActivityController(db, mockClimatiq.Object, mockPoint.Object);
+		SetUser(controller, user.Id);
+
+		var result = await controller.ChartData(0, CancellationToken.None);
+
+		var ok = Assert.IsType<OkObjectResult>(result.Result);
+		var list = Assert.IsAssignableFrom<IEnumerable<ChartDataPointDto>>(ok.Value);
+		Assert.Equal(7, list.Count());
+	}
 }
