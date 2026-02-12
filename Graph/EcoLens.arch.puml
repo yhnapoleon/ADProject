@@ -1,0 +1,61 @@
+@startuml
+title EcoLens Architecture (Container/Component)
+left to right direction
+skinparam componentStyle rectangle
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+
+actor "User" as User
+component "Browser (Web)" as Browser
+component "Android App (Kotlin)" as Android
+component "Web UI\nReact + Vite\n:5173" as Web
+
+node "Backend" {
+  component "EcoLens.Api\n.NET 8 Web API\n:5133\nJWT + Swagger\n/metrics" as Api
+}
+
+database "SQL Server\nEcoLensDb" as Sql
+
+node "AI / Recognition" {
+  component "VisionService\nFastAPI\n:8000 (local) / Azure (prod)\n/metrics" as Vision
+}
+
+node "Observability" {
+  component "Prometheus\nscrape /metrics" as Prom
+  component "Azure Application Insights\nTelemetry" as AppInsights
+}
+
+cloud "External Services" {
+  component "Google Maps API\nGeocoding + Routing" as GMaps
+  component "Climatiq API\nEmission Factors" as Clim
+  component "OpenFoodFacts API\nBarcode Products" as OFF
+  component "Google Cloud Vision API\nOCR" as GCV
+  component "LLM API\n(GeminiService via AiSettings.BaseUrl)" as LLM
+}
+
+User --> Browser
+Browser --> Web
+
+User --> Android
+
+Web --> Api : HTTP/JSON
+Android --> Api : HTTP/JSON
+
+Api --> Sql : EF Core / SQL
+Api --> Vision : HTTP (IVisionService)
+
+Api --> GMaps : HTTP
+Api --> Clim : HTTP
+Api --> OFF : HTTP
+Api --> GCV : HTTP
+Api --> LLM : HTTP
+
+Prom --> Api : scrape /metrics
+Prom --> Vision : scrape /metrics
+
+Api --> AppInsights : telemetry
+Vision --> AppInsights : telemetry
+
+@enduml
+

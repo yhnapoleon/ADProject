@@ -14,6 +14,11 @@ public class ApplicationDbContext : DbContext
 	}
 
 	public DbSet<ApplicationUser> ApplicationUsers => Set<ApplicationUser>();
+
+	/// <summary>
+	/// 兼容部分代码/文档中使用的 _context.Users 写法（本项目实际表为 ApplicationUsers）。
+	/// </summary>
+	public DbSet<ApplicationUser> Users => Set<ApplicationUser>();
 	public DbSet<CarbonReference> CarbonReferences => Set<CarbonReference>();
 	public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 	public DbSet<AiInsight> AiInsights => Set<AiInsight>();

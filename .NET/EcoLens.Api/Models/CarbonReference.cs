@@ -18,6 +18,13 @@ public class CarbonReference : BaseEntity
 	[Column(TypeName = "decimal(18,4)")]
 	public decimal Co2Factor { get; set; }
 
+	/// <summary>
+	/// 兼容文档/接口描述中的命名：CarbonEmission。
+	/// 注意：数据库实际字段为 Co2Factor（单位见 Unit）。
+	/// </summary>
+	[NotMapped]
+	public decimal CarbonEmission => Co2Factor;
+
 	[Required]
 	[MaxLength(50)]
 	public string Unit { get; set; } = string.Empty;

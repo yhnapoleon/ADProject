@@ -43,6 +43,16 @@ public class ApplicationUser : BaseEntity
 
 	public int CurrentPoints { get; set; }
 
+	/// <summary>
+	/// 兼容部分接口描述中的字段名：Points（等同于 CurrentPoints）。
+	/// </summary>
+	[NotMapped]
+	public int Points
+	{
+		get => CurrentPoints;
+		set => CurrentPoints = value;
+	}
+
 	[MaxLength(100)]
 	[Required]
 	public string Region { get; set; } = string.Empty;

@@ -1,7 +1,9 @@
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using EcoLens.Api.DTOs;
 using EcoLens.Api.Services;
@@ -27,6 +29,14 @@ public class GeminiService : IAiService
 
 	public async Task<string> GetAnswerAsync(string userPrompt)
 	{
+		return await GetAnswerAsync(userPrompt, systemPrompt: null, ct: default);
+	}
+
+	/// <summary>
+	/// 支持 System Prompt 的 Chat Completions 调用（OpenAI 兼容 messages 协议）。
+	/// </summary>
+	public async Task<string> GetAnswerAsync(string userPrompt, string? systemPrompt, CancellationToken ct = default)
+	{
 		if (string.IsNullOrWhiteSpace(userPrompt))
 		{
 			return string.Empty;
@@ -48,19 +58,23 @@ public class GeminiService : IAiService
 		using var request = new HttpRequestMessage(HttpMethod.Post, targetUrl);
 		request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _settings.ApiKey);
 
+		var messages = new List<object>(capacity: 2);
+		if (!string.IsNullOrWhiteSpace(systemPrompt))
+		{
+			messages.Add(new { role = "system", content = systemPrompt });
+		}
+		messages.Add(new { role = "user", content = userPrompt });
+
 		var body = new
 		{
 			model = string.IsNullOrWhiteSpace(_settings.Model) ? "gemini-3-flash-preview" : _settings.Model,
-			messages = new object[]
-			{
-				new { role = "user", content = userPrompt }
-			}
+			messages = messages.ToArray()
 		};
 
 		var json = JsonSerializer.Serialize(body, SerializerOptions);
 		request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-		using var response = await _httpClient.SendAsync(request);
+		using var response = await _httpClient.SendAsync(request, ct);
 		var responseText = await response.Content.ReadAsStringAsync();
 
 		if (!response.IsSuccessStatusCode)
