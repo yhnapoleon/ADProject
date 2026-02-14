@@ -38,7 +38,7 @@ npm install
 ```bash
 npm run dev
 ```
-开发服务器将在 `http://localhost:3000` 启动，支持热模块替换 (HMR)
+开发服务器默认在 `http://localhost:5173` 启动，支持热模块替换 (HMR)
 
 ### 生产构建
 ```bash
@@ -145,14 +145,22 @@ function UserComponent() {
 
 ## 🔌 环境变量配置
 
-在项目根目录创建 `.env` 文件配置环境变量：
+本项目通过 `VITE_API_URL` 指定后端 API 的 **origin**（例如 `http://localhost:5133` 或 Azure 后端域名）。
+
+你可以直接在 shell 中临时设置（Windows PowerShell 示例）：
+
+```powershell
+$env:VITE_API_URL="http://localhost:5133"
+npm run dev
+```
+
+或参考 `web/env.example` 创建你的本地环境文件（注意：Vite 环境变量会在构建时固化到产物里）。
+
+示例：
 
 ```env
-# .env
-VITE_API_URL=http://localhost:5000/api
-
-# .env.production
-VITE_API_URL=https://api.example.com
+VITE_API_URL=http://localhost:5133
+# VITE_API_URL=https://ecolens-api-daa7a0e4a3d4d7e8.southeastasia-01.azurewebsites.net
 ```
 
 在代码中使用：
@@ -298,4 +306,3 @@ service.interceptors.request.use((config) => {
 4. 复杂的逻辑单独提取为 Hook 或工具函数
 5. 为公共组件和函数添加必要的文档注释
 
-6666
