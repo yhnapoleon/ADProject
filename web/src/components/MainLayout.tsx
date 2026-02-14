@@ -1,6 +1,7 @@
 import { Layout, Menu, Button, Avatar, Space } from 'antd';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import dayjs from 'dayjs';
+import logo from '../assets/icons/splash.svg';
 import {
   AppstoreOutlined,
   CoffeeOutlined,
@@ -90,7 +91,7 @@ const MainLayout: React.FC = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '20px', borderBottom: '1px solid #f0f0f0', marginBottom: '16px' }}>
           <img
-            src="/src/assets/icons/splash.svg"
+            src={logo}
             alt="Logo"
             style={{ width: '40px', height: '40px' }}
           />

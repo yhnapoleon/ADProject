@@ -322,7 +322,7 @@ const Dashboard = () => {
                       <span>{user.nickname ?? user.username ?? '-'}</span>
                     </div>
                     <span style={{ fontWeight: 700, color: '#674fa3' }}>
-                      {numberFormatter.format(user.emissionsTotal ?? 0)} kg
+                      {numberFormatter.format(user.pointsToday ?? 0)} pts
                     </span>
                   </div>
                 ))
