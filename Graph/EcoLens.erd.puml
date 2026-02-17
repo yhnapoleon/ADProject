@@ -1,0 +1,261 @@
+@startuml
+hide circle
+skinparam linetype ortho
+
+entity "ApplicationUsers" as ApplicationUsers {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  Username : nvarchar(100)
+  Nickname : nvarchar(100) <<nullable>>
+  Email : nvarchar(256) <<unique>>
+  PasswordHash : nvarchar(512)
+  Role : int
+  AvatarUrl : nvarchar(max) <<nullable>>
+  TotalCarbonSaved : decimal(18,2)
+  TotalCarbonEmission : decimal(18,4)
+  CurrentPoints : int
+  Region : nvarchar(100)
+  BirthDate : datetime
+  LastNeutralDate : datetime <<nullable>>
+  ContinuousNeutralDays : int
+  StepsUsedToday : int
+  LastStepUsageDate : datetime <<nullable>>
+  IsActive : bit
+  TreesTotalCount : int
+  CurrentTreeProgress : int
+}
+
+entity "CarbonReferences" as CarbonReferences {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  LabelName : nvarchar(100)
+  Category : int
+  Co2Factor : decimal(18,4)
+  Unit : nvarchar(50)
+  Region : nvarchar(100) <<nullable>>
+  Source : nvarchar(50)
+  ClimatiqActivityId : nvarchar(200) <<nullable>>
+}
+
+entity "ActivityLogs" as ActivityLogs {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  CarbonReferenceId : int <<FK>>
+  Quantity : decimal(18,4)
+  TotalEmission : decimal(18,4)
+  ImageUrl : nvarchar(1024) <<nullable>>
+  DetectedLabel : nvarchar(200) <<nullable>>
+}
+
+entity "AiInsights" as AiInsights {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  Content : nvarchar(max)
+  Type : int
+  IsRead : bit
+}
+
+entity "StepRecords" as StepRecords {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  StepCount : int
+  RecordDate : datetime
+  CarbonOffset : decimal(18,4)
+}
+
+entity "TravelLogs" as TravelLogs {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  TransportMode : int
+  OriginAddress : nvarchar(500)
+  OriginLatitude : decimal(10,7)
+  OriginLongitude : decimal(10,7)
+  DestinationAddress : nvarchar(500)
+  DestinationLatitude : decimal(10,7)
+  DestinationLongitude : decimal(10,7)
+  DistanceMeters : int
+  DistanceKilometers : decimal(10,2)
+  DurationSeconds : int <<nullable>>
+  CarbonEmission : decimal(18,4)
+  RoutePolyline : nvarchar(5000) <<nullable>>
+  Notes : nvarchar(1000) <<nullable>>
+  PassengerCount : int <<nullable>>
+}
+
+entity "UtilityBills" as UtilityBills {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  YearMonth : nvarchar(7)
+  BillType : int
+  BillPeriodStart : datetime
+  BillPeriodEnd : datetime
+  ElectricityUsage : decimal(18,4) <<nullable>>
+  ElectricityCost : decimal(18,2)
+  WaterUsage : decimal(18,4) <<nullable>>
+  WaterCost : decimal(18,2)
+  GasUsage : decimal(18,4) <<nullable>>
+  GasCost : decimal(18,2)
+  ElectricityCarbonEmission : decimal(18,4)
+  WaterCarbonEmission : decimal(18,4)
+  GasCarbonEmission : decimal(18,4)
+  TotalCarbonEmission : decimal(18,4)
+  InputMethod : int
+  OcrConfidence : decimal(18,4) <<nullable>>
+  OcrRawText : nvarchar(max) <<nullable>>
+  Notes : nvarchar(1000) <<nullable>>
+}
+
+entity "FoodRecords" as FoodRecords {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  Name : nvarchar(200)
+  Amount : float
+  EmissionFactor : decimal(18,4)
+  Emission : decimal(18,4)
+  Note : nvarchar(500) <<nullable>>
+}
+
+entity "DietRecords" as DietRecords {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  Name : nvarchar(200)
+  Amount : float
+  EmissionFactor : decimal(18,4)
+  Emission : decimal(18,4)
+}
+
+entity "Posts" as Posts {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : int <<FK>>
+  Title : nvarchar(200)
+  Content : nvarchar(max)
+  ImageUrls : nvarchar(max) <<nullable>>
+  Type : int
+  ViewCount : int
+  IsDeleted : bit
+}
+
+entity "Comments" as Comments {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  PostId : int <<FK>>
+  UserId : int <<FK>>
+  Content : nvarchar(2000)
+}
+
+entity "UserFollows" as UserFollows {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  FollowerId : int <<FK>>
+  FolloweeId : int <<FK>>
+}
+
+entity "DietTemplates" as DietTemplates {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  UserId : uniqueidentifier
+  TemplateName : nvarchar(100)
+}
+
+entity "DietTemplateItems" as DietTemplateItems {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  DietTemplateId : int <<FK>>
+  FoodId : int
+  Quantity : float
+  Unit : nvarchar(50)
+}
+
+entity "BarcodeReferences" as BarcodeReferences {
+  *Id : int
+  --
+  CreatedAt : datetime
+  UpdatedAt : datetime
+  Barcode : nvarchar(50)
+  ProductName : nvarchar(200)
+  CarbonReferenceId : int <<FK>> <<nullable>>
+  Category : nvarchar(max) <<nullable>>
+  Brand : nvarchar(100) <<nullable>>
+}
+
+entity "PointAwardLogs" as PointAwardLogs {
+  *Id : int
+  --
+  UserId : int
+  Points : int
+  AwardedAt : datetime
+  Source : nvarchar(32)
+  CreatedAt : datetime
+}
+
+entity "SystemSettings" as SystemSettings {
+  *Id : int
+  --
+  ConfidenceThreshold : int
+  VisionModel : nvarchar(100)
+  WeeklyDigest : bit
+  MaintenanceMode : bit
+}
+
+' ====== Relations (from ApplicationDbContextModelSnapshot.cs) ======
+
+ApplicationUsers "1" -- "0..*" ActivityLogs : UserId
+CarbonReferences "1" -- "0..*" ActivityLogs : CarbonReferenceId
+
+ApplicationUsers "1" -- "0..*" AiInsights : UserId
+ApplicationUsers "1" -- "0..*" StepRecords : UserId
+ApplicationUsers "1" -- "0..*" TravelLogs : UserId
+ApplicationUsers "1" -- "0..*" UtilityBills : UserId
+
+ApplicationUsers "1" -- "0..*" FoodRecords : UserId
+ApplicationUsers "1" -- "0..*" DietRecords : UserId
+
+ApplicationUsers "1" -- "0..*" Posts : UserId
+Posts "1" -- "0..*" Comments : PostId
+ApplicationUsers "1" -- "0..*" Comments : UserId
+
+ApplicationUsers "1" -- "0..*" UserFollows : FollowerId
+ApplicationUsers "1" -- "0..*" UserFollows : FolloweeId
+
+DietTemplates "1" -- "0..*" DietTemplateItems : DietTemplateId
+
+CarbonReferences "0..1" -- "0..*" BarcodeReferences : CarbonReferenceId
+
+@enduml
+

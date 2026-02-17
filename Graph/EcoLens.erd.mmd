@@ -1,0 +1,236 @@
+erDiagram
+  ApplicationUsers ||--o{ ActivityLogs : "UserId"
+  CarbonReferences ||--o{ ActivityLogs : "CarbonReferenceId"
+
+  ApplicationUsers ||--o{ AiInsights : "UserId"
+  ApplicationUsers ||--o{ StepRecords : "UserId"
+  ApplicationUsers ||--o{ TravelLogs : "UserId"
+  ApplicationUsers ||--o{ UtilityBills : "UserId"
+  ApplicationUsers ||--o{ FoodRecords : "UserId"
+  ApplicationUsers ||--o{ DietRecords : "UserId"
+  ApplicationUsers ||--o{ Posts : "UserId"
+  ApplicationUsers ||--o{ Comments : "UserId"
+
+  Posts ||--o{ Comments : "PostId"
+
+  ApplicationUsers ||--o{ UserFollows : "FollowerId"
+  ApplicationUsers ||--o{ UserFollows : "FolloweeId"
+
+  DietTemplates ||--o{ DietTemplateItems : "DietTemplateId"
+
+  CarbonReferences o|--o{ BarcodeReferences : "CarbonReferenceId (nullable)"
+
+  ActivityLogs {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    int CarbonReferenceId FK
+    decimal_18_4 Quantity
+    decimal_18_4 TotalEmission
+    nvarchar_1024 ImageUrl "nullable"
+    nvarchar_200 DetectedLabel "nullable"
+  }
+
+  AiInsights {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    nvarchar_max Content
+    int Type
+    bit IsRead
+  }
+
+  ApplicationUsers {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    nvarchar_100 Username
+    nvarchar_100 Nickname "nullable"
+    nvarchar_256 Email "UNIQUE"
+    nvarchar_512 PasswordHash
+    int Role
+    nvarchar_max AvatarUrl "nullable"
+    decimal_18_2 TotalCarbonSaved
+    decimal_18_4 TotalCarbonEmission
+    int CurrentPoints
+    nvarchar_100 Region
+    datetime BirthDate
+    datetime LastNeutralDate "nullable"
+    int ContinuousNeutralDays
+    int StepsUsedToday
+    datetime LastStepUsageDate "nullable"
+    bit IsActive
+    int TreesTotalCount
+    int CurrentTreeProgress
+  }
+
+  BarcodeReferences {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    nvarchar_50 Barcode
+    nvarchar_200 ProductName
+    int CarbonReferenceId FK "nullable"
+    nvarchar_max Category "nullable"
+    nvarchar_100 Brand "nullable"
+  }
+
+  CarbonReferences {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    nvarchar_100 LabelName
+    int Category
+    decimal_18_4 Co2Factor
+    nvarchar_50 Unit
+    nvarchar_100 Region "nullable"
+    nvarchar_50 Source
+    nvarchar_200 ClimatiqActivityId "nullable"
+  }
+
+  Comments {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int PostId FK
+    int UserId FK
+    nvarchar_2000 Content
+  }
+
+  DietRecords {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    nvarchar_200 Name
+    float Amount
+    decimal_18_4 EmissionFactor
+    decimal_18_4 Emission
+  }
+
+  DietTemplates {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    uniqueidentifier UserId
+    nvarchar_100 TemplateName
+  }
+
+  DietTemplateItems {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int DietTemplateId FK
+    int FoodId
+    float Quantity
+    nvarchar_50 Unit
+  }
+
+  FoodRecords {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    nvarchar_200 Name
+    float Amount
+    decimal_18_4 EmissionFactor
+    decimal_18_4 Emission
+    nvarchar_500 Note "nullable"
+  }
+
+  PointAwardLogs {
+    int Id PK
+    int UserId
+    int Points
+    datetime AwardedAt
+    nvarchar_32 Source
+    datetime CreatedAt
+  }
+
+  Posts {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    nvarchar_200 Title
+    nvarchar_max Content
+    nvarchar_max ImageUrls "nullable"
+    int Type
+    int ViewCount
+    bit IsDeleted
+  }
+
+  StepRecords {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    int StepCount
+    datetime RecordDate
+    decimal_18_4 CarbonOffset
+  }
+
+  SystemSettings {
+    int Id PK
+    int ConfidenceThreshold
+    nvarchar_100 VisionModel
+    bit WeeklyDigest
+    bit MaintenanceMode
+  }
+
+  TravelLogs {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    int TransportMode
+    nvarchar_500 OriginAddress
+    decimal_10_7 OriginLatitude
+    decimal_10_7 OriginLongitude
+    nvarchar_500 DestinationAddress
+    decimal_10_7 DestinationLatitude
+    decimal_10_7 DestinationLongitude
+    int DistanceMeters
+    decimal_10_2 DistanceKilometers
+    int DurationSeconds "nullable"
+    decimal_18_4 CarbonEmission
+    nvarchar_5000 RoutePolyline "nullable"
+    nvarchar_1000 Notes "nullable"
+    int PassengerCount "nullable"
+  }
+
+  UserFollows {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int FollowerId FK
+    int FolloweeId FK
+  }
+
+  UtilityBills {
+    int Id PK
+    datetime CreatedAt
+    datetime UpdatedAt
+    int UserId FK
+    nvarchar_7 YearMonth
+    int BillType
+    datetime BillPeriodStart
+    datetime BillPeriodEnd
+    decimal_18_4 ElectricityUsage "nullable"
+    decimal_18_2 ElectricityCost
+    decimal_18_4 WaterUsage "nullable"
+    decimal_18_2 WaterCost
+    decimal_18_4 GasUsage "nullable"
+    decimal_18_2 GasCost
+    decimal_18_4 ElectricityCarbonEmission
+    decimal_18_4 WaterCarbonEmission
+    decimal_18_4 GasCarbonEmission
+    decimal_18_4 TotalCarbonEmission
+    int InputMethod
+    decimal_18_4 OcrConfidence "nullable"
+    nvarchar_max OcrRawText "nullable"
+    nvarchar_1000 Notes "nullable"
+  }
+

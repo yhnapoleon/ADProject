@@ -1,0 +1,23 @@
+fastapi>=0.115.6,<1.0.0
+starlette>=0.40.0,<1.0.0
+uvicorn>=0.30.6,<1.0.0
+python-multipart==0.0.22
+# Upgrade to a Python 3.13 compatible version (prebuilt pydantic-core wheels)
+pydantic>=2.9.2,<3.0.0
+# 固定 >=12.1.1 以修复 CVE-2026-25990 (Trivy HIGH)
+pillow>=12.1.1,<13
+
+# FIX 1: Pin numpy to avoid 2.0 conflicts
+# For Python 3.13 compatibility, require NumPy 2.x
+numpy>=2.1.0,<3.0.0
+
+# FIX 2: Upgrade transformers to a stable recent version
+transformers==4.53.0
+
+# FIX 3: Upgrade torch to 2.6.0 (CPU version) to fix CVE security error
+# 使用 PyPI 上的 CPU 默认轮子，移除额外索引与 +cpu 后缀
+torch==2.7.0
+# Pin torchvision to a version compatible with torch 2.7.x
+torchvision==0.22.0
+prometheus-fastapi-instrumentator==6.0.0
+azure-monitor-opentelemetry

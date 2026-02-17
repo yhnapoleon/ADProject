@@ -1,0 +1,20 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.ADMobile" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Customize your dark theme here. -->
+        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+
+        <!-- Restore system bar visibility for night mode -->
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <!-- windowLightNavigationBar 仅在 values-night-v27 中设置，因需 API 27 -->
+    </style>
+
+    <style name="Theme.ADMobile" parent="Base.Theme.ADMobile" />
+
+    <style name="Theme.ADMobile.NoActionBar" parent="Theme.ADMobile">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>

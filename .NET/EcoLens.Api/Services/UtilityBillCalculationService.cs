@@ -1,0 +1,104 @@
+using EcoLens.Api.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace EcoLens.Api.Services;
+
+/// <summary>Utility bill carbon emission calculation service.</summary>
+public class UtilityBillCalculationService : IUtilityBillCalculationService
+{
+	private readonly ApplicationDbContext _db;
+	private readonly ILogger<UtilityBillCalculationService> _logger;
+
+	public UtilityBillCalculationService(
+		ApplicationDbContext db,
+		ILogger<UtilityBillCalculationService> logger)
+	{
+		_db = db;
+		_logger = logger;
+	}
+
+	/// <summary>Calculate carbon emission from usage.</summary>
+	public async Task<CarbonEmissionResult> CalculateCarbonEmissionAsync(
+		decimal? electricityUsage,
+		decimal? waterUsage,
+		decimal? gasUsage,
+		CancellationToken ct = default)
+	{
+		try
+		{
+		var electricityFactor = await _db.CarbonReferences
+			.FirstOrDefaultAsync(c => c.LabelName == "Electricity", ct);
+
+		var waterFactor = await _db.CarbonReferences
+			.FirstOrDefaultAsync(c => c.LabelName == "Water", ct);
+
+		var gasFactor = await _db.CarbonReferences
+			.FirstOrDefaultAsync(c => c.LabelName == "Gas", ct);
+
+		if (electricityFactor == null)
+		{
+			_logger.LogError("Electricity carbon factor not found in database");
+			throw new InvalidOperationException("Electricity carbon emission factor not found");
+		}
+
+		if (waterFactor == null)
+		{
+			_logger.LogError("Water carbon factor not found in database");
+			throw new InvalidOperationException("Water carbon emission factor not found");
+		}
+
+		if (gasFactor == null)
+		{
+			_logger.LogError("Gas carbon factor not found in database");
+			throw new InvalidOperationException("Gas carbon emission factor not found");
+		}
+
+			var electricityCarbon = electricityUsage.HasValue && electricityUsage.Value > 0
+				? electricityUsage.Value * electricityFactor.Co2Factor
+				: 0m;
+
+			var waterCarbon = waterUsage.HasValue && waterUsage.Value > 0
+				? waterUsage.Value * waterFactor.Co2Factor
+				: 0m;
+
+			var gasCarbon = gasUsage.HasValue && gasUsage.Value > 0
+				? gasUsage.Value * gasFactor.Co2Factor
+				: 0m;
+
+			var totalCarbon = electricityCarbon + waterCarbon + gasCarbon;
+
+			_logger.LogInformation(
+				"Carbon emission calculated: Electricity={Electricity} kWh -> {ElectricityCarbon} kg CO2, " +
+				"Water={Water} m³ -> {WaterCarbon} kg CO2, " +
+				"Gas={Gas} -> {GasCarbon} kg CO2, " +
+				"Total={Total} kg CO2",
+				electricityUsage, electricityCarbon,
+				waterUsage, waterCarbon,
+				gasUsage, gasCarbon,
+				totalCarbon);
+
+			if (totalCarbon < 0)
+			{
+				_logger.LogWarning("Negative carbon emission calculated: {Total}", totalCarbon);
+			}
+
+			if (totalCarbon > 1000000) // 1000 t CO2, unusually large
+			{
+				_logger.LogWarning("Unusually large carbon emission calculated: {Total} kg CO2", totalCarbon);
+			}
+
+			return new CarbonEmissionResult
+			{
+				ElectricityCarbon = electricityCarbon,
+				WaterCarbon = waterCarbon,
+				GasCarbon = gasCarbon,
+				TotalCarbon = totalCarbon
+			};
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error calculating carbon emission");
+			throw;
+		}
+	}
+}

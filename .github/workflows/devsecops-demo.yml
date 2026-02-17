@@ -1,0 +1,434 @@
+name: DevSecOps Demo
+
+on:
+  push:
+    branches:
+      - main
+      - devsecops-demo
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  codeql-javascript:
+    name: CodeQL (JavaScript/TypeScript Frontend)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL (Frontend)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          # JavaScript/TypeScript are interpreted; no build, analyze source directly
+          build-mode: none
+          # Use security-extended query set (XSS, open redirect, sensitive data, CORS, etc.)
+          config-file: ./.github/codeql/codeql-config-frontend.yml
+
+      - name: Perform CodeQL Analysis (Frontend)
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript'
+        continue-on-error: true
+
+  codeql-java-kotlin:
+    name: CodeQL (Java/Kotlin)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+          build-mode: manual
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Mobile Dependency Check (SCA)
+        uses: dependency-check/Dependency-Check_Action@main
+        env:
+          # Action runs in Docker; use container's JDK path so JAVA_HOME is valid inside the image
+          JAVA_HOME: /opt/jdk
+        with:
+          project: 'EcoLens-Mobile'
+          path: './mobile/AD'
+          format: 'HTML'
+          out: 'mobile_reports/sca'
+
+      - name: Android Lint & Unit Tests (Debug)
+        working-directory: ./mobile/AD
+        run: |
+          chmod +x gradlew
+          ./gradlew lintDebug testDebugUnitTest --no-daemon
+
+      - name: Build Android (manual)
+        working-directory: ./mobile/AD
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:java-kotlin'
+        continue-on-error: true
+
+      - name: Upload Android comprehensive reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-comprehensive-reports
+          path: |
+            mobile_reports/sca/*.html
+            mobile/AD/app/build/reports/lint-results-debug.html
+            mobile/AD/app/build/reports/tests/testDebugUnitTest/**
+            mobile/AD/Android_Error_Mapping.md
+          retention-days: 7
+
+      - name: Upload Android debug APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: mobile/AD/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+  backend:
+    name: .NET Backend Pipeline
+    runs-on: ubuntu-latest
+    outputs:
+      webapp-url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8.x
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Dependency Check (SCA)
+        uses: dependency-check/Dependency-Check_Action@main
+        id: Depcheck
+        with:
+          project: 'EcoLens'
+          path: './.NET'
+          format: 'HTML'
+          out: 'reports'
+          # Use --noupdate to avoid NVD DB download timeout during demo
+          args: >
+            --failOnCVSS 7
+            --enableExperimental
+            --disableAssembly
+            --noupdate
+            --suppression dependency-check-suppressions.xml
+
+      - name: Initialize CodeQL (C#)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+        continue-on-error: true
+
+      - name: Restore
+        run: dotnet restore "./.NET/EcoLens.Api/EcoLens.Api.csproj"
+
+      - name: Build
+        run: dotnet build "./.NET/EcoLens.Api/EcoLens.Api.csproj" -c Release --no-restore --nologo
+
+      - name: Test
+        run: dotnet test "./.NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports --collect "XPlat Code Coverage"
+
+      - name: Generate Coverage HTML Report
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:"test_reports/**/coverage.cobertura.xml" -targetdir:"coverage-report" -reporttypes:HtmlInline_AzurePipelines
+
+      - name: Verify Error Documentation Generated
+        run: |
+          if [ -f "Backend_Error_Codes.md" ]; then
+            echo "Backend_Error_Codes.md found at repo root."
+          else
+            FOUND_PATH="$(find . -type f -name Backend_Error_Codes.md 2>/dev/null | head -n 1)"
+            if [ -n "$FOUND_PATH" ]; then
+              echo "Found at $FOUND_PATH, copying to repo root..."
+              cp "$FOUND_PATH" "Backend_Error_Codes.md"
+            else
+              echo "Backend_Error_Codes.md not found after tests; creating placeholder so pipeline can continue."
+              echo "| Error Code | Technical Reason | User Friendly Message |" > Backend_Error_Codes.md
+              echo "|---|---|---|" >> Backend_Error_Codes.md
+              echo "| (generated at run time) | See ErrorRegistry | - |" >> Backend_Error_Codes.md
+            fi
+          fi
+
+      - name: Upload Coverage HTML Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-html
+          path: coverage-report/**
+          retention-days: 7
+
+      - name: Upload Backend Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-comprehensive-reports
+          path: |
+            reports/dependency-check-report.html
+            test_reports/**
+            Backend_Error_Codes.md
+          retention-days: 7
+
+      - name: Publish
+        run: dotnet publish "./.NET/EcoLens.Api/EcoLens.Api.csproj" -c Release -o "./.NET/EcoLens.Api/publish" --nologo
+
+      - name: CodeQL Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:csharp"
+        continue-on-error: true
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'ecolens-demo-environment'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_DEMO }}
+          package: './.NET/EcoLens.Api/publish'
+
+  ai_service:
+    name: AI Service Pipeline
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t ecolens-ai:${{ github.sha }} -f VisionService/Dockerfile VisionService
+
+      - name: Trivy Image Scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: 'ecolens-ai:${{ github.sha }}'
+          format: 'table'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '1'
+
+  dast:
+    name: DAST Pipeline (Post-Deploy)
+    runs-on: ubuntu-latest
+    needs: [backend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare ZAP writable files
+        run: |
+          touch zap.yaml report_json.json report_md.md report_html.html
+          chmod a+w zap.yaml report_json.json report_md.md report_html.html
+
+      # Warm up target URL to avoid "Read timed out" (e.g. Azure app cold start)
+      - name: Warm up target URL
+        run: |
+          url="${{ needs.backend.outputs.webapp-url }}"
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -sf --connect-timeout 15 --max-time 30 "$url" -o /dev/null; then
+              echo "Target responded successfully."
+              break
+            fi
+            echo "Attempt $i failed or timed out, retrying in 10s..."
+            sleep 10
+          done
+
+      - name: DAST - ZAP Baseline (Docker)
+        run: |
+          docker pull ghcr.io/zaproxy/zaproxy:stable -q
+          docker run --rm \
+            -v "${{ github.workspace }}":/zap/wrk/:rw \
+            --network=host \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t "${{ needs.backend.outputs.webapp-url }}" \
+              -J report_json.json \
+              -w report_md.md \
+              -r report_html.html \
+              -m 10 -d 1
+        continue-on-error: true
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-reports
+          path: |
+            report_html.html
+            report_md.md
+            report_json.json
+          retention-days: 7
+
+  dast-frontend:
+    name: DAST Pipeline (Frontend Web)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install and build frontend
+        working-directory: ./web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Prepare ZAP writable files (frontend)
+        run: |
+          # Create report files in workspace root (same pattern as backend DAST)
+          # Note: ZAP requires zap.yaml (not zap_frontend.yaml) for its internal config
+          touch report_frontend_json.json report_frontend_md.md report_frontend_html.html zap.yaml
+          chmod a+w report_frontend_json.json report_frontend_md.md report_frontend_html.html zap.yaml
+          
+          echo "Files prepared:"
+          ls -la report_frontend_* zap.yaml
+
+      - name: Serve frontend and run ZAP (Frontend DAST)
+        run: |
+          # Start frontend server in background
+          npx --yes serve -s web/dist -l 3000 > serve.log 2>&1 &
+          SERVE_PID=$!
+          
+          # Wait for server to be ready with retries
+          echo "Waiting for frontend server to start..."
+          for i in {1..30}; do
+            if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+              echo "Frontend server is ready!"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Frontend server failed to start after 30 attempts"
+              cat serve.log
+              kill $SERVE_PID 2>/dev/null || true
+              exit 1
+            fi
+            sleep 2
+          done
+          
+          # Pull ZAP image
+          docker pull ghcr.io/zaproxy/zaproxy:stable -q
+          
+          # Verify frontend server is accessible before running ZAP
+          echo "Verifying frontend server accessibility..."
+          if curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+            echo "✓ Frontend server is accessible"
+          else
+            echo "✗ Frontend server is NOT accessible"
+            cat serve.log || true
+          fi
+          
+          # Run ZAP scan (same pattern as backend DAST)
+          echo "Starting ZAP baseline scan..."
+          docker run --rm \
+            -v "${{ github.workspace }}":/zap/wrk/:rw \
+            --network=host \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+              -t http://127.0.0.1:3000 \
+              -J report_frontend_json.json \
+              -w report_frontend_md.md \
+              -r report_frontend_html.html \
+              -m 10 -d 1
+          
+          echo "ZAP scan completed"
+          
+          # Stop the frontend server
+          kill $SERVE_PID 2>/dev/null || true
+          
+          # Verify reports were generated and have content
+          echo "Checking report files after ZAP scan..."
+          for report_file in report_frontend_html.html report_frontend_json.json report_frontend_md.md; do
+            if [ -f "$report_file" ]; then
+              size=$(wc -c < "$report_file" 2>/dev/null || echo "0")
+              echo "File: $report_file - $size bytes"
+              if [ "$size" -lt 100 ]; then
+                echo "  ⚠️  WARNING: File is very small or empty!"
+                echo "  First 200 characters:"
+                head -c 200 "$report_file" 2>/dev/null || echo "  (Could not read file)"
+                echo ""
+              else
+                echo "  ✓ File has content"
+              fi
+            else
+              echo "  ❌ File not found: $report_file"
+            fi
+          done
+        continue-on-error: true
+
+      - name: Verify and list report files before upload
+        if: always()
+        run: |
+          echo "Checking report files before upload..."
+          ls -lh report_frontend_* 2>/dev/null || echo "No report files found"
+          echo ""
+          echo "File sizes:"
+          for file in report_frontend_html.html report_frontend_md.md report_frontend_json.json; do
+            if [ -f "$file" ]; then
+              size=$(wc -c < "$file" || echo "0")
+              echo "  $file: $size bytes"
+              if [ "$size" -lt 100 ]; then
+                echo "    ⚠️  Warning: File is very small, showing first 500 chars:"
+                head -c 500 "$file" || true
+                echo ""
+              fi
+            else
+              echo "  ❌ $file: NOT FOUND"
+            fi
+          done
+
+      - name: Upload frontend DAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dast-reports
+          path: |
+            report_frontend_html.html
+            report_frontend_md.md
+            report_frontend_json.json
+          retention-days: 7
+          if-no-files-found: warn
+

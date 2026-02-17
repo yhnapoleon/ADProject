@@ -1,0 +1,63 @@
+%%{init: {'flowchart': {'nodeSpacing': 70, 'rankSpacing': 90}} }%%
+flowchart LR
+  %% EcoLens Architecture (Container / Component Level)
+  %% Ports (dev defaults): Web :5173, API :5133, Vision :8000
+
+  subgraph Clients["Clients"]
+    Browser["Browser (Web)"]
+    Android["Android App (Kotlin)"]
+  end
+
+  subgraph Frontend["Frontend"]
+    Web["Web UI\nReact + Vite\n:5173"]
+  end
+
+  subgraph Backend["Backend"]
+    Api["EcoLens.Api\n.NET 8 Web API\n:5133\nJWT + Swagger\n/metrics (Prometheus)"]
+  end
+
+  subgraph Data["Data"]
+    Sql["SQL Server (EF Core)\nEcoLensDb"]
+  end
+
+  subgraph AI["AI / Recognition"]
+    Vision["VisionService\nFastAPI\n:8000 (local) / Azure (prod)\n/metrics (Prometheus)"]
+  end
+
+  subgraph Observability["Observability"]
+    Prom["Prometheus\nscrapes /metrics"]
+    AppInsights["Azure Application Insights\nTelemetry"]
+  end
+
+  subgraph External["External Services"]
+    GMaps["Google Maps API\nGeocoding + Routing"]
+    Clim["Climatiq API\nEmission Factors"]
+    OFF["OpenFoodFacts API\nBarcode Products"]
+    GCV["Google Cloud Vision API\nOCR"]
+    LLM["LLM API\n(GeminiService via AiSettings.BaseUrl)"]
+  end
+
+  %% Client -> Frontend/Backend
+  Browser --> Web
+  Web -->|HTTP/JSON| Api
+  Android -->|HTTP/JSON| Api
+
+  %% Backend -> Data
+  Api -->|EF Core / SQL| Sql
+
+  %% Backend -> AI services
+  Api -->|HTTP (IVisionService)| Vision
+
+  %% Backend -> External APIs
+  Api -->|HTTP| GMaps
+  Api -->|HTTP| Clim
+  Api -->|HTTP| OFF
+  Api -->|HTTP| GCV
+  Api -->|HTTP| LLM
+
+  %% Observability
+  Prom -->|scrape| Api
+  Prom -->|scrape| Vision
+  Api -->|telemetry| AppInsights
+  Vision -->|telemetry| AppInsights
+

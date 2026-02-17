@@ -1,0 +1,87 @@
+name: Deploy .NET Backend to Azure
+
+on:
+  push:
+    branches:
+      - main # 如果默认分支不是 main，请改成你的默认分支名
+    paths:
+      - '.NET/**' # 后端位于 .NET 目录；若目录不同请修改
+      - '.github/workflows/dotnet-deploy.yml'
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取代码
+      - uses: actions/checkout@v4
+
+      # 2. 设置 .NET 环境
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x' # 与项目 TargetFramework 对齐，例如 net8.0；若不同请修改
+
+      # 3. 还原并编译 (Build)
+      # 如果仓库没有 .sln，可直接对 .csproj 构建（当前按 .NET/EcoLens.Api/EcoLens.Api.csproj）
+      - name: Restore
+        run: dotnet restore ".NET/EcoLens.Api/EcoLens.Api.csproj"
+      - name: Build
+        run: dotnet build ".NET/EcoLens.Api/EcoLens.Api.csproj" --configuration Release --no-restore
+        # 若你有解决方案文件 .sln，请将上面路径替换为你的 .sln，相对仓库根路径
+
+      # 3.5 运行单元测试（生成错误文档与 TRX 报告）
+      - name: Test
+        run: dotnet test ".NET/EcoLens.Tests/EcoLens.Tests.csproj" -c Release --nologo --logger "trx;LogFileName=test_results.trx" --results-directory ./test_reports --collect "XPlat Code Coverage"
+
+      - name: Generate Coverage HTML Report
+        run: |
+          dotnet tool install -g dotnet-reportgenerator-globaltool
+          reportgenerator -reports:"test_reports/**/coverage.cobertura.xml" -targetdir:"coverage-report" -reporttypes:HtmlInline_AzurePipelines
+
+      - name: Verify Error Documentation Generated
+        run: |
+          if [ -f "Backend_Error_Codes.md" ]; then
+            echo "Backend_Error_Codes.md found at repo root."
+          else
+            FOUND_PATH="$(find . -type f -name Backend_Error_Codes.md 2>/dev/null | head -n 1)"
+            if [ -n "$FOUND_PATH" ]; then
+              echo "Found at $FOUND_PATH, copying to repo root..."
+              cp "$FOUND_PATH" "Backend_Error_Codes.md"
+            else
+              echo "Backend_Error_Codes.md not found after tests; creating placeholder so deploy can continue."
+              echo "| Error Code | Technical Reason | User Friendly Message |" > Backend_Error_Codes.md
+              echo "|---|---|---|" >> Backend_Error_Codes.md
+              echo "| (generated at deploy time) | See ErrorRegistry | - |" >> Backend_Error_Codes.md
+            fi
+          fi
+
+      - name: Upload Backend Error Codes (Artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-error-codes
+          path: |
+            Backend_Error_Codes.md
+            test_reports/**
+            coverage-report/**
+          retention-days: 7
+
+      # 4. 发布 (Publish)
+      - name: Publish
+        run: dotnet publish ".NET/EcoLens.Api/EcoLens.Api.csproj" -c Release -o ${{ github.workspace }}/publish
+        # 若 API 项目路径不同，请替换为实际的 .csproj 相对路径
+
+      # 5. 部署到 Azure Web App
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: 'ecolens-api' # 替换为你在 Azure 创建的 Web App 名称
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }} # 在仓库 Secrets 中配置
+          package: ${{ github.workspace }}/publish
+

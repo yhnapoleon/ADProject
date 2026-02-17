@@ -1,0 +1,45 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+# Visual Studio
+.vs/
+.vscode/
+*.sln.docstates
+
+# 配置文件（包含敏感信息，不提交到 Git）
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+
+# 用户密钥
+secrets.json
+
+# 数据库
+*.db
+*.mdf
+*.ldf
+
+# 日志
+logs/
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+~$*
+node_modules
+
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# 本地 xuwenzhe 分支专用文档（仅本地保留，禁止上传远程）
+docs/sequence-diagrams-PB004-PB005.md
